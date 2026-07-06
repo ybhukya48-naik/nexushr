@@ -1,0 +1,84 @@
+name: NexusHR CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  backend:
+    name: Backend — build, test, coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+          cache: maven
+
+      - name: Build and test (unit + integration)
+        run: mvn -B clean verify
+
+      - name: Upload JaCoCo report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: backend/target/site/jacoco/
+          retention-days: 14
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          REPORT=target/site/jacoco/jacoco.xml
+          if [ -f "$REPORT" ]; then
+            LINES=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('$REPORT')
+          for c in tree.getroot().findall('counter'):
+              if c.get('type') == 'LINE':
+                  cov = int(c.get('covered')); miss = int(c.get('missed'))
+                  pct = round(cov / (cov + miss) * 100, 1)
+                  print(f'Line coverage: {pct}% ({cov}/{cov+miss})')
+            ")
+            echo "$LINES"
+          fi
+
+  frontend:
+    name: Frontend — lint, type-check, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 7

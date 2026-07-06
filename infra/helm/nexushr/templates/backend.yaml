@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexushr-backend
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  selector:
+    matchLabels:
+      app: nexushr-backend
+  template:
+    metadata:
+      labels:
+        app: nexushr-backend
+    spec:
+      containers:
+        - name: backend
+          image: {{ .Values.backend.image }}
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nexushr-backend
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: nexushr-backend
+  ports:
+    - port: 8080
+      targetPort: 8080

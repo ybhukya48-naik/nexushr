@@ -1,0 +1,9 @@
+namespace: nexushr
+
+backend:
+  image: ghcr.io/zidio-dev/nexushr-backend:latest
+  replicas: 3
+
+frontend:
+  image: ghcr.io/zidio-dev/nexushr-frontend:latest
+  replicas: 2

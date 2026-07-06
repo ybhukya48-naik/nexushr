@@ -1,0 +1,171 @@
+{
+  "title": "NexusHR Backend",
+  "uid": "nexushr-backend",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "tags": ["nexushr", "spring-boot"],
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "HTTP Requests / min",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "targets": [{
+        "expr": "round(sum(rate(http_server_requests_seconds_count{job=\"nexushr-backend\"}[1m])) * 60)",
+        "legendFormat": "req/min",
+        "datasource": "Prometheus"
+      }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "fieldConfig": { "defaults": { "unit": "reqpm", "thresholds": {
+        "mode": "absolute",
+        "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 100 }, { "color": "red", "value": 500 }]
+      }}}
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Error Rate (5xx)",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "targets": [{
+        "expr": "round(sum(rate(http_server_requests_seconds_count{job=\"nexushr-backend\",status=~\"5..\"}[5m])) * 60)",
+        "legendFormat": "5xx/min",
+        "datasource": "Prometheus"
+      }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "fieldConfig": { "defaults": { "unit": "reqpm", "thresholds": {
+        "mode": "absolute",
+        "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }]
+      }}}
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "JVM Heap Used",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "targets": [{
+        "expr": "jvm_memory_used_bytes{job=\"nexushr-backend\",area=\"heap\"}",
+        "legendFormat": "heap",
+        "datasource": "Prometheus"
+      }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "fieldConfig": { "defaults": { "unit": "bytes", "thresholds": {
+        "mode": "absolute",
+        "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 536870912 }, { "color": "red", "value": 805306368 }]
+      }}}
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Active DB Connections",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "targets": [{
+        "expr": "hikaricp_connections_active{job=\"nexushr-backend\"}",
+        "legendFormat": "active",
+        "datasource": "Prometheus"
+      }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "fieldConfig": { "defaults": { "thresholds": {
+        "mode": "absolute",
+        "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 8 }, { "color": "red", "value": 15 }]
+      }}}
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "HTTP Request Rate by Endpoint",
+      "gridPos": { "x": 0, "y": 4, "w": 24, "h": 8 },
+      "targets": [{
+        "expr": "sum by (uri, method, status) (rate(http_server_requests_seconds_count{job=\"nexushr-backend\"}[1m]))",
+        "legendFormat": "{{method}} {{uri}} {{status}}",
+        "datasource": "Prometheus"
+      }],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 2 } } }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "HTTP P99 Latency (ms)",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "targets": [{
+        "expr": "histogram_quantile(0.99, sum by (le, uri) (rate(http_server_requests_seconds_bucket{job=\"nexushr-backend\"}[5m]))) * 1000",
+        "legendFormat": "p99 {{uri}}",
+        "datasource": "Prometheus"
+      }],
+      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "lineWidth": 2 } } }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "JVM Memory — Heap vs Non-Heap",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{job=\"nexushr-backend\",area=\"heap\"}",
+          "legendFormat": "Heap used",
+          "datasource": "Prometheus"
+        },
+        {
+          "expr": "jvm_memory_committed_bytes{job=\"nexushr-backend\",area=\"heap\"}",
+          "legendFormat": "Heap committed",
+          "datasource": "Prometheus"
+        },
+        {
+          "expr": "jvm_memory_used_bytes{job=\"nexushr-backend\",area=\"nonheap\"}",
+          "legendFormat": "Non-heap used",
+          "datasource": "Prometheus"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "JVM CPU Usage",
+      "gridPos": { "x": 0, "y": 20, "w": 8, "h": 6 },
+      "targets": [{
+        "expr": "process_cpu_usage{job=\"nexushr-backend\"}",
+        "legendFormat": "CPU",
+        "datasource": "Prometheus"
+      }],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "HikariCP Connection Pool",
+      "gridPos": { "x": 8, "y": 20, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "expr": "hikaricp_connections_active{job=\"nexushr-backend\"}",
+          "legendFormat": "Active",
+          "datasource": "Prometheus"
+        },
+        {
+          "expr": "hikaricp_connections_idle{job=\"nexushr-backend\"}",
+          "legendFormat": "Idle",
+          "datasource": "Prometheus"
+        },
+        {
+          "expr": "hikaricp_connections_pending{job=\"nexushr-backend\"}",
+          "legendFormat": "Pending",
+          "datasource": "Prometheus"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "JVM GC Pause Time",
+      "gridPos": { "x": 16, "y": 20, "w": 8, "h": 6 },
+      "targets": [{
+        "expr": "rate(jvm_gc_pause_seconds_sum{job=\"nexushr-backend\"}[1m]) * 1000",
+        "legendFormat": "{{action}} {{cause}}",
+        "datasource": "Prometheus"
+      }],
+      "fieldConfig": { "defaults": { "unit": "ms" } }
+    }
+  ]
+}
