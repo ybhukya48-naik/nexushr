@@ -1,2 +1,3 @@
-ALTER TABLE employees ADD COLUMN password VARCHAR(255) NOT NULL DEFAULT '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EH';
-ALTER TABLE employees ADD COLUMN mfa_secret VARCHAR(255);
+-- Password and MFA columns are already created in V1__init_schema.sql.
+
+-- This migration is intentionally empty.

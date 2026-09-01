@@ -5,9 +5,6 @@ import com.zidio.nexushr.domain.PerformanceReview;
 import com.zidio.nexushr.repository.PerformanceReviewRepository;
 import com.zidio.nexushr.web.dto.AiInsightResponse;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.chat.prompt.SystemPromptTemplate;
-import org.springframework.ai.chat.prompt.UserPromptTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
