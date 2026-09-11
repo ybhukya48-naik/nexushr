@@ -5,6 +5,8 @@ import com.zidio.nexushr.domain.PerformanceReview;
 import com.zidio.nexushr.security.JwtTokenService;
 import com.zidio.nexushr.security.SecurityConfig;
 import com.zidio.nexushr.service.PerformanceService;
+import com.zidio.nexushr.service.PerformanceGoalService;
+import com.zidio.nexushr.service.PerformanceFeedbackService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -35,10 +37,16 @@ class PerformanceControllerTest {
     private PerformanceService performanceService;
 
     @MockitoBean
+    private PerformanceGoalService performanceGoalService;
+
+    @MockitoBean
+    private PerformanceFeedbackService performanceFeedbackService;
+
+    @MockitoBean
     private JwtTokenService jwtTokenService;
 
     @Test
-    @WithMockUser
+    @WithMockUser(roles = "HR")
     void list_returnsReviews() throws Exception {
         PerformanceReview review = new PerformanceReview();
         review.setId(1L);
@@ -53,7 +61,7 @@ class PerformanceControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithMockUser(roles = "HR")
     void list_returnsEmptyArray_whenNoReviews() throws Exception {
         when(performanceService.findAll()).thenReturn(List.of());
 
@@ -63,7 +71,7 @@ class PerformanceControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithMockUser(roles = "HR")
     void create_returnsCreatedReview() throws Exception {
         PerformanceReview review = new PerformanceReview();
         review.setId(2L);

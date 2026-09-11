@@ -8,7 +8,7 @@ on:
 
 jobs:
   backend:
-    name: Backend — build, test, coverage
+    name: Backend â€” build, test, coverage
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -52,11 +52,11 @@ jobs:
           fi
 
   frontend:
-    name: Frontend — lint, type-check, build
+    name: Frontend â€” lint, type-check, build
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: frontend
+        working-directory: nexushr-frontend
 
     steps:
       - uses: actions/checkout@v4
@@ -65,7 +65,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: nexushr-frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -80,5 +80,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
-          path: frontend/dist/
+          path: nexushr-frontend/dist/
           retention-days: 7

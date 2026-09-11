@@ -38,7 +38,11 @@ services:
       DB_USER: nexushr
       DB_PASSWORD: nexushr
       REDIS_HOST: redis
-      JWT_SECRET: super-secure-and-long-jwt-secret-for-dev-mode-only
+      SPRING_PROFILES_ACTIVE: prod
+      DEMO_USERS_ENABLED: "true"
+      TZ: Asia/Kolkata
+      CORS_ALLOWED_ORIGINS: http://localhost:5175,http://127.0.0.1:5175
+      JWT_SECRET: ${JWT_SECRET:-nexushr-local-dev-secret-key-2026-long-enough-for-hs256}
     ports:
       - "8080:8080"
     depends_on:
@@ -47,7 +51,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health/readiness > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health > /dev/null || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 8
@@ -58,7 +62,7 @@ services:
       context: .
       dockerfile: ./infra/docker/frontend.Dockerfile
     ports:
-      - "5173:80"
+      - "5175:80"
     depends_on:
       backend:
         condition: service_healthy

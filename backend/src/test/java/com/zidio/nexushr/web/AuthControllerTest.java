@@ -1,3 +1,4 @@
+
 package com.zidio.nexushr.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,15 +11,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AuthController.class)
 @Import(SecurityConfig.class)
@@ -52,7 +53,9 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.accessToken")
                         .value("mock-jwt-token"))
                 .andExpect(jsonPath("$.role")
-                        .value("ADMIN"));
+                        .value("ADMIN"))
+                .andExpect(jsonPath("$.username")
+                        .value("admin"));
     }
 
     @Test
@@ -90,13 +93,13 @@ class AuthControllerTest {
     }
 
     @Test
-    void login_withUnknownUsername_returnsEmployeeRole() throws Exception {
+    void login_withEmployeeDemoUsername_returnsEmployeeRole() throws Exception {
 
         when(jwtTokenService.generate(anyString(), anyMap()))
                 .thenReturn("mock-jwt-token");
 
         AuthDtos.LoginRequest request =
-                new AuthDtos.LoginRequest("john", "password");
+                new AuthDtos.LoginRequest("employee", "password");
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -104,6 +107,18 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.role")
                         .value("EMPLOYEE"));
+    }
+
+    @Test
+    void login_withUnknownUsername_returnsUnauthorized() throws Exception {
+
+        AuthDtos.LoginRequest request =
+                new AuthDtos.LoginRequest("john", "password");
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

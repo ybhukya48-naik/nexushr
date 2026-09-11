@@ -8,116 +8,142 @@ on:
         required: true
         default: staging
         type: choice
-        options: [staging, production]
+        options:
+          - staging
+          - production
+
   push:
     tags:
       - "v*"
 
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE:  ghcr.io/${{ github.repository_owner }}/nexushr-backend
+  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/nexushr-backend
   FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/nexushr-frontend
 
 jobs:
   publish-images:
     name: Build & push Docker images
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
       packages: write
 
     outputs:
-      backend_tag:  ${{ steps.meta-backend.outputs.tags }}
-      frontend_tag: ${{ steps.meta-frontend.outputs.tags }}
-      version:      ${{ steps.meta-backend.outputs.version }}
+      backend_tag: ${{ steps.meta.outputs.backend_tag }}
+      frontend_tag: ${{ steps.meta.outputs.frontend_tag }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: docker/setup-buildx-action@v3
+      - name: Set image tag
+        id: meta
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            TAG="sha-${GITHUB_SHA::12}"
+          fi
 
-      - uses: docker/login-action@v3
+          echo "backend_tag=${BACKEND_IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
+          echo "frontend_tag=${FRONTEND_IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
+
+          echo "Using image tag: ${TAG}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── Backend image ───────────────────────────────────────────────────
-      - name: Docker metadata (backend)
-        id: meta-backend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.BACKEND_IMAGE }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=sha-,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
-
       - name: Build and push backend
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
+          context: .
           file: ./infra/docker/backend.Dockerfile
           push: true
-          tags: ${{ steps.meta-backend.outputs.tags }}
-          labels: ${{ steps.meta-backend.outputs.labels }}
-          cache-from: type=gha
-          cache-to:   type=gha,mode=max
-
-      # ── Frontend image ──────────────────────────────────────────────────
-      - name: Docker metadata (frontend)
-        id: meta-frontend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.FRONTEND_IMAGE }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=sha-,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
+          tags: ${{ steps.meta.outputs.backend_tag }}
+          cache-from: type=gha,scope=nexushr-backend
+          cache-to: type=gha,mode=max,scope=nexushr-backend
 
       - name: Build and push frontend
         uses: docker/build-push-action@v6
         with:
-          context: ./frontend
+          context: .
           file: ./infra/docker/frontend.Dockerfile
           push: true
-          tags: ${{ steps.meta-frontend.outputs.tags }}
-          labels: ${{ steps.meta-frontend.outputs.labels }}
-          cache-from: type=gha
-          cache-to:   type=gha,mode=max
+          tags: ${{ steps.meta.outputs.frontend_tag }}
+          cache-from: type=gha,scope=nexushr-frontend
+          cache-to: type=gha,mode=max,scope=nexushr-frontend
 
   deploy:
-    name: Deploy to Kubernetes
+    name: Deploy NexusHR
     needs: publish-images
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'staging' }}
+
+    if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'
+
+    permissions:
+      contents: read
+      packages: read
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: azure/setup-kubectl@v3
-
-      - uses: azure/setup-helm@v4
-
-      - name: Configure kubeconfig
+      - name: Set deployment environment
+        id: environment
+        shell: bash
         run: |
-          mkdir -p ~/.kube
-          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
-          chmod 600 ~/.kube/config
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo "name=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=production" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Helm upgrade / install
-        run: |
-          helm upgrade --install nexushr ./infra/helm/nexushr \
-            --namespace nexushr \
-            --create-namespace \
-            --set backend.image=${{ env.BACKEND_IMAGE }}:${{ needs.publish-images.outputs.version }} \
-            --set frontend.image=${{ env.FRONTEND_IMAGE }}:${{ needs.publish-images.outputs.version }} \
-            --wait \
-            --timeout 5m
+      - name: Install Helm
+        uses: azure/setup-helm@v4
 
-      - name: Verify rollout
+      - name: Validate Helm chart
         run: |
-          kubectl rollout status deployment/nexushr-backend  -n nexushr --timeout=120s
-          kubectl rollout status deployment/nexushr-frontend -n nexushr --timeout=120s
+          helm lint ./infra/helm/nexushr
+
+      - name: Render Helm templates
+        run: |
+          helm template nexushr ./infra/helm/nexushr \
+            --set backend.image="${{ needs.publish-images.outputs.backend_tag }}" \
+            --set frontend.image="${{ needs.publish-images.outputs.frontend_tag }}"
+
+      - name: Deployment information
+        run: |
+          echo "Environment: ${{ steps.environment.outputs.name }}"
+          echo "Backend image: ${{ needs.publish-images.outputs.backend_tag }}"
+          echo "Frontend image: ${{ needs.publish-images.outputs.frontend_tag }}"
+
+      # Kubernetes deployment requires a configured kubeconfig/cluster.
+      # Configure KUBE_CONFIG_DATA as a GitHub Actions secret before enabling
+      # the kubectl/Helm upgrade step for a real cluster.
+      #
+      # - name: Configure kubeconfig
+      #   env:
+      #     KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
+      #   run: |
+      #     mkdir -p "${HOME}/.kube"
+      #     echo "$KUBE_CONFIG_DATA" | base64 --decode > "${HOME}/.kube/config"
+      #
+      # - name: Deploy with Helm
+      #   run: |
+      #     helm upgrade --install nexushr ./infra/helm/nexushr \
+      #       --namespace nexushr \
+      #       --create-namespace \
+      #       --set backend.image="${{ needs.publish-images.outputs.backend_tag }}" \
+      #       --set frontend.image="${{ needs.publish-images.outputs.frontend_tag }}" \
+      #       --wait \
+      #       --timeout 10m

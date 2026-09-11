@@ -28,6 +28,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         String authHeader = request.getHeader("Authorization");
+        System.err.println("JWT_HEADER_CHECK: path=" + request.getRequestURI() + " hasAuthorization=" + (authHeader != null) + " startsBearer=" + (authHeader != null && authHeader.startsWith("Bearer ")));
+        System.err.println("JWT_HEADER_CHECK: path=" + request.getRequestURI() + " hasAuthorization=" + (authHeader != null) + " startsBearer=" + (authHeader != null && authHeader.startsWith("Bearer ")));
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
@@ -47,7 +49,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             );
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authentication);
-        } catch (Exception ignored) {
+
+            System.err.println(
+                "JWT_AUTH_OK: path=" + request.getRequestURI()
+                + " username=" + username
+                + " role=" + role
+                + " authorities=" + authentication.getAuthorities()
+                + " authenticated=" + authentication.isAuthenticated()
+            );
+        } catch (Exception ex) {
+            System.err.println("JWT_AUTH_ERROR: " + ex.getClass().getName() + " - " + ex.getMessage());
             SecurityContextHolder.clearContext();
         }
 

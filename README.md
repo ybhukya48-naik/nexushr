@@ -1,4 +1,4 @@
-# NexusHR — AI-Enabled Enterprise HR & Workforce Intelligence Platform
+# NexusHR â€” AI-Enabled Enterprise HR & Workforce Intelligence Platform
 
 Production-grade Java full-stack HRMS covering the complete employee lifecycle, with AI attrition insights, role-based access control, and a full observability stack.
 
@@ -6,54 +6,54 @@ Production-grade Java full-stack HRMS covering the complete employee lifecycle, 
 
 | Layer | Technology |
 |-------|-----------|
-| Backend | Java 25 · Spring Boot 3.5.9 · Spring Security 6 · JPA + Hibernate 6 · Flyway |
-| Database | PostgreSQL 17 (prod) · H2 (tests) |
+| Backend | Java 25 Â· Spring Boot 3.5.9 Â· Spring Security 6 Â· JPA + Hibernate 6 Â· Flyway |
+| Database | PostgreSQL 17 (prod) Â· H2 (tests) |
 | Cache | Redis 7 |
 | Auth | Stateless JWT (JJWT 0.12) |
-| Frontend | React 19 · TypeScript · Vite · react-router-dom |
+| Frontend | React 19 Â· TypeScript Â· Vite Â· react-router-dom |
 | API Docs | springdoc-openapi (Swagger UI) |
-| CI/CD | GitHub Actions — build/test/push/deploy |
-| Containers | Docker multi-stage · nginx:1.27 |
-| Orchestration | Kubernetes manifests · Helm chart |
-| Observability | Prometheus 3 · Grafana 12 · Spring Boot Actuator |
-| Testing | JUnit 5 · Mockito · TestContainers (PostgreSQL) · JaCoCo |
+| CI/CD | GitHub Actions â€” build/test/push/deploy |
+| Containers | Docker multi-stage Â· nginx:1.27 |
+| Orchestration | Kubernetes manifests Â· Helm chart |
+| Observability | Prometheus 3 Â· Grafana 12 Â· Spring Boot Actuator |
+| Testing | JUnit 5 Â· Mockito Â· TestContainers (PostgreSQL) Â· JaCoCo |
 
 ## Repository Layout
 
 ```
-├── backend/                   Spring Boot API
-│   └── src/test/              65 unit tests + 19 integration tests (TestContainers)
-├── frontend/                  React SPA
-│   └── src/
-│       ├── api/client.ts      Typed API client (all 14 endpoints)
-│       ├── components/        Nav, PageShell
-│       └── pages/             Login, Dashboard, Employees, Leave,
-│                              Attendance, Payroll, Performance, AI Insights
-├── infra/
-│   ├── docker/                backend.Dockerfile · frontend.Dockerfile · nginx.conf
-│   ├── k8s/                   namespace · deployments · services · ingress · HPA
-│   ├── helm/nexushr/          Helm chart
-│   └── monitoring/            prometheus.yml · Grafana datasource + dashboard
-├── .github/workflows/
-│   ├── ci.yml                 build · test (Java 25) · JaCoCo coverage · tsc · Vite build
-│   └── cd.yml                 Docker push (ghcr.io) · Helm deploy · rollout verify
-└── docker-compose.yml         Full local stack: postgres · redis · backend · frontend
-                               · prometheus · grafana
+â”œâ”€â”€ backend/                   Spring Boot API
+â”‚   â””â”€â”€ src/test/              65 unit tests + 19 integration tests (TestContainers)
+â”œâ”€â”€ nexushr-frontend/         React SPA
+â”‚   â””â”€â”€ src/
+â”‚       â”œâ”€â”€ api/client.ts      Typed API client (all 14 endpoints)
+â”‚       â”œâ”€â”€ components/        Nav, PageShell
+â”‚       â””â”€â”€ pages/             Login, Dashboard, Employees, Leave,
+â”‚                              Attendance, Payroll, Performance, AI Insights
+â”œâ”€â”€ infra/
+â”‚   â”œâ”€â”€ docker/                backend.Dockerfile Â· frontend.Dockerfile Â· nginx.conf
+â”‚   â”œâ”€â”€ k8s/                   namespace Â· deployments Â· services Â· ingress Â· HPA
+â”‚   â”œâ”€â”€ helm/nexushr/          Helm chart
+â”‚   â””â”€â”€ monitoring/            prometheus.yml Â· Grafana datasource + dashboard
+â”œâ”€â”€ .github/workflows/
+â”‚   â”œâ”€â”€ ci.yml                 build Â· test (Java 25) Â· JaCoCo coverage Â· tsc Â· Vite build
+â”‚   â””â”€â”€ cd.yml                 Docker push (ghcr.io) Â· Helm deploy Â· rollout verify
+â””â”€â”€ docker-compose.yml         Full local stack: postgres Â· redis Â· backend Â· frontend
+                               Â· prometheus Â· grafana
 ```
 
 ## Quick Start
 
 ### Prerequisites
-- Docker Desktop ≥ 4.x
+- Docker Desktop â‰¥ 4.x
 - (Optional) JDK 25 + Maven 3.9 for local backend dev
 
-### 1 — Start the full stack
+### 1 â€” Start the full stack
 
 ```bash
 docker compose up --build
 ```
 
-Services start in dependency order (postgres → redis → backend → frontend + prometheus → grafana).
+Services start in dependency order (postgres â†’ redis â†’ backend â†’ frontend + prometheus â†’ grafana).
 
 | Service | URL |
 |---------|-----|
@@ -64,7 +64,7 @@ Services start in dependency order (postgres → redis → backend → frontend 
 | Prometheus | http://localhost:9090 |
 | Grafana | http://localhost:3000 (admin / admin) |
 
-### 2 — Demo users
+### 2 â€” Demo users
 
 | Username | Role | Access |
 |----------|------|--------|
@@ -75,7 +75,7 @@ Services start in dependency order (postgres → redis → backend → frontend 
 
 Password: any non-empty value (the bootstrap auth assigns roles by username).
 
-### 3 — Run tests
+### 3 â€” Run tests
 
 ```bash
 # Unit tests only (no Docker needed)
@@ -142,9 +142,9 @@ kubectl create secret generic nexushr-secrets -n nexushr \
 
 ## Security Notes
 
-- All secrets are injected via environment variables / k8s Secrets — never hardcoded
+- All secrets are injected via environment variables / k8s Secrets â€” never hardcoded
 - Pods run as non-root (`runAsUser: 1000`), with `readOnlyRootFilesystem: true` and all Linux capabilities dropped
-- Network policies default-deny all ingress; only frontend→backend (8080) and ingress→frontend (80) are allowed
+- Network policies default-deny all ingress; only frontendâ†’backend (8080) and ingressâ†’frontend (80) are allowed
 - JWT expiry: 120 minutes (configurable via `app.jwt.expiration-minutes`)
 - CSRF disabled (stateless JWT); CORS configured via Spring defaults
 
@@ -156,4 +156,3 @@ kubectl create secret generic nexushr-secrets -n nexushr \
 - Add notification microservice (email / in-app)
 - Add Playwright E2E tests for the frontend
 - Add k6 load tests (target: 10 k concurrent users)
-

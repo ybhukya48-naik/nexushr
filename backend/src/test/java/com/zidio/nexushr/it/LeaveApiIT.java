@@ -13,8 +13,8 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Layer 1 — Integration tests: Leave request lifecycle against real PostgreSQL.
- * Covers create → list → approve/reject flow.
+ * Layer 1 - Integration tests: Leave request lifecycle against real PostgreSQL.
+ * Covers create -> list -> approve/reject flow and overlap validation.
  */
 class LeaveApiIT extends AbstractIntegrationTest {
 
@@ -28,46 +28,61 @@ class LeaveApiIT extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        String token = jwtTokenService.generate("admin", Map.of("role", "ADMIN"));
+        String token = jwtTokenService.generate(
+                "admin",
+                Map.of("role", "ADMIN")
+        );
+
         authHeaders = new HttpHeaders();
         authHeaders.setBearerAuth(token);
         authHeaders.setContentType(MediaType.APPLICATION_JSON);
     }
 
     /**
-     * Creates a leave request for seed employee id=1 (Aarav Sharma).
-     * Returns the created leave request id.
+     * Creates a leave request for seed employee id=1.
      */
-    private int createLeaveRequest() {
-        // Seed data employee ids start at 1; use employee 1 (Aarav Sharma)
+    private int createLeaveRequest(
+            String startDate,
+            String endDate) {
+
         String body = """
                 {
                   "employee": {"id": 1},
-                  "startDate": "2026-08-01",
-                  "endDate": "2026-08-05",
-                  "reason": "Annual leave",
-                  "status": "PENDING"
+                  "startDate": "%s",
+                  "endDate": "%s",
+                  "reason": "Annual leave"
                 }
-                """;
+                """.formatted(startDate, endDate);
+
         ResponseEntity<Map> response = restTemplate.exchange(
                 baseUrl() + "/api/v1/leaves",
                 HttpMethod.POST,
                 new HttpEntity<>(body, authHeaders),
                 Map.class
         );
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        assertThat(response.getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
         return (Integer) response.getBody().get("id");
     }
 
     @Test
     void createLeaveRequest_persists() {
-        int id = createLeaveRequest();
+        int id = createLeaveRequest(
+                "2026-08-01",
+                "2026-08-05"
+        );
+
         assertThat(id).isPositive();
     }
 
     @Test
     void listLeaveRequests_includesCreatedRequest() {
-        createLeaveRequest();
+        createLeaveRequest(
+                "2026-08-10",
+                "2026-08-12"
+        );
 
         ResponseEntity<Object[]> response = restTemplate.exchange(
                 baseUrl() + "/api/v1/leaves",
@@ -75,35 +90,152 @@ class LeaveApiIT extends AbstractIntegrationTest {
                 new HttpEntity<>(authHeaders),
                 Object[].class
         );
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isNotEmpty();
+
+        assertThat(response.getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        assertThat(response.getBody())
+                .isNotEmpty();
     }
 
     @Test
     void approveLeave_changesStatusToApproved() {
-        int id = createLeaveRequest();
+        int id = createLeaveRequest(
+                "2026-08-15",
+                "2026-08-18"
+        );
 
         ResponseEntity<Map> response = restTemplate.exchange(
-                baseUrl() + "/api/v1/leaves/" + id + "/status?status=APPROVED",
+                baseUrl() + "/api/v1/leaves/" + id
+                        + "/status?status=APPROVED",
                 HttpMethod.PATCH,
                 new HttpEntity<>(authHeaders),
                 Map.class
         );
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).containsEntry("status", "APPROVED");
+
+        assertThat(response.getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        assertThat(response.getBody())
+                .containsEntry("status", "APPROVED");
     }
 
     @Test
     void rejectLeave_changesStatusToRejected() {
-        int id = createLeaveRequest();
+        int id = createLeaveRequest(
+                "2026-08-20",
+                "2026-08-23"
+        );
 
         ResponseEntity<Map> response = restTemplate.exchange(
-                baseUrl() + "/api/v1/leaves/" + id + "/status?status=REJECTED",
+                baseUrl() + "/api/v1/leaves/" + id
+                        + "/status?status=REJECTED",
                 HttpMethod.PATCH,
                 new HttpEntity<>(authHeaders),
                 Map.class
         );
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).containsEntry("status", "REJECTED");
+
+        assertThat(response.getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        assertThat(response.getBody())
+                .containsEntry("status", "REJECTED");
+    }
+
+    @Test
+    void overlappingLeave_returnsConflict() {
+        createLeaveRequest(
+                "2026-08-25",
+                "2026-08-30"
+        );
+
+        String overlappingBody = """
+                {
+                  "employee": {"id": 1},
+                  "startDate": "2026-08-28",
+                  "endDate": "2026-09-02",
+                  "reason": "Overlapping leave"
+                }
+                """;
+
+        ResponseEntity<Map> response = restTemplate.exchange(
+                baseUrl() + "/api/v1/leaves",
+                HttpMethod.POST,
+                new HttpEntity<>(overlappingBody, authHeaders),
+                Map.class
+        );
+
+        assertThat(response.getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void approvedLeave_isIncludedInLeaveBalance() {
+        int id = createLeaveRequest(
+                "2026-12-01",
+                "2026-12-03"
+        );
+
+        ResponseEntity<Map> approvalResponse = restTemplate.exchange(
+                baseUrl() + "/api/v1/leaves/" + id
+                        + "/status?status=APPROVED",
+                HttpMethod.PATCH,
+                new HttpEntity<>(authHeaders),
+                Map.class
+        );
+
+        assertThat(approvalResponse.getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<Map> balanceResponse = restTemplate.exchange(
+                baseUrl() + "/api/v1/leaves/balance/1",
+                HttpMethod.GET,
+                new HttpEntity<>(authHeaders),
+                Map.class
+        );
+
+        assertThat(balanceResponse.getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        assertThat(balanceResponse.getBody())
+                .containsEntry("employeeId", 1)
+                .containsEntry("annualEntitlement", 24)
+                .containsEntry("usedDays", 3)
+                .containsEntry("remainingDays", 21);
+    }
+
+    @Test
+    void rejectedLeave_isNotIncludedInLeaveBalance() {
+        int id = createLeaveRequest(
+                "2026-12-10",
+                "2026-12-14"
+        );
+
+        ResponseEntity<Map> rejectionResponse = restTemplate.exchange(
+                baseUrl() + "/api/v1/leaves/" + id
+                        + "/status?status=REJECTED",
+                HttpMethod.PATCH,
+                new HttpEntity<>(authHeaders),
+                Map.class
+        );
+
+        assertThat(rejectionResponse.getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<Map> balanceResponse = restTemplate.exchange(
+                baseUrl() + "/api/v1/leaves/balance/1",
+                HttpMethod.GET,
+                new HttpEntity<>(authHeaders),
+                Map.class
+        );
+
+        assertThat(balanceResponse.getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        assertThat(balanceResponse.getBody())
+                .containsEntry("employeeId", 1)
+                .containsEntry("annualEntitlement", 24)
+                .containsEntry("usedDays", 0)
+                .containsEntry("remainingDays", 24);
     }
 }

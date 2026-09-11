@@ -1,12 +1,21 @@
 FROM node:22-alpine AS build
+
 WORKDIR /app
-COPY frontend/package*.json ./
+
+COPY nexushr-frontend/package*.json ./
 RUN npm ci
-COPY frontend/ .
+
+COPY nexushr-frontend/ ./
+
+ENV VITE_API_BASE_URL=/api/v1
+
 RUN npm run build
 
-FROM nginx:1.27-alpine
+FROM nginx:alpine
+
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY infra/docker/nginx.conf /etc/nginx/conf.d/default.conf
-RUN rm -f /etc/nginx/conf.d/default.conf.bak
+
 EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

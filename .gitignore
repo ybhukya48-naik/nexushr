@@ -1,38 +1,125 @@
-# Java
+# ============================================================
+# NexusHR - Root Git Ignore
+# ============================================================
+
+# ----------------------------
+# Java / Maven
+# ----------------------------
 target/
+**/target/
 *.class
 *.jar
 *.war
 *.ear
 
-# Maven
 .mvn/
 mvnw
 mvnw.cmd
 
-# Node
+# ----------------------------
+# Node / Frontend
+# ----------------------------
 node_modules/
+**/node_modules/
 dist/
+**/dist/
 .next/
+coverage/
+**/coverage/
 
+# TypeScript generated build information
+*.tsbuildinfo
+
+# ----------------------------
 # IDE
+# ----------------------------
 .idea/
-*.iml
+**/.idea/
 .vscode/
+**/.vscode/
+*.iml
 *.swp
 *.swo
 
+# ----------------------------
 # OS
+# ----------------------------
 .DS_Store
 Thumbs.db
 
-# Environment
+# ----------------------------
+# Environment / secrets
+# ----------------------------
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
 
+# ----------------------------
 # Logs
+# ----------------------------
 *.log
+**/*.log
 
-# Test
-coverage/
+# ----------------------------
+# Backup / temporary files
+# ----------------------------
+*.bak
+*.backup
+*.backup-*
+*.stage2-backup
+*.stage2-secure-backup
+*.cors-backup
+*.security-backup
+*.ai-backup
+*.ui-backup
+*.before-*.bak
+*.before-*.tsx
+*.before-*.java
+*.before-*.ps1.bak
+
+# Backup directories
+backup-*/
+backup-archive/
+**/backup-*/
+**/backup-archive/
+frontend-backup-*/
+ui-backup-*/
+**/frontend-backup-*/
+**/ui-backup-*/
+
+# ----------------------------
+# Generated reports / test artifacts
+# ----------------------------
+*-dashboard.pdf
+*-dashboard.xlsx
+login-test.json
+login-register-test.json
+register-test.json
+**/login-test.json
+**/login-register-test.json
+**/register-test.json
+
+# Temporary crypto/test helper artifacts
+crypto-classpath.txt
+PasswordHashGenerator.java
+PasswordHashGenerator.class
+
+# ----------------------------
+# Local Docker / temporary files
+# ----------------------------
+*.local
+*.tmp
+*.temp
+
+# Frontend backup files with date suffixes
+**/*.tsx.bak-*
+**/*.ts.bak-*
+**/*.css.bak-*
+**/*.json.bak-*
+
+# Old duplicate project at repository root
+/src/
+/pom.xml
