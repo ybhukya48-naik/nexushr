@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import {
   createPayroll,
   getEmployees,
@@ -6,6 +6,8 @@ import {
   getEmployeePayroll,
   getPayrollRecords,
   getPayslip,
+  downloadPayslipPdf,
+  emailPayslip,
   markPayrollPaid,
   type EmployeeResponse,
   type PayrollRecord,
@@ -46,6 +48,7 @@ export default function Payroll() {
 
   const [payslip, setPayslip] = useState<PayslipResponse | null>(null);
   const [payslipLoading, setPayslipLoading] = useState(false);
+  const [emailingPayslip, setEmailingPayslip] = useState(false);
 
   const payrollEmployees = useMemo(
     () => employees.filter((employee) => employee.active === true),
@@ -192,6 +195,60 @@ export default function Payroll() {
       setPayslipLoading(false);
     }
   }
+
+  async function handleDownloadPdf() {
+    if (!payslip) {
+      return;
+    }
+
+    setError("");
+
+    try {
+      const pdf = await downloadPayslipPdf(payslip.payrollId);
+
+      const url = window.URL.createObjectURL(pdf);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download =
+        `CYOND-Payslip-${payslip.employeeCode}-${payslip.payMonth}.pdf`;
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to download payslip PDF.",
+      );
+    }
+  }
+  async function handleEmailPayslip() {
+    if (!payslip) {
+      return;
+    }
+
+    setEmailingPayslip(true);
+    setError("");
+
+    try {
+      const result = await emailPayslip(payslip.payrollId);
+
+      setMessage(result);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to email payslip.",
+      );
+    } finally {
+      setEmailingPayslip(false);
+    }
+  }
+
 
   return (
     <section className="employees-page">
@@ -497,13 +554,32 @@ export default function Payroll() {
               </p>
             </div>
 
-            <button
-              type="button"
-              className="table-action"
-              onClick={() => setPayslip(null)}
-            >
-              Close
-            </button>
+            <div>
+              <button
+                type="button"
+                className="primary-action"
+                onClick={() => void handleDownloadPdf()}
+              >
+                Download PDF
+              </button>
+
+              <button
+                type="button"
+                className="table-action"
+                onClick={() => void handleEmailPayslip()}
+                disabled={emailingPayslip}
+              >
+                {emailingPayslip ? "Emailing..." : "Email Payslip"}
+              </button>
+
+              <button
+                type="button"
+                className="table-action"
+                onClick={() => setPayslip(null)}
+              >
+                Close
+              </button>
+            </div>
           </div>
 
           <div className="employee-summary-grid">
@@ -567,3 +643,14 @@ export default function Payroll() {
     </section>
   );
 }
+
+
+
+
+
+
+
+
+
+
+

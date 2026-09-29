@@ -8,8 +8,6 @@ WORKDIR /build
 
 COPY pom.xml .
 
-RUN mvn -B -Dmaven.wagon.http.retryHandler.count=5 dependency:go-offline
-
 COPY src ./src
 
 RUN mvn -B -DskipTests package
@@ -34,5 +32,7 @@ USER 10001
 EXPOSE 8080
 
 ENV SPRING_PROFILES_ACTIVE=prod
+ENV TZ=Asia/Kolkata
+ENV JAVA_TOOL_OPTIONS=-Duser.timezone=Asia/Kolkata
 
 ENTRYPOINT ["java", "-jar", "app.jar"]

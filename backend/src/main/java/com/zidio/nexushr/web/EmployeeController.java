@@ -53,6 +53,7 @@ public class EmployeeController {
                 employeeService.findById(employeeId)
         );
     }
+
     @GetMapping("/{id}")
     public EmployeeResponse getById(@PathVariable Long id) {
         return EmployeeResponse.from(
@@ -73,7 +74,10 @@ public class EmployeeController {
     @PutMapping("/{id}")
     public EmployeeResponse update(
             @PathVariable Long id,
-            @RequestBody EmployeeRequest request) {
+            @RequestBody EmployeeRequest request,
+            Authentication authentication) {
+
+        requireHr(authentication);
 
         Employee updated = employeeService.update(id, request);
 
@@ -82,7 +86,25 @@ public class EmployeeController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Long id) {
+    public void delete(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        requireHr(authentication);
+
         employeeService.delete(id);
+    }
+
+    private void requireHr(Authentication authentication) {
+        if (authentication == null
+                || authentication.getAuthorities().stream()
+                .noneMatch(authority ->
+                        "ROLE_HR".equals(authority.getAuthority()))) {
+
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Only HR users can edit or delete employees"
+            );
+        }
     }
 }

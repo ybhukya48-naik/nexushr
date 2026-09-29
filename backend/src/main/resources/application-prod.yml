@@ -15,6 +15,13 @@ app:
   auth:
     demo-users-enabled: ${DEMO_USERS_ENABLED:false}
 
+aws:
+  region: ${AWS_REGION}
+  s3-bucket: ${AWS_S3_BUCKET}
+  endpoint-url-s3: ${AWS_ENDPOINT_URL_S3}
+  access-key-id: ${AWS_ACCESS_KEY_ID}
+  secret-access-key: ${AWS_SECRET_ACCESS_KEY}
+
 logging:
   level:
     org.springframework.security: ${SECURITY_LOG_LEVEL:INFO}

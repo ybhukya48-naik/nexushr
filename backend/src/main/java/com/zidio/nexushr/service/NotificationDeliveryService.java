@@ -3,8 +3,7 @@ package com.zidio.nexushr.service;
 import com.zidio.nexushr.domain.Notification;
 import com.zidio.nexushr.domain.NotificationChannel;
 import com.zidio.nexushr.domain.NotificationDeliveryStatus;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
+import com.zidio.nexushr.service.email.ResendEmailService;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -12,67 +11,114 @@ import java.time.LocalDateTime;
 @Service
 public class NotificationDeliveryService {
 
-    private final JavaMailSender mailSender;
+    private final ResendEmailService emailService;
 
     public NotificationDeliveryService(
-            @org.springframework.beans.factory.annotation.Autowired(required = false)
-            JavaMailSender mailSender) {
-        this.mailSender = mailSender;
+            ResendEmailService emailService) {
+        this.emailService = emailService;
     }
 
     public Notification deliver(Notification notification) {
-        notification.setDeliveryStatus(NotificationDeliveryStatus.PENDING);
+
+        notification.setDeliveryStatus(
+                NotificationDeliveryStatus.PENDING
+        );
 
         try {
-            NotificationChannel channel = notification.getChannel();
+
+            NotificationChannel channel =
+                    notification.getChannel();
+
+            System.out.println(
+                    "NOTIFICATION_DELIVERY_START: channel="
+                            + channel
+                            + " employeeId="
+                            + notification.getEmployeeId()
+            );
 
             if (channel == NotificationChannel.EMAIL ||
                 channel == NotificationChannel.BOTH) {
+
                 sendEmail(notification);
             }
 
             if (channel == NotificationChannel.SMS ||
                 channel == NotificationChannel.BOTH) {
+
                 sendSms(notification);
             }
 
-            notification.setDeliveryStatus(NotificationDeliveryStatus.SENT);
-            notification.setSentAt(LocalDateTime.now());
+            notification.setDeliveryStatus(
+                    NotificationDeliveryStatus.SENT
+            );
+
+            notification.setSentAt(
+                    LocalDateTime.now()
+            );
+
             notification.setFailureReason(null);
 
+            System.out.println(
+                    "NOTIFICATION_DELIVERY_SUCCESS: channel="
+                            + channel
+                            + " employeeId="
+                            + notification.getEmployeeId()
+            );
+
         } catch (Exception ex) {
-            notification.setDeliveryStatus(NotificationDeliveryStatus.FAILED);
-            notification.setFailureReason(ex.getMessage());
+
+            notification.setDeliveryStatus(
+                    NotificationDeliveryStatus.FAILED
+            );
+
+            notification.setFailureReason(
+                    ex.getMessage()
+            );
+
+            System.err.println(
+                    "NOTIFICATION_DELIVERY_FAILED: "
+                            + ex.getClass().getSimpleName()
+                            + ": "
+                            + ex.getMessage()
+            );
+
         }
 
         return notification;
     }
 
     private void sendEmail(Notification notification) {
+
         if (notification.getRecipientEmail() == null ||
             notification.getRecipientEmail().isBlank()) {
+
             throw new IllegalArgumentException(
                     "Recipient email is required for EMAIL/BOTH notification"
             );
         }
 
-        if (mailSender == null) {
-            throw new IllegalStateException(
-                    "Email service is not configured"
-            );
-        }
+        System.out.println(
+                "NOTIFICATION_EMAIL_SEND: recipient="
+                        + maskEmail(notification.getRecipientEmail())
+        );
 
-        SimpleMailMessage mail = new SimpleMailMessage();
-        mail.setTo(notification.getRecipientEmail());
-        mail.setSubject(notification.getTitle());
-        mail.setText(notification.getMessage());
+        String resendId = emailService.sendTextEmail(
+                notification.getRecipientEmail(),
+                notification.getTitle(),
+                notification.getMessage()
+        );
 
-        mailSender.send(mail);
+        System.out.println(
+                "NOTIFICATION_EMAIL_RESEND_SUCCESS: resendId="
+                        + resendId
+        );
     }
 
     private void sendSms(Notification notification) {
+
         if (notification.getRecipientPhone() == null ||
             notification.getRecipientPhone().isBlank()) {
+
             throw new IllegalArgumentException(
                     "Recipient phone is required for SMS/BOTH notification"
             );
@@ -80,9 +126,26 @@ public class NotificationDeliveryService {
 
         /*
          * SMS provider integration point.
-         *
-         * For submission/demo purposes we simulate successful SMS delivery.
-         * A real provider such as Twilio/MSG91 can be connected later.
+         * For now, simulate success.
          */
+        System.out.println(
+                "NOTIFICATION_SMS_SIMULATED: employeeId="
+                        + notification.getEmployeeId()
+        );
+    }
+
+    private String maskEmail(String email) {
+
+        String trimmed = email.trim();
+
+        int at = trimmed.indexOf('@');
+
+        if (at <= 1) {
+            return "***";
+        }
+
+        return trimmed.charAt(0)
+                + "***"
+                + trimmed.substring(at - 1);
     }
 }

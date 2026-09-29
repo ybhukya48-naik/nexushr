@@ -79,6 +79,11 @@ public class NotificationService {
             String recipientPhone,
             LocalDateTime scheduledAt) {
 
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Employee not found: " + employeeId));
+
         Notification notification = new Notification();
 
         notification.setEmployeeId(employeeId);
@@ -95,8 +100,44 @@ public class NotificationService {
                         ? channel
                         : NotificationChannel.IN_APP);
 
-        notification.setRecipientEmail(recipientEmail);
-        notification.setRecipientPhone(recipientPhone);
+        /*
+         * Employee contact details are resolved from the database.
+         * The frontend is not the source of truth for email or phone.
+         */
+        if (notification.getChannel() == NotificationChannel.EMAIL ||
+                notification.getChannel() == NotificationChannel.BOTH) {
+
+            if (employee.getEmail() == null ||
+                    employee.getEmail().isBlank()) {
+
+                throw new IllegalArgumentException(
+                        "Employee email is not available");
+            }
+
+            notification.setRecipientEmail(
+                    employee.getEmail());
+
+        } else {
+            notification.setRecipientEmail(null);
+        }
+
+        if (notification.getChannel() == NotificationChannel.SMS ||
+                notification.getChannel() == NotificationChannel.BOTH) {
+
+            if (employee.getPhone() == null ||
+                    employee.getPhone().isBlank()) {
+
+                throw new IllegalArgumentException(
+                        "Employee phone is not available");
+            }
+
+            notification.setRecipientPhone(
+                    employee.getPhone());
+
+        } else {
+            notification.setRecipientPhone(null);
+        }
+
         notification.setScheduledAt(scheduledAt);
 
         /*

@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { FormEvent } from "react";
 import {
   createEmployee,
   getEmployees,
+  updateEmployee,
+  deleteEmployee,
   type EmployeeRequest,
   type EmployeeResponse,
   type EmployeeLifecycleStatus,
@@ -105,6 +107,14 @@ export default function Employees() {
   const [role] = useState(getStoredRole);
 
   const managementAccess = canManageEmployees(role);
+  const canEditDeleteEmployees = role === "HR";
+
+  const [editingEmployeeId, setEditingEmployeeId] =
+    useState<number | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] =
+    useState(false);
+  const [employeeToDelete, setEmployeeToDelete] =
+    useState<EmployeeResponse | null>(null);
 
   async function loadEmployees() {
     if (!managementAccess) {
@@ -237,6 +247,67 @@ export default function Employees() {
     }));
   }
 
+  function handleEditEmployee(employee: EmployeeResponse) {
+    if (!canEditDeleteEmployees) {
+      return;
+    }
+
+    setSaveError("");
+    setEditingEmployeeId(employee.id);
+
+    setForm({
+      employeeCode: employee.employeeCode,
+      fullName: employee.fullName,
+      email: employee.email,
+      phone: employee.phone ?? "",
+      accountNumber: employee.accountNumber ?? "",
+      password: "",
+      roleType: employee.roleType,
+      department: employee.department,
+      designation: employee.designation,
+      joiningDate: employee.joiningDate,
+      baseSalary: employee.baseSalary,
+      active: employee.active,
+    });
+
+    setShowCreateForm(true);
+  }
+
+  function handleDeleteEmployee(employee: EmployeeResponse) {
+    if (!canEditDeleteEmployees) {
+      return;
+    }
+
+    setEmployeeToDelete(employee);
+    setShowDeleteConfirm(true);
+  }
+
+  async function confirmDeleteEmployee() {
+    if (!canEditDeleteEmployees || !employeeToDelete) {
+      return;
+    }
+
+    setSaving(true);
+    setSaveError("");
+
+    try {
+      await deleteEmployee(employeeToDelete.id);
+
+      setShowDeleteConfirm(false);
+      setEmployeeToDelete(null);
+
+      await loadEmployees();
+    } catch (err) {
+      setSaveError(
+        err instanceof Error
+          ? err.message
+          : "Unable to delete employee.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleCreateEmployee(event: FormEvent) {
     event.preventDefault();
 
@@ -247,27 +318,36 @@ export default function Employees() {
     setSaving(true);
     setSaveError("");
 
+    const employeeData: EmployeeRequest = {
+      ...form,
+      employeeCode: form.employeeCode.trim(),
+      fullName: form.fullName.trim(),
+      email: form.email.trim().toLowerCase(),
+      phone: form.phone?.trim() || "",
+      accountNumber: form.accountNumber?.trim() || "",
+      department: form.department.trim(),
+      designation: form.designation.trim(),
+    };
+
     try {
-      await createEmployee({
-        ...form,
-        employeeCode: form.employeeCode.trim(),
-        fullName: form.fullName.trim(),
-        email: form.email.trim().toLowerCase(),
-        phone: form.phone?.trim() || "",
-        accountNumber: form.accountNumber?.trim() || "",
-        department: form.department.trim(),
-        designation: form.designation.trim(),
-      });
+      if (editingEmployeeId !== null) {
+        await updateEmployee(editingEmployeeId, employeeData);
+      } else {
+        await createEmployee(employeeData);
+      }
 
       setForm({ ...emptyForm });
       setShowCreateForm(false);
+      setEditingEmployeeId(null);
 
       await loadEmployees();
     } catch (err) {
       setSaveError(
         err instanceof Error
           ? err.message
-          : "Unable to create employee.",
+          : editingEmployeeId !== null
+            ? "Unable to update employee."
+            : "Unable to create employee.",
       );
     } finally {
       setSaving(false);
@@ -279,7 +359,7 @@ export default function Employees() {
       <section className="employees-page">
         <div className="employees-header">
           <div>
-            <p className="page-eyebrow">F01 · Employee Lifecycle</p>
+            <p className="page-eyebrow">F01 Â· Employee Lifecycle</p>
             <h1>Employees</h1>
             <p>Employee directory access is restricted to authorized HR users.</p>
           </div>
@@ -309,7 +389,7 @@ export default function Employees() {
     <section className="employees-page">
       <div className="employees-header">
         <div>
-          <p className="page-eyebrow">F01 · Employee Lifecycle</p>
+          <p className="page-eyebrow">F01 Â· Employee Lifecycle</p>
           <h1>Employees</h1>
           <p>Manage your workforce and employee lifecycle.</p>
         </div>
@@ -361,8 +441,16 @@ export default function Employees() {
         >
           <div className="employees-header">
             <div>
-              <p className="page-eyebrow">F01 · Create Employee</p>
-              <h2>Add Employee</h2>
+              <p className="page-eyebrow">
+                {editingEmployeeId !== null
+                  ? "F01 Â· Edit Employee"
+                  : "F01 Â· Create Employee"}
+              </p>
+              <h2>
+                {editingEmployeeId !== null
+                  ? "Edit Employee"
+                  : "Add Employee"}
+              </h2>
             </div>
 
             <button
@@ -558,7 +646,13 @@ export default function Employees() {
             className="primary-action"
             disabled={saving}
           >
-            {saving ? "Creating..." : "Create Employee"}
+            {saving
+              ? editingEmployeeId !== null
+                ? "Updating..."
+                : "Creating..."
+              : editingEmployeeId !== null
+                ? "Update Employee"
+                : "Create Employee"}
           </button>
         </form>
       )}
@@ -679,16 +773,40 @@ export default function Employees() {
                         </span>
                       </td>
                       <td>
-                        ₹{employee.baseSalary.toLocaleString("en-IN")}
+                        {`\u20B9`}{employee.baseSalary.toLocaleString("en-IN")}
                       </td>
                       <td>
-                        <button
-                          type="button"
-                          className="table-action"
-                          onClick={() => navigate(`/employees/${employee.id}`)}
-                        >
-                          View
-                        </button>
+                        <div className="employee-actions">
+                          <button
+                            type="button"
+                            className="table-action"
+                            onClick={() => navigate(`/employees/${employee.id}`)}
+                          >
+                            View
+                          </button>
+
+                          {canEditDeleteEmployees && (
+                            <>
+                              <button
+                                type="button"
+                                className="table-action"
+                                onClick={() => handleEditEmployee(employee)}
+                                disabled={saving}
+                              >
+                                Edit
+                              </button>
+
+                              <button
+                                type="button"
+                                className="table-action"
+                                onClick={() => handleDeleteEmployee(employee)}
+                                disabled={saving}
+                              >
+                                Delete
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -716,6 +834,69 @@ export default function Employees() {
           </>
         )}
       </div>
+
+      {showDeleteConfirm && employeeToDelete && (
+        <div className="employees-panel">
+          <div className="employees-header">
+            <div>
+              <p className="page-eyebrow">Employee Lifecycle</p>
+              <h2>Delete Employee</h2>
+              <p>
+                Are you sure you want to delete{" "}
+                <strong>{employeeToDelete.fullName}</strong>?
+              </p>
+            </div>
+          </div>
+
+          <div className="employee-empty-state">
+            <span>
+              This action will remove the employee from the organization-wide
+              employee directory.
+            </span>
+
+            {saveError && (
+              <span role="alert">
+                {saveError}
+              </span>
+            )}
+
+            <div className="employee-actions">
+              <button
+                type="button"
+                className="table-action"
+                onClick={() => {
+                  if (!saving) {
+                    setShowDeleteConfirm(false);
+                    setEmployeeToDelete(null);
+                    setSaveError("");
+                  }
+                }}
+                disabled={saving}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="table-action"
+                onClick={() => void confirmDeleteEmployee()}
+                disabled={saving}
+              >
+                {saving ? "Deleting..." : "Confirm Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
+
+
+
+
+
+
+
+
+

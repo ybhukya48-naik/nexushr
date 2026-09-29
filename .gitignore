@@ -123,3 +123,14 @@ PasswordHashGenerator.class
 # Old duplicate project at repository root
 /src/
 /pom.xml
+
+# Local login/test data
+login.json
+login-test.json
+
+# Local backup files created during development
+*.before-*
+*.ai-backup
+
+# Development-only S3 test endpoint
+backend/src/main/java/com/zidio/nexushr/web/S3TestController.java

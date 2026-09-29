@@ -5,14 +5,10 @@ target/
 .env
 .env.*
 !.env.example
-
 application-local.yml
 application-local.properties
-
 *.bak
-
 .idea/
 .vscode/
 *.iml
-
 .DS_Store

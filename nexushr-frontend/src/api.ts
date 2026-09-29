@@ -1,4 +1,4 @@
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8080/api/v1`;
+﻿export const API_BASE = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8080/api/v1`;
 
 export interface LoginResponse {
   accessToken: string;
@@ -598,6 +598,38 @@ export function getPayslip(id: number) {
   );
 }
 
+export async function downloadPayslipPdf(id: number): Promise<Blob> {
+  const token = localStorage.getItem("nexushr_token");
+
+  const headers = new Headers();
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(
+    `${API_BASE}/payroll/${id}/payslip/pdf`,
+    {
+      method: "GET",
+      headers,
+    },
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem("nexushr_token");
+      localStorage.removeItem("nexushr_user");
+      localStorage.removeItem("nexushr_role");
+    }
+
+    throw new Error(
+      `Unable to download payslip PDF: ${response.status}`,
+    );
+  }
+
+  return response.blob();
+}
+
 export interface AiAttritionResponse {
   employeeId: number;
   attritionRisk: number;
@@ -690,4 +722,39 @@ export function getAiWorkforceDashboard() {
   return request<AiWorkforceDashboardResponse>(
     "/ai/workforce-dashboard",
   );
+}
+
+
+export async function emailPayslip(id: number): Promise<string> {
+  const token = localStorage.getItem("nexushr_token");
+
+  const headers = new Headers();
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(
+    `${API_BASE}/payroll/${id}/payslip/email`,
+    {
+      method: "POST",
+      headers,
+    },
+  );
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem("nexushr_token");
+      localStorage.removeItem("nexushr_user");
+      localStorage.removeItem("nexushr_role");
+    }
+
+    const errorText = await response.text();
+
+    throw new Error(
+      errorText || `Unable to email payslip: ${response.status}`,
+    );
+  }
+
+  return response.text();
 }

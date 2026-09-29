@@ -1,4 +1,4 @@
-import { API_BASE } from "../api";
+﻿import { API_BASE } from "../api";
 import { useEffect, useState } from "react";
 import {
   getCurrentEmployee,
@@ -26,6 +26,10 @@ export interface AttendanceMetrics {
   overtime: number;
   workMinutes: number;
   overtimeMinutes: number;
+}
+
+function normalizeAttendanceDate(value?: string) {
+  return String(value ?? "").trim().slice(0, 10);
 }
 
 async function attendanceRequest<T>(
@@ -296,7 +300,7 @@ export default function Attendance() {
     actionEmployee && date === today
       ? records.find(
           (record) =>
-            record.attendanceDate === today &&
+            normalizeAttendanceDate(record.attendanceDate) === normalizeAttendanceDate(today) &&
             String(record.employee.id) === String(actionEmployee.id),
         )
       : undefined;
@@ -368,8 +372,13 @@ export default function Attendance() {
 
         const employeeRecords = await getEmployeeAttendance(me.id);
 
+        console.log("[Attendance DEBUG] employee:", me.id, me.employeeCode);
+        console.log("[Attendance DEBUG] today:", today);
+        console.log("[Attendance DEBUG] selected date:", date);
+        console.log("[Attendance DEBUG] employee records:", employeeRecords);
+
         const recordsForDate = employeeRecords.filter(
-          (record) => record.attendanceDate === date,
+          (record) => normalizeAttendanceDate(record.attendanceDate) === normalizeAttendanceDate(date),
         );
 
         setEmployees([me]);
@@ -489,7 +498,7 @@ export default function Attendance() {
       (record) =>
         Boolean(record.checkInTime) &&
         !record.checkOutTime &&
-        record.attendanceDate === today,
+        normalizeAttendanceDate(record.attendanceDate) === normalizeAttendanceDate(today),
     );
 
     if (!hasOpenAttendance) {
@@ -923,3 +932,7 @@ export default function Attendance() {
     </>
   );
 }
+
+
+
+

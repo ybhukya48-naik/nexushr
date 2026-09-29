@@ -3,13 +3,12 @@ package com.zidio.nexushr.service;
 import com.zidio.nexushr.domain.Notification;
 import com.zidio.nexushr.domain.NotificationChannel;
 import com.zidio.nexushr.domain.NotificationDeliveryStatus;
+import com.zidio.nexushr.service.email.ResendEmailService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -18,14 +17,20 @@ import static org.mockito.Mockito.*;
 class NotificationDeliveryServiceTest {
 
     @Mock
-    private JavaMailSender mailSender;
+    private ResendEmailService emailService;
 
     private NotificationDeliveryService service() {
-        return new NotificationDeliveryService(mailSender);
+        return new NotificationDeliveryService(emailService);
     }
 
     @Test
     void emailNotificationShouldBeSent() {
+
+        when(emailService.sendTextEmail(
+                anyString(),
+                anyString(),
+                anyString()
+        )).thenReturn("resend-email-id");
 
         Notification notification = new Notification();
         notification.setChannel(NotificationChannel.EMAIL);
@@ -42,21 +47,32 @@ class NotificationDeliveryServiceTest {
         assertNotNull(result.getSentAt());
         assertNull(result.getFailureReason());
 
-        ArgumentCaptor<SimpleMailMessage> captor =
-                ArgumentCaptor.forClass(SimpleMailMessage.class);
+        ArgumentCaptor<String> toCaptor =
+                ArgumentCaptor.forClass(String.class);
 
-        verify(mailSender).send(captor.capture());
+        ArgumentCaptor<String> subjectCaptor =
+                ArgumentCaptor.forClass(String.class);
 
-        SimpleMailMessage mail = captor.getValue();
+        ArgumentCaptor<String> messageCaptor =
+                ArgumentCaptor.forClass(String.class);
 
-        assertArrayEquals(
-                new String[]{"employee@example.com"},
-                mail.getTo());
+        verify(emailService).sendTextEmail(
+                toCaptor.capture(),
+                subjectCaptor.capture(),
+                messageCaptor.capture()
+        );
 
-        assertEquals("Approval", mail.getSubject());
+        assertEquals(
+                "employee@example.com",
+                toCaptor.getValue());
+
+        assertEquals(
+                "Approval",
+                subjectCaptor.getValue());
+
         assertEquals(
                 "Your leave was approved.",
-                mail.getText());
+                messageCaptor.getValue());
     }
 
     @Test
@@ -77,11 +93,17 @@ class NotificationDeliveryServiceTest {
         assertNotNull(result.getSentAt());
         assertNull(result.getFailureReason());
 
-        verifyNoInteractions(mailSender);
+        verifyNoInteractions(emailService);
     }
 
     @Test
     void bothNotificationShouldSendEmailAndSms() {
+
+        when(emailService.sendTextEmail(
+                anyString(),
+                anyString(),
+                anyString()
+        )).thenReturn("resend-email-id");
 
         Notification notification = new Notification();
         notification.setChannel(NotificationChannel.BOTH);
@@ -99,7 +121,11 @@ class NotificationDeliveryServiceTest {
         assertNotNull(result.getSentAt());
         assertNull(result.getFailureReason());
 
-        verify(mailSender).send(any(SimpleMailMessage.class));
+        verify(emailService).sendTextEmail(
+                "employee@example.com",
+                "Announcement",
+                "Company meeting tomorrow."
+        );
     }
 
     @Test
@@ -117,11 +143,12 @@ class NotificationDeliveryServiceTest {
                 result.getDeliveryStatus());
 
         assertNotNull(result.getFailureReason());
+
         assertTrue(
                 result.getFailureReason()
                         .contains("Recipient email is required"));
 
-        verifyNoInteractions(mailSender);
+        verifyNoInteractions(emailService);
     }
 
     @Test
@@ -139,11 +166,12 @@ class NotificationDeliveryServiceTest {
                 result.getDeliveryStatus());
 
         assertNotNull(result.getFailureReason());
+
         assertTrue(
                 result.getFailureReason()
                         .contains("Recipient phone is required"));
 
-        verifyNoInteractions(mailSender);
+        verifyNoInteractions(emailService);
     }
 
     @Test
@@ -155,9 +183,13 @@ class NotificationDeliveryServiceTest {
         notification.setTitle("Test");
         notification.setMessage("Test message.");
 
-        doThrow(new RuntimeException("SMTP connection failed"))
-                .when(mailSender)
-                .send(any(SimpleMailMessage.class));
+        when(emailService.sendTextEmail(
+                "employee@example.com",
+                "Test",
+                "Test message."
+        )).thenThrow(
+                new RuntimeException("Resend email sending failed")
+        );
 
         Notification result = service().deliver(notification);
 
@@ -166,11 +198,15 @@ class NotificationDeliveryServiceTest {
                 result.getDeliveryStatus());
 
         assertEquals(
-                "SMTP connection failed",
+                "Resend email sending failed",
                 result.getFailureReason());
 
         assertNull(result.getSentAt());
 
-        verify(mailSender).send(any(SimpleMailMessage.class));
+        verify(emailService).sendTextEmail(
+                "employee@example.com",
+                "Test",
+                "Test message."
+        );
     }
 }

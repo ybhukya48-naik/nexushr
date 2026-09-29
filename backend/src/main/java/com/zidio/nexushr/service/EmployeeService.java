@@ -20,7 +20,6 @@ public class EmployeeService {
     public EmployeeService(
             EmployeeRepository employeeRepository,
             PasswordEncoder passwordEncoder) {
-
         this.employeeRepository = employeeRepository;
         this.passwordEncoder = passwordEncoder;
     }
@@ -32,34 +31,30 @@ public class EmployeeService {
     public Employee findById(Long id) {
         return employeeRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Employee not found with id: " + id));
+                        new IllegalArgumentException(
+                                "Employee not found: " + id
+                        ));
     }
 
     public Employee create(EmployeeRequest request) {
-
-        if (request.getPassword() == null ||
-                request.getPassword().isBlank()) {
-
+        if (request.getPassword() == null
+                || request.getPassword().isBlank()) {
             throw new IllegalArgumentException(
-                    "Employee password is required"
+                    "Password is required"
             );
         }
 
         if (employeeRepository.existsByEmployeeCode(
                 request.getEmployeeCode())) {
-
             throw new IllegalArgumentException(
-                    "Employee code already exists: "
-                            + request.getEmployeeCode()
+                    "Employee code already exists"
             );
         }
 
         if (employeeRepository.existsByEmail(
                 request.getEmail())) {
-
             throw new IllegalArgumentException(
-                    "Employee email already exists: "
-                            + request.getEmail()
+                    "Email already exists"
             );
         }
 
@@ -70,22 +65,19 @@ public class EmployeeService {
         employee.setEmail(request.getEmail());
         employee.setPhone(request.getPhone());
         employee.setAccountNumber(request.getAccountNumber());
-
-        // IMPORTANT:
-        // Never store the plain-text password.
         employee.setPassword(
                 passwordEncoder.encode(request.getPassword())
         );
-
         employee.setRoleType(request.getRoleType());
         employee.setDepartment(request.getDepartment());
         employee.setDesignation(request.getDesignation());
         employee.setJoiningDate(request.getJoiningDate());
         employee.setBaseSalary(request.getBaseSalary());
-        // Employees created by HR are immediately active and available
-        // for Attendance and Payroll workflows.
+
         employee.setActive(true);
-        employee.setLifecycleStatus(EmployeeLifecycleStatus.ACTIVE);
+        employee.setLifecycleStatus(
+                EmployeeLifecycleStatus.ACTIVE
+        );
 
         return employeeRepository.save(employee);
     }
@@ -96,19 +88,22 @@ public class EmployeeService {
 
         Employee employee = findById(id);
 
-        if (request.getEmployeeCode() != null) {
+        if (request.getEmployeeCode() != null
+                && !request.getEmployeeCode().isBlank()) {
             employee.setEmployeeCode(
                     request.getEmployeeCode()
             );
         }
 
-        if (request.getFullName() != null) {
+        if (request.getFullName() != null
+                && !request.getFullName().isBlank()) {
             employee.setFullName(
                     request.getFullName()
             );
         }
 
-        if (request.getEmail() != null) {
+        if (request.getEmail() != null
+                && !request.getEmail().isBlank()) {
             employee.setEmail(
                     request.getEmail()
             );
@@ -125,19 +120,22 @@ public class EmployeeService {
                     request.getAccountNumber()
             );
         }
+
         if (request.getRoleType() != null) {
             employee.setRoleType(
                     request.getRoleType()
             );
         }
 
-        if (request.getDepartment() != null) {
+        if (request.getDepartment() != null
+                && !request.getDepartment().isBlank()) {
             employee.setDepartment(
                     request.getDepartment()
             );
         }
 
-        if (request.getDesignation() != null) {
+        if (request.getDesignation() != null
+                && !request.getDesignation().isBlank()) {
             employee.setDesignation(
                     request.getDesignation()
             );
@@ -161,13 +159,8 @@ public class EmployeeService {
             );
         }
 
-        /*
-         * Only change password when a new password
-         * was actually supplied.
-         */
-        if (request.getPassword() != null &&
-                !request.getPassword().isBlank()) {
-
+        if (request.getPassword() != null
+                && !request.getPassword().isBlank()) {
             employee.setPassword(
                     passwordEncoder.encode(
                             request.getPassword()
@@ -180,6 +173,12 @@ public class EmployeeService {
 
     public void delete(Long id) {
         Employee employee = findById(id);
-        employeeRepository.delete(employee);
+
+        employee.setActive(false);
+        employee.setLifecycleStatus(
+                EmployeeLifecycleStatus.OFFBOARDED
+        );
+
+        employeeRepository.save(employee);
     }
 }

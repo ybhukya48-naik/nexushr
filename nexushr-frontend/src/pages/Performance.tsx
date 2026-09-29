@@ -512,7 +512,7 @@ export default function Performance() {
         <div className="performance-panel-header">
           <div>
             <h3>Recent Feedback</h3>
-            <p>Live feedback from NexusHR.</p>
+            <p>Live feedback from Cyond.</p>
           </div>
         </div>
 

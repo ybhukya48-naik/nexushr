@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -36,9 +36,16 @@
                 <version>${spring-ai.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>            
+            <!-- AWS SDK v2 BOM -->
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>2.48.0</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
-
-        </dependencies>
+</dependencies>
     </dependencyManagement>
 
     <!-- Repositories -->
@@ -191,6 +198,15 @@
         </dependency>
 
 
+        
+        <!-- ==================== -->
+        <!-- Neon S3 Object Storage -->
+        <!-- ==================== -->
+
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+        </dependency>
         <!-- ==================== -->
         <!-- Testing -->
         <!-- ==================== -->
@@ -335,3 +351,7 @@
     </build>
 
 </project>
+
+
+
+

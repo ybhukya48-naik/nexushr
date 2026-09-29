@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
   BrowserRouter,
@@ -74,7 +74,7 @@ function AppRoutes() {
         <div className="brand">
           <div className="brand-mark">N</div>
           <div>
-            <strong>NexusHR</strong>
+            <strong>Cyond</strong>
             <span>Workforce Intelligence</span>
           </div>
         </div>
@@ -110,7 +110,7 @@ function AppRoutes() {
         <header className="topbar">
           <div>
             <p className="eyebrow">ENTERPRISE HR PLATFORM</p>
-            <h1>NexusHR</h1>
+            <h1>Cyond</h1>
           </div>
 
           <div className="user-area">
@@ -255,7 +255,7 @@ function Login() {
     setLoading(true);
 
     try {
-      const loginUsername = username.trim().toLowerCase();
+      const loginUsername = username.trim();
       const loginPassword = password;
 
       const response = await apiLogin(loginUsername, loginPassword);
@@ -287,11 +287,17 @@ function Login() {
           <div className="login-brand">
             <div className="brand-mark large">N</div>
             <div>
-              <strong>NexusHR</strong>
+              <strong>Cyond</strong>
               <span>Workforce Intelligence</span>
             </div>
           </div>
 
+          <div className="login-cover-image">
+            <img
+              src="/images/cyond-cover.png"
+              alt="Cyond Workforce Intelligence"
+            />
+          </div>
           <div className="login-hero">
             <span className="login-badge">Enterprise HR Platform</span>
             <h1>
@@ -337,7 +343,7 @@ function Login() {
               <div className="login-mobile-brand">
                 <div className="brand-mark">N</div>
                 <div>
-                  <strong>NexusHR</strong>
+                  <strong>Cyond</strong>
                   <span>Workforce Intelligence</span>
                 </div>
               </div>
@@ -352,7 +358,7 @@ function Login() {
 
               <p>
                 {isRegistering
-                  ? "Join NexusHR and access your employee workspace."
+                  ? "Join Cyond and access your employee workspace."
                   : "Sign in to continue to your workspace."}
               </p>
             </div>
@@ -504,8 +510,8 @@ function Login() {
                     ? "Creating account..."
                     : "Signing in..."
                   : isRegistering
-                    ? "Create NexusHR account"
-                    : "Sign in to NexusHR"}
+                    ? "Create Cyond account"
+                    : "Sign in to Cyond"}
               </span>
 
               {!loading && (
@@ -517,7 +523,7 @@ function Login() {
               <span>
                 {isRegistering
                   ? "Already have an account?"
-                  : "Don't have a NexusHR account?"}
+                  : "Don't have a Cyond account?"}
               </span>
 
               <button
@@ -546,7 +552,7 @@ function Login() {
             </div>
 
             <div className="login-footer">
-              <span>NexusHR</span>
+              <span>Cyond</span>
               <span>Secure enterprise workspace</span>
               <span>Workforce Intelligence</span>
             </div>
@@ -582,7 +588,7 @@ function Dashboard() {
       <div className="page-loading">
         <div className="loading-spinner"></div>
         <strong>Loading workforce dashboard</strong>
-        <span>Connecting to NexusHR services...</span>
+        <span>Connecting to Cyond services...</span>
       </div>
     );
   }
@@ -1047,3 +1053,6 @@ export default function App() {
     </BrowserRouter>
   );
 }
+
+
+

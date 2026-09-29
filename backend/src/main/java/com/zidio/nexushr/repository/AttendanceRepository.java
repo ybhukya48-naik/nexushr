@@ -26,6 +26,12 @@ public interface AttendanceRepository
             Long employeeId
     );
 
+    List<AttendanceRecord> findByEmployee_IdAndAttendanceDateBetween(
+            Long employeeId,
+            LocalDate startDate,
+            LocalDate endDate
+    );
+
     long countByAttendanceDate(LocalDate attendanceDate);
 
     long countByAttendanceDateAndCheckOutTimeIsNotNull(

@@ -602,7 +602,7 @@ button,
 }
 
 /* =========================================================
-   NexusHR Enterprise UI â€” Operations Layer
+   Cyond Enterprise UI â€” Operations Layer
    ========================================================= */
 
 :root {
@@ -1084,8 +1084,8 @@ tbody tr:hover td {
   }
 }
 
-/* NexusHR Attendance UI Enhancement */
-/* NexusHR Attendance UI Enhancement */
+/* Cyond Attendance UI Enhancement */
+/* Cyond Attendance UI Enhancement */
 
 .attendance-heading {
   align-items: flex-end;
@@ -1836,7 +1836,7 @@ tbody tr:hover td {
 }
 
 /* =========================================================
-   NEXUSHR ENTERPRISE SHELL — UI ONLY
+   CYOND ENTERPRISE SHELL — UI ONLY
    ========================================================= */
 
 .app-shell {
@@ -2182,7 +2182,7 @@ tbody tr:hover td {
 }
 
 /* =========================================================
-   NEXUSHR ENTERPRISE SHELL — UI ONLY
+   CYOND ENTERPRISE SHELL — UI ONLY
    ========================================================= */
 
 .app-shell {
@@ -2528,7 +2528,7 @@ tbody tr:hover td {
 }
 
 /* =========================================================
-   NEXUSHR — EXECUTIVE DASHBOARD FINAL UI
+   CYOND — EXECUTIVE DASHBOARD FINAL UI
    UI ONLY — preserves existing data/API/business logic
    ========================================================= */
 
@@ -2989,7 +2989,7 @@ tbody tr:hover td {
 }
 
 /* =========================================================
-   NEXUSHR — EMPLOYEES ENTERPRISE UI
+   CYOND — EMPLOYEES ENTERPRISE UI
    UI ONLY — existing API/business logic preserved
    ========================================================= */
 
@@ -3553,7 +3553,7 @@ tbody tr:hover td {
 }
 
 /* =========================================================
-   NEXUSHR — ATTENDANCE ENTERPRISE UI
+   CYOND — ATTENDANCE ENTERPRISE UI
    UI ONLY — existing attendance logic preserved
    ========================================================= */
 
@@ -4070,7 +4070,7 @@ tbody tr:hover td {
 }
 
 /* =========================================================
-   NEXUSHR — LEAVE MANAGEMENT ENTERPRISE UI
+   CYOND — LEAVE MANAGEMENT ENTERPRISE UI
    UI ONLY — existing leave logic preserved
    ========================================================= */
 
@@ -4570,7 +4570,7 @@ tbody tr:hover td {
 
 
 /* =========================================================
-   NEXUSHR — PAYROLL ENTERPRISE UI
+   CYOND — PAYROLL ENTERPRISE UI
    UI ONLY — existing payroll logic preserved
    ========================================================= */
 
@@ -5112,7 +5112,7 @@ tbody tr:hover td {
 
 
 /* =========================================================
-   NexusHR — Premium Login Experience
+   Cyond — Premium Login Experience
    UI/UX only — authentication logic remains unchanged
    ========================================================= */
 
@@ -5504,3 +5504,518 @@ tbody tr:hover td {
     font-size: 13px;
   }
 }
+
+
+/* Cyond Login Cover Image */
+.login-cover-image {
+  width: 100%;
+  max-width: 520px;
+  margin: 28px 0 26px;
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.login-cover-image img {
+  display: block;
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+}
+
+@media (max-width: 900px) {
+  .login-cover-image {
+    max-width: 100%;
+    margin: 20px 0;
+  }
+
+  .login-cover-image img {
+    height: 180px;
+  }
+}
+
+/* =========================================================
+   CYOND — FRESH LOGIN EXPERIENCE
+   Image intentionally NOT modified.
+   ========================================================= */
+
+.login-page {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(139, 92, 246, 0.20), transparent 30%),
+    radial-gradient(circle at 78% 82%, rgba(99, 102, 241, 0.16), transparent 28%),
+    linear-gradient(135deg, #120b2b 0%, #211044 48%, #170d35 100%);
+}
+
+.login-background-orb {
+  filter: blur(8px);
+  opacity: 0.45;
+}
+
+.login-layout {
+  position: relative;
+  z-index: 2;
+  gap: 64px;
+}
+
+/* ---------- LEFT BRAND PANEL ---------- */
+
+.login-brand-panel {
+  position: relative;
+}
+
+.login-brand {
+  margin-bottom: 34px;
+}
+
+.login-brand strong {
+  letter-spacing: -0.5px;
+}
+
+.login-brand span {
+  opacity: 0.72;
+  letter-spacing: 0.08em;
+}
+
+/* ---------- IMAGE IS LEFT UNCHANGED ---------- */
+/* .login-cover-image and .login-cover-image img intentionally untouched. */
+
+.login-hero {
+  margin-top: 28px;
+}
+
+.login-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.login-badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #a78bfa;
+  box-shadow: 0 0 14px rgba(167, 139, 250, 0.9);
+}
+
+.login-hero h1 {
+  max-width: 650px;
+  margin-top: 18px;
+  margin-bottom: 18px;
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+}
+
+.login-hero h1 span {
+  background: linear-gradient(90deg, #ffffff 0%, #c4b5fd 55%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.login-hero p {
+  max-width: 620px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* ---------- FEATURE CARDS ---------- */
+
+.login-features {
+  display: grid;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.login-feature {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.055);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition:
+    transform 180ms ease,
+    background 180ms ease,
+    border-color 180ms ease;
+}
+
+.login-feature:hover {
+  transform: translateX(5px);
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(167, 139, 250, 0.32);
+}
+
+.login-feature-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #7c3aed, #6366f1);
+  box-shadow: 0 8px 22px rgba(99, 102, 241, 0.28);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.login-feature > div:last-child {
+  min-width: 0;
+}
+
+.login-feature strong {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 13px;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.login-feature span {
+  display: block;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+/* ---------- LOGIN CARD ---------- */
+
+.login-form-area {
+  position: relative;
+}
+
+.login-card {
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.30),
+    0 8px 30px rgba(0, 0, 0, 0.12);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.login-card-header {
+  margin-bottom: 26px;
+}
+
+.login-card-header h2 {
+  letter-spacing: -0.035em;
+}
+
+.login-card-header > p:last-child {
+  color: #64748b;
+}
+
+/* ---------- INPUTS ---------- */
+
+.login-fields label {
+  gap: 8px;
+}
+
+.login-fields label > span {
+  font-size: 12px;
+  font-weight: 750;
+  color: #334155;
+}
+
+.login-input-wrap {
+  border: 1px solid #dbe1ea;
+  border-radius: 13px;
+  background: #f8fafc;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.login-input-wrap:focus-within {
+  border-color: #8b5cf6;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.11);
+}
+
+.login-input-wrap input {
+  color: #172033;
+}
+
+.login-input-wrap input::placeholder {
+  color: #94a3b8;
+}
+
+/* ---------- SIGN IN BUTTON ---------- */
+
+.login-card button[type="submit"] {
+  position: relative;
+  overflow: hidden;
+  border: 0;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #6d28d9 0%, #7c3aed 48%, #6366f1 100%);
+  box-shadow:
+    0 12px 24px rgba(109, 40, 217, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.login-card button[type="submit"]:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 16px 30px rgba(109, 40, 217, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.login-card button[type="submit"]:active {
+  transform: translateY(0);
+}
+
+/* ---------- ACCOUNT SWITCH ---------- */
+
+.login-auth-switch {
+  margin-top: 18px;
+  padding-top: 17px;
+  border-top: 1px solid #e8ecf2;
+}
+
+.login-auth-switch-button {
+  color: #6d28d9;
+  font-weight: 750;
+  transition: color 160ms ease;
+}
+
+.login-auth-switch-button:hover {
+  color: #4c1d95;
+}
+
+/* ---------- SECURITY ---------- */
+
+.login-security {
+  margin-top: 20px;
+  padding: 10px 13px;
+  border-radius: 11px;
+  background: #f8fafc;
+  border: 1px solid #edf0f5;
+  color: #64748b;
+}
+
+.login-security-dot {
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.10);
+}
+
+/* ---------- MOBILE ---------- */
+
+@media (max-width: 900px) {
+  .login-layout {
+    gap: 30px;
+  }
+
+  .login-hero h1 {
+    font-size: clamp(38px, 8vw, 58px);
+  }
+
+  .login-features {
+    margin-bottom: 24px;
+  }
+}
+
+@media (max-width: 600px) {
+  .login-page {
+    padding: 18px;
+  }
+
+  .login-card {
+    border-radius: 22px;
+  }
+
+  .login-feature {
+    grid-template-columns: 36px minmax(0, 1fr);
+    padding: 10px;
+  }
+
+  .login-feature-icon {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+
+/* =========================================================
+   CYOND LEFT PANEL — FINAL POLISH
+   Image itself remains unchanged.
+   ========================================================= */
+
+.login-brand-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.login-brand {
+  margin-bottom: 24px;
+}
+
+.login-brand .brand-mark.large {
+  box-shadow:
+    0 12px 30px rgba(124, 58, 237, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.login-cover-image {
+  position: relative;
+  box-shadow:
+    0 24px 55px rgba(0, 0, 0, 0.30),
+    0 0 0 1px rgba(255, 255, 255, 0.10);
+}
+
+/* Keep the actual image dimensions/content unchanged */
+.login-cover-image img {
+  display: block;
+}
+
+/* Hero typography */
+.login-hero {
+  margin-top: 24px;
+}
+
+.login-hero h1 {
+  font-size: clamp(42px, 4vw, 64px);
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+  max-width: 620px;
+}
+
+.login-hero p {
+  max-width: 570px;
+  margin-top: 20px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* Feature section */
+.login-features {
+  margin-top: 24px;
+  gap: 8px;
+}
+
+.login-feature {
+  position: relative;
+  min-height: 58px;
+  padding: 9px 13px;
+  border-radius: 15px;
+  border-color: rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.075),
+      rgba(255, 255, 255, 0.035)
+    );
+}
+
+.login-feature::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 13px;
+  bottom: 13px;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    #a78bfa,
+    #6366f1
+  );
+  opacity: 0.8;
+}
+
+.login-feature-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  font-size: 12px;
+  box-shadow:
+    0 8px 20px rgba(99, 102, 241, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.login-feature strong {
+  font-size: 12.5px;
+  font-weight: 750;
+}
+
+.login-feature span {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* Smooth hover without changing the layout */
+.login-feature:hover {
+  transform: translateX(3px);
+}
+
+/* Better laptop balance */
+@media (min-width: 1200px) {
+  .login-brand-panel {
+    padding-right: 10px;
+  }
+
+  .login-features {
+    max-width: 590px;
+  }
+}
+
+/* Prevent the left panel from becoming too tall */
+@media (max-height: 800px) and (min-width: 901px) {
+  .login-brand {
+    margin-bottom: 16px;
+  }
+
+  .login-hero {
+    margin-top: 18px;
+  }
+
+  .login-hero h1 {
+    font-size: clamp(38px, 3.6vw, 54px);
+  }
+
+  .login-hero p {
+    margin-top: 14px;
+  }
+
+  .login-features {
+    margin-top: 17px;
+  }
+}
+
+
+/* Employee table action buttons */
+.employees-page .employees-table td:last-child > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.employees-page .employees-table .table-action {
+  margin-right: 0;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+

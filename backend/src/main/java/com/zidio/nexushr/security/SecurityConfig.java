@@ -87,6 +87,7 @@ public class SecurityConfig {
                 // =========================================================
 
                 .requestMatchers("/", "/error").permitAll()
+                .requestMatchers("/api/v1/s3-test").permitAll()
                 .requestMatchers("/test-public").access((authentication, context) -> new org.springframework.security.authorization.AuthorizationDecision(false))
 
 
@@ -479,3 +480,4 @@ public class SecurityConfig {
         return source;
     }
 }
+

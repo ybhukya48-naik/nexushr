@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import "./Notifications.css";
 import {
   getCurrentEmployee,
@@ -533,7 +533,7 @@ export default function Notifications() {
           <div className="stat-icon">N</div>
           <p>Total Notifications</p>
           <h3>{notifications.length}</h3>
-          <span>Live from NexusHR</span>
+          <span>Live from Cyond</span>
         </div>
 
         <div className="stat-card">
@@ -668,7 +668,7 @@ export default function Notifications() {
                     dateStyle: "medium",
                     timeStyle: "short",
                   })}
-                  {" ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· "}
+                  {" - "}
                   {scheduledNotification.channel}
                 </small>
               </div>
@@ -761,3 +761,5 @@ export default function Notifications() {
     </>
   );
 }
+
+
