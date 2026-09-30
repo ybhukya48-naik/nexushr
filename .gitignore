@@ -134,3 +134,5 @@ login-test.json
 
 # Development-only S3 test endpoint
 backend/src/main/java/com/zidio/nexushr/web/S3TestController.java
+.vercel
+.env*
