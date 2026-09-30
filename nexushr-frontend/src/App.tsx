@@ -11,10 +11,12 @@ import {
 } from "react-router-dom";
 import {
   getDashboardSummary,
+  getCurrentEmployee,
   login as apiLogin,
   getAiWorkforceDashboard,
   type DashboardSummary,
   type AiWorkforceDashboardResponse,
+  type EmployeeResponse,
 } from "./api";
 import Employees from "./pages/Employees";
 import EmployeeProfile from "./pages/EmployeeProfile";
@@ -118,7 +120,7 @@ function AppRoutes() {
               onClick={() => navigate("/notifications")}
               aria-label="Notifications"
             >
-            </button>
+              <span aria-hidden="true">🔔</span>`n            </button>
 
             <div className="avatar">
               {role === "ADMIN" ? "AD" : role === "MANAGER" ? "MG" : "HR"}
@@ -140,7 +142,16 @@ function AppRoutes() {
 
         <section className="content">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route
+              path="/"
+              element={
+                role === "EMPLOYEE" ? (
+                  <EmployeeDashboard />
+                ) : (
+                  <Dashboard />
+                )
+              }
+            />
             <Route path="/employees" element={<Employees />} />
             <Route path="/employees/:id" element={<EmployeeProfile />} />
             <Route path="/attendance" element={<Attendance />} />
@@ -519,6 +530,239 @@ function Login() {
    DASHBOARD
 ============================================================ */
 
+
+function EmployeeDashboard() {
+  const [employee, setEmployee] =
+    useState<EmployeeResponse | null>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getCurrentEmployee()
+      .then(setEmployee)
+      .catch((err) => {
+        console.error(err);
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load your employee details.",
+        );
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="page-loading">
+        <div className="loading-spinner"></div>
+
+        <strong>
+          Loading your dashboard
+        </strong>
+
+        <span>
+          Connecting to Cyond services...
+        </span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">
+            MY DASHBOARD
+          </p>
+
+          <h2>
+            Unable to load your details
+          </h2>
+
+          <p>
+            {error}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!employee) {
+    return null;
+  }
+
+  return (
+    <div className="dashboard-page">
+
+      <div className="dashboard-hero">
+        <div className="dashboard-hero-copy">
+
+          <p className="eyebrow">
+            MY DASHBOARD
+          </p>
+
+          <h2>
+            Welcome, {employee.fullName}
+          </h2>
+
+          <p>
+            View your employee information and access your
+            attendance, leave, payroll and performance details
+            from Cyond.
+          </p>
+
+        </div>
+      </div>
+
+      <div className="dashboard-kpi-grid">
+
+        <article className="dashboard-kpi">
+          <div className="dashboard-kpi-top">
+            <span className="dashboard-kpi-icon">
+              ID
+            </span>
+
+            <span className="dashboard-kpi-label">
+              Employee Code
+            </span>
+          </div>
+
+          <strong>
+            {employee.employeeCode}
+          </strong>
+
+          <p>
+            Your employee identification
+          </p>
+        </article>
+
+        <article className="dashboard-kpi">
+          <div className="dashboard-kpi-top">
+            <span className="dashboard-kpi-icon">
+              D
+            </span>
+
+            <span className="dashboard-kpi-label">
+              Department
+            </span>
+          </div>
+
+          <strong>
+            {employee.department || "—"}
+          </strong>
+
+          <p>
+            Current department
+          </p>
+        </article>
+
+        <article className="dashboard-kpi">
+          <div className="dashboard-kpi-top">
+            <span className="dashboard-kpi-icon">
+              R
+            </span>
+
+            <span className="dashboard-kpi-label">
+              Designation
+            </span>
+          </div>
+
+          <strong>
+            {employee.designation || "—"}
+          </strong>
+
+          <p>
+            Current designation
+          </p>
+        </article>
+
+        <article className="dashboard-kpi">
+          <div className="dashboard-kpi-top">
+            <span className="dashboard-kpi-icon">
+              S
+            </span>
+
+            <span className="dashboard-kpi-label">
+              Status
+            </span>
+          </div>
+
+          <strong>
+            {employee.lifecycleStatus}
+          </strong>
+
+          <p>
+            Employment status
+          </p>
+        </article>
+
+      </div>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">
+              EMPLOYEE INFORMATION
+            </p>
+
+            <h3>
+              My Profile
+            </h3>
+          </div>
+        </div>
+
+        <div className="detail-grid">
+
+          <div>
+            <span>Full Name</span>
+            <strong>
+              {employee.fullName}
+            </strong>
+          </div>
+
+          <div>
+            <span>Email</span>
+            <strong>
+              {employee.email || "—"}
+            </strong>
+          </div>
+
+          <div>
+            <span>Employee Code</span>
+            <strong>
+              {employee.employeeCode}
+            </strong>
+          </div>
+
+          <div>
+            <span>Department</span>
+            <strong>
+              {employee.department || "—"}
+            </strong>
+          </div>
+
+          <div>
+            <span>Designation</span>
+            <strong>
+              {employee.designation || "—"}
+            </strong>
+          </div>
+
+          <div>
+            <span>Joining Date</span>
+            <strong>
+              {employee.joiningDate || "—"}
+            </strong>
+          </div>
+
+        </div>
+      </section>
+
+    </div>
+  );
+}
 function Dashboard() {
   const navigate = useNavigate();
 
@@ -1358,3 +1602,8 @@ export default function App() {
     </BrowserRouter>
   );
 }
+
+
+
+
+
