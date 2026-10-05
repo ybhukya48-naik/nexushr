@@ -96,7 +96,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem("nexushr_token");
 
   const headers = new Headers(options.headers);
-  headers.set("Content-Type", "application/json");
+
+  if (!(options.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
 
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
@@ -522,6 +525,59 @@ export interface PayrollRequest {
   pf?: number;
   leaveDeduction?: number;
   otherDeductions?: number;
+  autoFromAttendance?: boolean;
+}
+
+export interface AttendanceImportRowError {
+  rowNumber: number;
+  employeeCode: string;
+  message: string;
+}
+
+export interface AttendanceImportResponse {
+  payMonth: string;
+  totalRows: number;
+  importedCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  errors: AttendanceImportRowError[];
+}
+
+export interface AttendanceMonthlyEmployeeSummary {
+  employeeId: number;
+  employeeCode: string;
+  fullName: string;
+  department: string;
+  workedMinutes: number;
+  expectedMinutes: number;
+  shortfallMinutes: number;
+  workedHours: number;
+  expectedHours: number;
+  shortfallHours: number;
+}
+
+export interface AttendanceMonthlySummaryResponse {
+  payMonth: string;
+  standardDailyMinutes: number;
+  businessDays: number;
+  totalEmployees: number;
+  totalWorkedMinutes: number;
+  totalExpectedMinutes: number;
+  totalShortfallMinutes: number;
+  employees: AttendanceMonthlyEmployeeSummary[];
+}
+
+export interface PayrollAutoComponentsResponse {
+  employeeId: number;
+  employeeCode: string;
+  payMonth: string;
+  businessDays: number;
+  expectedWorkMinutes: number;
+  workedMinutes: number;
+  shortfallMinutes: number;
+  overtimeMinutes: number;
+  leaveDeduction: number;
+  overtimeAmount: number;
 }
 
 export interface PayrollRecord {
@@ -581,6 +637,37 @@ export function createPayroll(payroll: PayrollRequest) {
     method: "POST",
     body: JSON.stringify(payroll),
   });
+}
+
+export function getPayrollAutoComponents(
+  employeeId: number,
+  payMonth: string,
+) {
+  return request<PayrollAutoComponentsResponse>(
+    `/payroll/auto-components?employeeId=${employeeId}&payMonth=${encodeURIComponent(payMonth)}`,
+  );
+}
+
+export function getAttendanceMonthlySummary(payMonth: string) {
+  return request<AttendanceMonthlySummaryResponse>(
+    `/attendance/monthly-summary?payMonth=${encodeURIComponent(payMonth)}`,
+  );
+}
+
+export function importAttendanceExcel(
+  payMonth: string,
+  file: File,
+) {
+  const body = new FormData();
+  body.append("file", file);
+
+  return request<AttendanceImportResponse>(
+    `/attendance/import-excel?payMonth=${encodeURIComponent(payMonth)}`,
+    {
+      method: "POST",
+      body,
+    },
+  );
 }
 
 export function markPayrollPaid(id: number) {

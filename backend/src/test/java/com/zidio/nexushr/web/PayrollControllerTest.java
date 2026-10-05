@@ -4,7 +4,9 @@ import com.zidio.nexushr.domain.Employee;
 import com.zidio.nexushr.domain.PayrollRecord;
 import com.zidio.nexushr.security.JwtTokenService;
 import com.zidio.nexushr.security.SecurityConfig;
+import com.zidio.nexushr.service.PayrollPdfService;
 import com.zidio.nexushr.service.PayrollService;
+import com.zidio.nexushr.service.email.ResendEmailService;
 import com.zidio.nexushr.web.dto.PayrollRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -37,6 +39,12 @@ class PayrollControllerTest {
 
     @MockitoBean
     private JwtTokenService jwtTokenService;
+
+        @MockitoBean
+        private PayrollPdfService payrollPdfService;
+
+        @MockitoBean
+        private ResendEmailService resendEmailService;
 
     private Employee testEmployee() {
         Employee employee = new Employee();

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+﻿import { Suspense, lazy, useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
   BrowserRouter,
@@ -18,13 +18,13 @@ import {
   type AiWorkforceDashboardResponse,
   type EmployeeResponse,
 } from "./api";
-import Employees from "./pages/Employees";
-import EmployeeProfile from "./pages/EmployeeProfile";
-import Attendance from "./pages/Attendance";
-import Leave from "./pages/Leave";
-import Payroll from "./pages/Payroll";
-import Performance from "./pages/Performance";
-import Notifications from "./pages/Notifications";
+const Employees = lazy(() => import("./pages/Employees"));
+const EmployeeProfile = lazy(() => import("./pages/EmployeeProfile"));
+const Attendance = lazy(() => import("./pages/Attendance"));
+const Leave = lazy(() => import("./pages/Leave"));
+const Payroll = lazy(() => import("./pages/Payroll"));
+const Performance = lazy(() => import("./pages/Performance"));
+const Notifications = lazy(() => import("./pages/Notifications"));
 
 const navItems: ReadonlyArray<
   readonly [string, string, readonly string[]]
@@ -73,7 +73,11 @@ function AppRoutes() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">N</div>
+          <img
+            className="brand-logo"
+            src="/images/cyond-logo.jpeg"
+            alt="Cyond logo"
+          />
           <div>
             <strong>Cyond</strong>
             <span>Waterproofing Diagnosis & Repair Experts</span>
@@ -120,7 +124,8 @@ function AppRoutes() {
               onClick={() => navigate("/notifications")}
               aria-label="Notifications"
             >
-              <span aria-hidden="true">🔔</span>`n            </button>
+              <span aria-hidden="true">🔔</span>
+            </button>
 
             <div className="avatar">
               {role === "ADMIN" ? "AD" : role === "MANAGER" ? "MG" : "HR"}
@@ -141,26 +146,37 @@ function AppRoutes() {
         </header>
 
         <section className="content">
-          <Routes>
-            <Route
-              path="/"
-              element={
-                role === "EMPLOYEE" ? (
-                  <EmployeeDashboard />
-                ) : (
-                  <Dashboard />
-                )
-              }
-            />
-            <Route path="/employees" element={<Employees />} />
-            <Route path="/employees/:id" element={<EmployeeProfile />} />
-            <Route path="/attendance" element={<Attendance />} />
-            <Route path="/leave" element={<Leave />} />
-            <Route path="/payroll" element={<Payroll />} />            <Route path="/performance" element={<Performance />} />
-            <Route path="/ai" element={<AIInsights />} />
-            <Route path="/notifications" element={<Notifications />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          <Suspense
+            fallback={
+              <div className="page-loading">
+                <div className="loading-spinner"></div>
+                <strong>Loading page</strong>
+                <span>Fetching module assets...</span>
+              </div>
+            }
+          >
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  role === "EMPLOYEE" ? (
+                    <EmployeeDashboard />
+                  ) : (
+                    <Dashboard />
+                  )
+                }
+              />
+              <Route path="/employees" element={<Employees />} />
+              <Route path="/employees/:id" element={<EmployeeProfile />} />
+              <Route path="/attendance" element={<Attendance />} />
+              <Route path="/leave" element={<Leave />} />
+              <Route path="/payroll" element={<Payroll />} />
+              <Route path="/performance" element={<Performance />} />
+              <Route path="/ai" element={<AIInsights />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </section>
       </main>
     </div>
@@ -237,9 +253,11 @@ function Login() {
 
           <div className="login-brand">
 
-            <div className="brand-mark large">
-              N
-            </div>
+            <img
+              className="brand-logo brand-logo-large"
+              src="/images/cyond-logo.jpeg"
+              alt="Cyond logo"
+            />
 
             <div>
               <strong>Cyond</strong>
@@ -357,9 +375,11 @@ function Login() {
               {/* MOBILE BRAND */}
               <div className="login-mobile-brand">
 
-                <div className="brand-mark">
-                  N
-                </div>
+                <img
+                  className="brand-logo"
+                  src="/images/cyond-logo.jpeg"
+                  alt="Cyond logo"
+                />
 
                 <div>
                   <strong>
@@ -1480,92 +1500,22 @@ function AIInsights() {
           <div>
 
             <h3>
-              AI Workforce Recommendations
+              AI Data Freshness
             </h3>
 
             <p>
-              Live workforce risk indicators generated
-              from the AI analytics service.
+              This page now shows only aggregated data generated from real employee records.
             </p>
 
           </div>
 
         </div>
 
-
-        {loading && !data ? (
-
-          <div className="empty-state">
-            Loading AI workforce intelligence...
-          </div>
-
-        ) : data?.employeeInsights?.length ? (
-
-          <div className="recommendations-list">
-
-            {data.employeeInsights
-              .slice()
-              .sort(
-                (a, b) =>
-                  b.attritionRisk -
-                  a.attritionRisk,
-              )
-              .slice(0, 5)
-              .map((employee) => (
-
-                <div
-                  className="recommendation"
-                  key={employee.employeeId}
-                >
-
-                  <div className="recommendation-icon">
-                    {employee.riskBand === "HIGH"
-                      ? "!"
-                      : "AI"}
-                  </div>
-
-                  <div>
-
-                    <strong>
-                      {employee.employeeName}
-                    </strong>
-
-                    <p>
-                      {employee.department}
-                      {" "}
-                      {(employee.attritionRisk * 100).toFixed(0)}
-                      % Attrition Risk
-                      {" "}
-                      Engagement{" "}
-                      {employee.engagementScore.toFixed(1)}
-                      %
-                    </p>
-
-                  </div>
-
-                  <span
-                    className={
-                      employee.riskBand === "HIGH"
-                        ? "badge high"
-                        : "badge"
-                    }
-                  >
-                    {employee.riskBand}
-                  </span>
-
-                </div>
-
-              ))}
-
-          </div>
-
-        ) : (
-
-          <div className="empty-state">
-            No employee AI insights are currently available.
-          </div>
-
-        )}
+        <div className="empty-state">
+          {data?.generatedAt
+            ? `Last generated at: ${data.generatedAt}`
+            : "AI data will appear after backend analytics runs."}
+        </div>
 
       </section>
     </>

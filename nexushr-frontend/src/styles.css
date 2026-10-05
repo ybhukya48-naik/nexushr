@@ -49,6 +49,21 @@ button,
   padding: 4px 10px 30px;
 }
 
+.brand-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #ffffff;
+}
+
+.brand-logo-large {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 18px;
+}
+
 .brand-mark {
   width: 40px;
   height: 40px;
@@ -103,7 +118,7 @@ button,
 }
 
 .nav-link.active {
-  box-shadow: inset 3px 0 0 #7c5cff;
+  box-shadow: inset 3px 0 0 #10aed8;
 }
 
 .sidebar-footer {
@@ -148,7 +163,7 @@ button,
 
 .eyebrow {
   margin: 0;
-  color: #6941c6;
+  color: #10aed8;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: .12em;
@@ -178,8 +193,8 @@ button,
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: #ede9fe;
-  color: #6941c6;
+  background: #e7f5fb;
+  color: #0b355f;
   font-size: 12px;
   font-weight: 800;
 }
@@ -210,7 +225,7 @@ button,
 .primary-button {
   border: 0;
   border-radius: 8px;
-  background: #6941c6;
+  background: #0b355f;
   color: white;
   padding: 11px 17px;
   text-decoration: none;
@@ -220,7 +235,7 @@ button,
 }
 
 .primary-button:hover {
-  background: #53389e;
+  background: #082948;
 }
 
 .full {
@@ -332,7 +347,7 @@ button,
 
 .bar div {
   height: 100%;
-  background: #7c5cff;
+  background: #10aed8;
   border-radius: inherit;
 }
 
@@ -590,7 +605,7 @@ button,
   height: 34px;
   margin-bottom: 8px;
   border: 3px solid #eaecf0;
-  border-top-color: #6941c6;
+  border-top-color: #10aed8;
   border-radius: 50%;
   animation: nexushr-spin .8s linear infinite;
 }
@@ -611,8 +626,9 @@ button,
   --nx-border: #e6eaf0;
   --nx-text: #172033;
   --nx-muted: #667085;
-  --nx-primary: #5b4bdb;
-  --nx-primary-dark: #4938c7;
+  --nx-primary: #0b355f;
+  --nx-primary-dark: #082948;
+  --nx-accent: #10aed8;
   --nx-success: #16865b;
   --nx-warning: #b7791f;
   --nx-danger: #c53030;
@@ -657,7 +673,7 @@ body {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: .09em;
-  color: var(--nx-primary);
+  color: var(--nx-accent);
 }
 
 /* PAGE HEADER */
@@ -888,10 +904,59 @@ tbody tr:hover td {
   min-height: 25px;
   padding: 0 9px;
   border-radius: 999px;
-  background: #eef2ff;
-  color: #5146b9;
+  background: #e7f5fb;
+  color: #0b355f;
   font-size: 11px;
   font-weight: 750;
+}
+
+.payroll-attendance-import {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.payroll-attendance-summary {
+  border: 1px solid #d3eaf4;
+  background: #f4fbff;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+
+.payroll-attendance-summary strong {
+  color: #082948;
+}
+
+.payroll-attendance-summary span {
+  color: #33536f;
+  font-size: 13px;
+}
+
+.payroll-auto-toggle {
+  grid-column: 1 / -1;
+}
+
+.payroll-auto-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+}
+
+.payroll-auto-toggle-row input[type="checkbox"] {
+  width: auto;
+  min-height: auto;
+  margin: 0;
+}
+
+.payroll-auto-toggle-row span {
+  color: #475467;
+  font-size: 13px;
 }
 
 .badge.high {
@@ -1081,6 +1146,10 @@ tbody tr:hover td {
 
   .panel {
     padding: 18px;
+  }
+
+  .payroll-attendance-import {
+    grid-template-columns: 1fr;
   }
 }
 

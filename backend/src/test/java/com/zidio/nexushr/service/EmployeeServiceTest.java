@@ -1,6 +1,7 @@
 package com.zidio.nexushr.service;
 
 import com.zidio.nexushr.domain.Employee;
+import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
 import com.zidio.nexushr.domain.RoleType;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.web.dto.EmployeeRequest;
@@ -299,7 +300,7 @@ class EmployeeServiceTest {
     }
 
     @Test
-    void delete_deletesEmployee() {
+    void delete_deactivatesEmployee() {
 
         when(employeeRepository.findById(1L))
                 .thenReturn(Optional.of(employee));
@@ -310,6 +311,13 @@ class EmployeeServiceTest {
                 .findById(1L);
 
         verify(employeeRepository)
-                .delete(employee);
+                .save(employee);
+
+        assertThat(employee.getActive()).isFalse();
+        assertThat(employee.getLifecycleStatus())
+                .isEqualTo(EmployeeLifecycleStatus.OFFBOARDED);
     }
 }
+
+
+

@@ -4,13 +4,14 @@ import com.zidio.nexushr.domain.PayrollRecord;
 import com.zidio.nexushr.service.PayrollPdfService;
 import com.zidio.nexushr.service.PayrollService;
 import com.zidio.nexushr.service.email.ResendEmailService;
+import com.zidio.nexushr.web.dto.PayrollAutoComponentsResponse;
 import com.zidio.nexushr.web.dto.PayrollRequest;
 import com.zidio.nexushr.web.dto.PayrollResponse;
 import com.zidio.nexushr.web.dto.PayslipResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpClientErrorException;
 
@@ -72,6 +73,15 @@ public class PayrollController {
 
         return payrollService.getPayslip(id);
     }
+
+        @GetMapping("/auto-components")
+        @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER')")
+        public PayrollAutoComponentsResponse autoComponents(
+                        @RequestParam Long employeeId,
+                        @RequestParam String payMonth) {
+
+                return payrollService.autoComponents(employeeId, payMonth);
+        }
 
     @GetMapping("/{id}/payslip/pdf")
     @PreAuthorize(

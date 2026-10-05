@@ -1,15 +1,21 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import {
   createPayroll,
+  getAttendanceMonthlySummary,
   getEmployees,
   getCurrentEmployee,
   getEmployeePayroll,
+  getPayrollAutoComponents,
   getPayrollRecords,
+  importAttendanceExcel,
   getPayslip,
   downloadPayslipPdf,
   emailPayslip,
   markPayrollPaid,
+  type AttendanceImportResponse,
+  type AttendanceMonthlySummaryResponse,
   type EmployeeResponse,
+  type PayrollAutoComponentsResponse,
   type PayrollRecord,
   type PayslipResponse,
 } from "../api";
@@ -23,6 +29,16 @@ function money(value: number) {
 
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);
+}
+
+function toOptionalNumber(value: string): number | undefined {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  return Number(trimmed);
 }
 
 export default function Payroll() {
@@ -40,6 +56,18 @@ export default function Payroll() {
   const [pf, setPf] = useState("");
   const [leaveDeduction, setLeaveDeduction] = useState("");
   const [otherDeductions, setOtherDeductions] = useState("");
+  const [autoFromAttendance, setAutoFromAttendance] = useState(true);
+
+  const [attendanceFile, setAttendanceFile] = useState<File | null>(null);
+  const [importingAttendance, setImportingAttendance] = useState(false);
+  const [attendanceImportResult, setAttendanceImportResult] =
+    useState<AttendanceImportResponse | null>(null);
+  const [attendanceSummary, setAttendanceSummary] =
+    useState<AttendanceMonthlySummaryResponse | null>(null);
+
+  const [autoComponents, setAutoComponents] =
+    useState<PayrollAutoComponentsResponse | null>(null);
+  const [autoComponentsLoading, setAutoComponentsLoading] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -102,9 +130,103 @@ export default function Payroll() {
     }
   }
 
+  async function loadAttendanceSummary(targetMonth: string) {
+    if (!isManagementRole) {
+      return;
+    }
+
+    try {
+      const summary = await getAttendanceMonthlySummary(targetMonth);
+      setAttendanceSummary(summary);
+    } catch (err) {
+      console.error("Attendance summary load failed:", err);
+    }
+  }
+
+  async function loadAutoComponents(
+    employeeId: string,
+    targetMonth: string,
+  ) {
+    if (!isManagementRole || !employeeId) {
+      setAutoComponents(null);
+      return;
+    }
+
+    setAutoComponentsLoading(true);
+
+    try {
+      const components = await getPayrollAutoComponents(
+        Number(employeeId),
+        targetMonth,
+      );
+
+      setAutoComponents(components);
+
+      if (autoFromAttendance) {
+        setOvertime(String(components.overtimeAmount));
+        setLeaveDeduction(String(components.leaveDeduction));
+      }
+    } catch (err) {
+      console.error("Auto payroll component load failed:", err);
+      setAutoComponents(null);
+    } finally {
+      setAutoComponentsLoading(false);
+    }
+  }
+
+  async function handleAttendanceImport(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!attendanceFile) {
+      setError("Please choose an attendance Excel file to import.");
+      return;
+    }
+
+    setImportingAttendance(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const result = await importAttendanceExcel(payMonth, attendanceFile);
+
+      setAttendanceImportResult(result);
+      setMessage("Attendance imported successfully.");
+
+      await loadAttendanceSummary(payMonth);
+
+      if (selectedEmployee) {
+        await loadAutoComponents(selectedEmployee, payMonth);
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to import attendance Excel.",
+      );
+    } finally {
+      setImportingAttendance(false);
+    }
+  }
+
   useEffect(() => {
     void loadData();
   }, []);
+
+  useEffect(() => {
+    if (!isManagementRole) {
+      return;
+    }
+
+    void loadAttendanceSummary(payMonth);
+  }, [payMonth, isManagementRole]);
+
+  useEffect(() => {
+    if (!isManagementRole || !selectedEmployee) {
+      return;
+    }
+
+    void loadAutoComponents(selectedEmployee, payMonth);
+  }, [selectedEmployee, payMonth, isManagementRole, autoFromAttendance]);
 
   async function handleGenerate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -127,12 +249,13 @@ export default function Payroll() {
       await createPayroll({
         employeeId: Number(selectedEmployee),
         payMonth,
-        hra: Number(hra || 0),
-        bonus: Number(bonus || 0),
-        overtime: Number(overtime || 0),
-        pf: Number(pf || 0),
-        leaveDeduction: Number(leaveDeduction || 0),
-        otherDeductions: Number(otherDeductions || 0),
+        autoFromAttendance,
+        hra: toOptionalNumber(hra),
+        bonus: toOptionalNumber(bonus),
+        overtime: toOptionalNumber(overtime),
+        pf: toOptionalNumber(pf),
+        leaveDeduction: toOptionalNumber(leaveDeduction),
+        otherDeductions: toOptionalNumber(otherDeductions),
       });
 
       setMessage("Payroll generated successfully.");
@@ -296,6 +419,64 @@ export default function Payroll() {
           </div>
         </div>
 
+          <form
+            className="payroll-attendance-import"
+            onSubmit={handleAttendanceImport}
+          >
+            <label>
+              Attendance Excel (month-wise)
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={(event) =>
+                  setAttendanceFile(event.target.files?.[0] ?? null)
+                }
+              />
+            </label>
+
+            <button
+              type="submit"
+              className="secondary-button"
+              disabled={importingAttendance}
+            >
+              {importingAttendance ? "Importing..." : "Import Attendance"}
+            </button>
+          </form>
+
+          {attendanceImportResult && (
+            <div className="payroll-attendance-summary">
+              <strong>
+                Import result ({attendanceImportResult.payMonth})
+              </strong>
+
+              <span>
+                Imported {attendanceImportResult.importedCount}, updated {attendanceImportResult.updatedCount}, skipped {attendanceImportResult.skippedCount}.
+              </span>
+
+              {attendanceImportResult.errors.length > 0 && (
+                <span>
+                  {attendanceImportResult.errors.length} rows had validation issues.
+                </span>
+              )}
+            </div>
+          )}
+
+          {attendanceSummary && (
+            <div className="payroll-attendance-summary">
+              <strong>
+                Attendance month summary ({attendanceSummary.payMonth})
+              </strong>
+
+              <span>
+                {attendanceSummary.totalEmployees} employees, {(
+                  attendanceSummary.totalWorkedMinutes / 60
+                ).toFixed(1)} worked hours, {(
+                  attendanceSummary.totalShortfallMinutes / 60
+                ).toFixed(1)} shortfall hours.
+              </span>
+            </div>
+          )}
+
         <form onSubmit={handleGenerate}>
           <div className="employee-filters">
             <label>
@@ -352,6 +533,51 @@ export default function Payroll() {
                 onChange={(event) => setPayMonth(event.target.value)}
               />
             </label>
+
+            <label className="payroll-auto-toggle">
+              Auto from Attendance
+              <div className="payroll-auto-toggle-row">
+                <input
+                  type="checkbox"
+                  checked={autoFromAttendance}
+                  onChange={(event) =>
+                    setAutoFromAttendance(event.target.checked)
+                  }
+                />
+                <span>
+                  Use imported attendance to auto-calculate overtime and leave deduction
+                </span>
+              </div>
+            </label>
+
+            {selectedEmployee && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() =>
+                  void loadAutoComponents(selectedEmployee, payMonth)
+                }
+                disabled={autoComponentsLoading}
+              >
+                {autoComponentsLoading
+                  ? "Calculating..."
+                  : "Refresh Attendance Calculation"}
+              </button>
+            )}
+
+            {autoComponents && (
+              <div className="payroll-attendance-summary">
+                <strong>
+                  Attendance calculation for {autoComponents.employeeCode}
+                </strong>
+                <span>
+                  Worked {(autoComponents.workedMinutes / 60).toFixed(1)}h of {(autoComponents.expectedWorkMinutes / 60).toFixed(1)}h, shortfall {(autoComponents.shortfallMinutes / 60).toFixed(1)}h.
+                </span>
+                <span>
+                  Auto leave deduction {money(autoComponents.leaveDeduction)} | Auto overtime {money(autoComponents.overtimeAmount)}
+                </span>
+              </div>
+            )}
 
             <label>
               HRA

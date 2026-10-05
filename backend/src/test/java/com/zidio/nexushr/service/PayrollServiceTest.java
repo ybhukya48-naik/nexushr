@@ -4,6 +4,7 @@ import com.zidio.nexushr.domain.Employee;
 import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
 import com.zidio.nexushr.domain.PayrollRecord;
 import com.zidio.nexushr.domain.PayrollStatus;
+import com.zidio.nexushr.repository.AttendanceRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.repository.PayrollRepository;
 import com.zidio.nexushr.web.dto.PayrollRequest;
@@ -32,6 +33,9 @@ class PayrollServiceTest {
 
     @Mock
     private EmployeeRepository employeeRepository;
+
+        @Mock
+        private AttendanceRepository attendanceRepository;
 
     @InjectMocks
     private PayrollService payrollService;

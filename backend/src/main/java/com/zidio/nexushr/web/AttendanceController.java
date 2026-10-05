@@ -2,9 +2,13 @@ package com.zidio.nexushr.web;
 
 import com.zidio.nexushr.domain.AttendanceRecord;
 import com.zidio.nexushr.service.AttendanceService;
+import com.zidio.nexushr.web.dto.AttendanceImportResponse;
 import com.zidio.nexushr.web.dto.AttendanceMetricsResponse;
+import com.zidio.nexushr.web.dto.AttendanceMonthlySummaryResponse;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -92,6 +96,26 @@ public class AttendanceController {
             @RequestParam LocalDate date) {
 
         return attendanceService.getMetrics(date);
+    }
+
+    @PostMapping(
+            value = "/import-excel",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
+    @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER')")
+    public AttendanceImportResponse importExcel(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam String payMonth) {
+
+        return attendanceService.importMonthlyExcel(file, payMonth);
+    }
+
+    @GetMapping("/monthly-summary")
+    @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER')")
+    public AttendanceMonthlySummaryResponse monthlySummary(
+            @RequestParam String payMonth) {
+
+        return attendanceService.monthlySummary(payMonth);
     }
 
     @GetMapping("/employee/{employeeId}")

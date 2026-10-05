@@ -32,7 +32,7 @@ public class EmployeeService {
         return employeeRepository.findById(id)
                 .orElseThrow(() ->
                         new IllegalArgumentException(
-                                "Employee not found: " + id
+                                "Employee not found with id: " + id
                         ));
     }
 
@@ -40,21 +40,21 @@ public class EmployeeService {
         if (request.getPassword() == null
                 || request.getPassword().isBlank()) {
             throw new IllegalArgumentException(
-                    "Password is required"
+                    "Employee password is required"
             );
         }
 
         if (employeeRepository.existsByEmployeeCode(
                 request.getEmployeeCode())) {
             throw new IllegalArgumentException(
-                    "Employee code already exists"
+                    "Employee code already exists: " + request.getEmployeeCode()
             );
         }
 
         if (employeeRepository.existsByEmail(
                 request.getEmail())) {
             throw new IllegalArgumentException(
-                    "Email already exists"
+                    "Employee email already exists: " + request.getEmail()
             );
         }
 
@@ -182,3 +182,6 @@ public class EmployeeService {
         employeeRepository.save(employee);
     }
 }
+
+
+

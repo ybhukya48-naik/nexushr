@@ -1,11 +1,28 @@
 server:
   address: 0.0.0.0
   port: ${PORT:10000}
+  compression:
+    enabled: true
+    min-response-size: 1024
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain,text/css,application/javascript
 
 spring:
   config:
     activate:
       on-profile: prod
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://ep-red-haze-b5nyszma-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require}
+    username: ${DB_USER:}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_MAX_POOL_SIZE:10}
+      minimum-idle: ${DB_MIN_IDLE:1}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:10000}
+      validation-timeout: ${DB_VALIDATION_TIMEOUT_MS:5000}
+      keepalive-time: ${DB_KEEPALIVE_TIME_MS:30000}
+      max-lifetime: ${DB_MAX_LIFETIME_MS:1200000}
+      idle-timeout: ${DB_IDLE_TIMEOUT_MS:300000}
 
 app:
   security:
@@ -17,7 +34,7 @@ app:
     expiration-minutes: ${JWT_EXPIRATION_MINUTES:120}
 
   auth:
-    demo-users-enabled: ${DEMO_USERS_ENABLED:false}
+    demo-users-enabled: ${DEMO_USERS_ENABLED:true}
 
 aws:
   region: ${AWS_REGION}
@@ -28,4 +45,4 @@ aws:
 
 logging:
   level:
-    org.springframework.security: ${SECURITY_LOG_LEVEL:INFO}
+    org.springframework.security: ${SECURITY_LOG_LEVEL:WARN}

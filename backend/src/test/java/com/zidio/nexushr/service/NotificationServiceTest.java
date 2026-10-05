@@ -7,6 +7,7 @@ import com.zidio.nexushr.domain.NotificationDeliveryStatus;
 import com.zidio.nexushr.domain.NotificationType;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.repository.NotificationRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -22,6 +23,15 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
 
+    private Employee testEmployee() {
+        Employee employee = new Employee();
+        employee.setId(1L);
+        employee.setEmail("employee@example.com");
+        employee.setPhone("9999999999");
+        employee.setActive(true);
+        return employee;
+    }
+
     @Mock
     private NotificationRepository notificationRepository;
 
@@ -33,6 +43,7 @@ class NotificationServiceTest {
 
     @InjectMocks
     private NotificationService notificationService;
+
 
     @Test
     void createNotificationShouldCreateInAppNotification() {
@@ -61,7 +72,9 @@ class NotificationServiceTest {
     @Test
     void sendInAppNotificationShouldNotInvokeExternalDelivery() {
 
-        when(notificationRepository.save(any(Notification.class)))
+                when(employeeRepository.findById(1L))
+                .thenReturn(java.util.Optional.of(testEmployee()));
+when(notificationRepository.save(any(Notification.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         Notification result = notificationService.sendNotification(
@@ -85,7 +98,9 @@ class NotificationServiceTest {
     @Test
     void sendEmailNotificationShouldInvokeDelivery() {
 
-        when(notificationRepository.save(any(Notification.class)))
+                when(employeeRepository.findById(1L))
+                .thenReturn(java.util.Optional.of(testEmployee()));
+when(notificationRepository.save(any(Notification.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         when(notificationDeliveryService.deliver(any(Notification.class)))
@@ -118,7 +133,9 @@ class NotificationServiceTest {
     @Test
     void sendSmsNotificationShouldInvokeDelivery() {
 
-        when(notificationRepository.save(any(Notification.class)))
+                when(employeeRepository.findById(1L))
+                .thenReturn(java.util.Optional.of(testEmployee()));
+when(notificationRepository.save(any(Notification.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         when(notificationDeliveryService.deliver(any(Notification.class)))
@@ -151,7 +168,9 @@ class NotificationServiceTest {
     @Test
     void sendBothNotificationShouldInvokeDelivery() {
 
-        when(notificationRepository.save(any(Notification.class)))
+                when(employeeRepository.findById(1L))
+                .thenReturn(java.util.Optional.of(testEmployee()));
+when(notificationRepository.save(any(Notification.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         when(notificationDeliveryService.deliver(any(Notification.class)))
@@ -202,6 +221,9 @@ class NotificationServiceTest {
         when(employeeRepository.findAll())
                 .thenReturn(List.of(active, inactive));
 
+        when(employeeRepository.findById(1L))
+                .thenReturn(java.util.Optional.of(active));
+
         when(notificationRepository.save(any(Notification.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -231,3 +253,9 @@ class NotificationServiceTest {
                 .deliver(any(Notification.class));
     }
 }
+
+
+
+
+
+

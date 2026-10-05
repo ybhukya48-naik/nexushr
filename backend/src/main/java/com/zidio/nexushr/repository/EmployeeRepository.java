@@ -15,6 +15,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     Optional<Employee> findByEmployeeCode(String employeeCode);
 
+    Optional<Employee> findByEmployeeCodeIgnoreCase(String employeeCode);
+
     boolean existsByEmail(String email);
 
     boolean existsByEmployeeCode(String employeeCode);
@@ -22,6 +24,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     long countByLifecycleStatus(EmployeeLifecycleStatus lifecycleStatus);
 
     long countByRoleType(RoleType roleType);
+
+    List<Employee> findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus lifecycleStatus);
 
     List<Employee> findByRoleTypeAndActiveTrue(RoleType roleType);
 

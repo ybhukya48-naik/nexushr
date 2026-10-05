@@ -144,11 +144,14 @@ public class AuthController {
             return ResponseEntity.badRequest().build();
         }
 
+        String normalizedUsername = request.username().trim();
+        String normalizedEmail = normalizedUsername.toLowerCase();
+
         // Demo users are development/test accounts only.
-        // Set DEMO_USERS_ENABLED=false in production.
+        // Override DEMO_USERS_ENABLED=false in production for strict auth.
         if (demoUsersEnabled) {
 
-            String demoRole = switch (request.username().toLowerCase()) {
+            String demoRole = switch (normalizedUsername.toLowerCase()) {
                 case "admin" -> "ADMIN";
                 case "hr" -> "HR";
                 case "manager" -> "MANAGER";
@@ -159,7 +162,7 @@ public class AuthController {
             if (demoRole != null) {
 
                 String token = jwtTokenService.generate(
-                        request.username(),
+                        normalizedUsername,
                         Map.of("role", demoRole)
                 );
 
@@ -167,7 +170,7 @@ public class AuthController {
                         new AuthDtos.LoginResponse(
                                 token,
                                 demoRole,
-                                request.username()
+                                normalizedUsername
                         )
                 );
             }
@@ -175,12 +178,12 @@ public class AuthController {
 
         // Real employee login using employee code or email.
         Optional<Employee> employeeOpt =
-                employeeRepository.findByEmployeeCode(request.username());
+                employeeRepository.findByEmployeeCodeIgnoreCase(normalizedUsername);
 
         if (employeeOpt.isEmpty()) {
             employeeOpt =
                     employeeRepository.findByEmail(
-                            request.username().trim().toLowerCase());
+                            normalizedEmail);
         }
 
         if (employeeOpt.isEmpty()) {

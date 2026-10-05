@@ -12,6 +12,11 @@ public interface AttendanceRepository
 
     List<AttendanceRecord> findByAttendanceDate(LocalDate attendanceDate);
 
+    List<AttendanceRecord> findByAttendanceDateBetween(
+            LocalDate startDate,
+            LocalDate endDate
+    );
+
     boolean existsByEmployee_IdAndAttendanceDate(
             Long employeeId,
             LocalDate attendanceDate

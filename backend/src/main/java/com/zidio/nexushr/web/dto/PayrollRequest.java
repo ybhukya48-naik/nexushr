@@ -20,6 +20,7 @@ public class PayrollRequest {
     private BigDecimal pf;
     private BigDecimal leaveDeduction;
     private BigDecimal otherDeductions;
+    private Boolean autoFromAttendance;
 
     public Long getEmployeeId() {
         return employeeId;
@@ -91,5 +92,13 @@ public class PayrollRequest {
 
     public void setOtherDeductions(BigDecimal otherDeductions) {
         this.otherDeductions = otherDeductions;
+    }
+
+    public Boolean getAutoFromAttendance() {
+        return autoFromAttendance;
+    }
+
+    public void setAutoFromAttendance(Boolean autoFromAttendance) {
+        this.autoFromAttendance = autoFromAttendance;
     }
 }

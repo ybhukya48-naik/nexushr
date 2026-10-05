@@ -17,6 +17,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 
 @Configuration(proxyBeanMethods = false)
@@ -448,9 +450,29 @@ public class SecurityConfig {
 
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(
-            List.of(corsAllowedOrigin.split(","))
-        );
+        List<String> configuredOrigins = Arrays.stream(corsAllowedOrigin.split(","))
+            .map(String::trim)
+            .filter(origin -> !origin.isBlank())
+            .toList();
+
+        List<String> allowedOrigins = new ArrayList<>();
+        List<String> allowedOriginPatterns = new ArrayList<>();
+
+        for (String origin : configuredOrigins) {
+            if (origin.contains("*")) {
+                allowedOriginPatterns.add(origin);
+            } else {
+                allowedOrigins.add(origin);
+            }
+        }
+
+        if (!allowedOrigins.isEmpty()) {
+            configuration.setAllowedOrigins(allowedOrigins);
+        }
+
+        if (!allowedOriginPatterns.isEmpty()) {
+            configuration.setAllowedOriginPatterns(allowedOriginPatterns);
+        }
 
         configuration.setAllowedMethods(
             List.of(

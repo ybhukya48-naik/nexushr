@@ -178,6 +178,10 @@ public class Employee {
         return active;
     }
 
+    public boolean getActive() {
+        return active;
+    }
+
     public void setActive(boolean active) {
         this.active = active;
     }
@@ -199,3 +203,4 @@ public class Employee {
         this.mfaSecret = mfaSecret;
     }
 }
+

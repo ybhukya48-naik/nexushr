@@ -2,13 +2,16 @@ package com.zidio.nexushr.service;
 
 import com.zidio.nexushr.domain.Employee;
 import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
+import com.zidio.nexushr.domain.AttendanceRecord;
 import com.zidio.nexushr.domain.PayrollRecord;
 import com.zidio.nexushr.domain.PayrollStatus;
 import com.zidio.nexushr.domain.NotificationChannel;
 import com.zidio.nexushr.domain.NotificationType;
+import com.zidio.nexushr.repository.AttendanceRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.service.NotificationService;
 import com.zidio.nexushr.repository.PayrollRepository;
+import com.zidio.nexushr.web.dto.PayrollAutoComponentsResponse;
 import com.zidio.nexushr.web.dto.PayrollRequest;
 import com.zidio.nexushr.web.dto.PayslipResponse;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +22,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.List;
@@ -31,18 +36,24 @@ public class PayrollService {
 
     private final PayrollRepository payrollRepository;
     private final EmployeeRepository employeeRepository;
+        private final AttendanceRepository attendanceRepository;
     private final NotificationService notificationService;
 
     @Value("${app.payroll.tax-rate:0.10}")
     private BigDecimal taxRate;
 
+        @Value("${app.attendance.standard-daily-minutes:480}")
+        private int standardDailyMinutes;
+
     public PayrollService(
             PayrollRepository payrollRepository,
             EmployeeRepository employeeRepository,
+                        AttendanceRepository attendanceRepository,
             NotificationService notificationService) {
 
         this.payrollRepository = payrollRepository;
         this.employeeRepository = employeeRepository;
+                this.attendanceRepository = attendanceRepository;
         this.notificationService = notificationService;
     }
 
@@ -129,11 +140,27 @@ public class PayrollService {
                         : request.getBasicSalary()
         );
 
+        boolean autoFromAttendance = Boolean.TRUE.equals(
+                request.getAutoFromAttendance()
+        );
+
+        PayrollAutoComponentsResponse autoComponents = autoFromAttendance
+                ? calculateAutoComponents(employee, request.getPayMonth(), basicSalary)
+                : null;
+
         BigDecimal hra = amount(request.getHra());
         BigDecimal bonus = amount(request.getBonus());
-        BigDecimal overtime = amount(request.getOvertime());
+        BigDecimal overtime = amount(
+                request.getOvertime() == null && autoComponents != null
+                        ? autoComponents.overtimeAmount()
+                        : request.getOvertime()
+        );
         BigDecimal pf = amount(request.getPf());
-        BigDecimal leaveDeduction = amount(request.getLeaveDeduction());
+        BigDecimal leaveDeduction = amount(
+                request.getLeaveDeduction() == null && autoComponents != null
+                        ? autoComponents.leaveDeduction()
+                        : request.getLeaveDeduction()
+        );
         BigDecimal otherDeductions = amount(request.getOtherDeductions());
 
         validateNonNegative("Basic salary", basicSalary);
@@ -192,6 +219,41 @@ public class PayrollService {
         payrollRecord.setStatus(PayrollStatus.GENERATED);
 
         return payrollRepository.save(payrollRecord);
+    }
+
+    @Transactional(readOnly = true)
+    public PayrollAutoComponentsResponse autoComponents(
+            Long employeeId,
+            String payMonth) {
+
+        if (employeeId == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Employee ID is required"
+            );
+        }
+
+        validatePayMonth(payMonth);
+
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Employee not found: " + employeeId
+                ));
+
+        if (employee.getBaseSalary() == null
+                || employee.getBaseSalary().compareTo(ZERO) <= 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Employee base salary must be greater than zero"
+            );
+        }
+
+        return calculateAutoComponents(
+                employee,
+                payMonth,
+                employee.getBaseSalary()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -344,5 +406,107 @@ public class PayrollService {
                     "Pay month must use YYYY-MM format"
             );
         }
+    }
+
+    private PayrollAutoComponentsResponse calculateAutoComponents(
+            Employee employee,
+            String payMonth,
+            BigDecimal basicSalary) {
+
+        YearMonth month = YearMonth.parse(payMonth);
+        LocalDate startDate = month.atDay(1);
+        LocalDate endDate = month.atEndOfMonth();
+
+        LocalDate effectiveStart = employee.getJoiningDate() != null
+                && employee.getJoiningDate().isAfter(startDate)
+                ? employee.getJoiningDate()
+                : startDate;
+
+        int businessDays = businessDaysBetween(effectiveStart, endDate);
+        int expectedWorkMinutes = businessDays * standardDailyMinutes;
+
+        List<AttendanceRecord> records = attendanceRepository
+                .findByEmployee_IdAndAttendanceDateBetween(
+                        employee.getId(),
+                        startDate,
+                        endDate
+                );
+
+        int workedMinutes = records.stream()
+                .map(AttendanceRecord::getWorkMinutes)
+                .filter(java.util.Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
+
+        int overtimeMinutes = records.stream()
+                .map(AttendanceRecord::getOvertimeMinutes)
+                .filter(java.util.Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
+
+        int shortfallMinutes = Math.max(0, expectedWorkMinutes - workedMinutes);
+
+        if (expectedWorkMinutes <= 0) {
+            return new PayrollAutoComponentsResponse(
+                    employee.getId(),
+                    employee.getEmployeeCode(),
+                    payMonth,
+                    businessDays,
+                    0,
+                    workedMinutes,
+                    0,
+                    overtimeMinutes,
+                    ZERO.setScale(2, RoundingMode.HALF_UP),
+                    ZERO.setScale(2, RoundingMode.HALF_UP)
+            );
+        }
+
+        BigDecimal expectedMinutesValue = BigDecimal.valueOf(expectedWorkMinutes);
+        BigDecimal perMinuteRate = basicSalary
+                .divide(expectedMinutesValue, 8, RoundingMode.HALF_UP);
+
+        BigDecimal leaveDeduction = perMinuteRate
+                .multiply(BigDecimal.valueOf(shortfallMinutes))
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal overtimeAmount = perMinuteRate
+                .multiply(BigDecimal.valueOf(overtimeMinutes))
+                .setScale(2, RoundingMode.HALF_UP);
+
+        return new PayrollAutoComponentsResponse(
+                employee.getId(),
+                employee.getEmployeeCode(),
+                payMonth,
+                businessDays,
+                expectedWorkMinutes,
+                workedMinutes,
+                shortfallMinutes,
+                overtimeMinutes,
+                leaveDeduction,
+                overtimeAmount
+        );
+    }
+
+    private int businessDaysBetween(LocalDate start, LocalDate end) {
+
+        if (start == null || end == null || start.isAfter(end)) {
+            return 0;
+        }
+
+        int businessDays = 0;
+        LocalDate date = start;
+
+        while (!date.isAfter(end)) {
+            DayOfWeek dayOfWeek = date.getDayOfWeek();
+
+            if (dayOfWeek != DayOfWeek.SATURDAY
+                    && dayOfWeek != DayOfWeek.SUNDAY) {
+                businessDays++;
+            }
+
+            date = date.plusDays(1);
+        }
+
+        return businessDays;
     }
 }
