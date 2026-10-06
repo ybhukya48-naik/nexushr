@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   createPayroll,
   getAttendanceMonthlySummary,
@@ -458,6 +458,13 @@ export default function Payroll() {
                   {attendanceImportResult.errors.length} rows had validation issues.
                 </span>
               )}
+              {attendanceImportResult.errors.length > 0 && (
+                <ul>
+                  {attendanceImportResult.errors.slice(0, 10).map((err, i) => (
+                    <li key={i}>{typeof err === "string" ? err : JSON.stringify(err)}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 
@@ -474,6 +481,23 @@ export default function Payroll() {
                   attendanceSummary.totalShortfallMinutes / 60
                 ).toFixed(1)} shortfall hours.
               </span>
+
+              <table>
+                <thead>
+                  <tr>
+                    <th>Code</th><th>Name</th><th>Worked hrs</th><th>Expected hrs</th><th>Shortfall hrs</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attendanceSummary.employees.map((e) => (
+                    <tr key={e.employeeId}>
+                      <td>{e.employeeCode}</td><td>{e.fullName}</td>
+                      <td>{e.workedHours.toFixed(1)}</td><td>{e.expectedHours.toFixed(1)}</td>
+                      <td>{e.shortfallHours.toFixed(1)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 

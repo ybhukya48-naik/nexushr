@@ -243,7 +243,7 @@ export default function EmployeeProfile() {
     <section className="employees-page">
       <div className="employees-header">
         <div>
-          <p className="page-eyebrow">F01 Â· Employee Lifecycle</p>
+          <p className="page-eyebrow">Employee Lifecycle</p>
           <h1>{employee.fullName}</h1>
           <p>
             Employee profile and employment information.
@@ -256,7 +256,7 @@ export default function EmployeeProfile() {
             className="table-action"
             onClick={() => navigate("/employees")}
           >
-            â† Back
+            Back
           </button>{" "}
 
           {!editing && (
@@ -305,7 +305,7 @@ export default function EmployeeProfile() {
           <div className="employees-header">
             <div>
               <p className="page-eyebrow">
-                F01 Â· Edit Employee
+                Edit Employee
               </p>
               <h2>Edit Employee</h2>
               <p>
@@ -496,7 +496,7 @@ export default function EmployeeProfile() {
           <div className="panel-header">
             <div>
               <p className="page-eyebrow">
-                F01 Â· Personal & Employment Details
+                Personal & Employment Details
               </p>
               <h2>Employee Information</h2>
               <p>
@@ -555,7 +555,7 @@ export default function EmployeeProfile() {
             <label>
               Base Salary
               <input
-                value={`â‚¹${employee.baseSalary.toLocaleString("en-IN")}`}
+                value={employee.baseSalary.toLocaleString("en-IN")}
                 readOnly
               />
             </label>
@@ -583,7 +583,7 @@ export default function EmployeeProfile() {
         <div className="panel-header">
           <div>
             <p className="page-eyebrow">
-              F01 Â· Lifecycle
+              Lifecycle
             </p>
             <h2>Lifecycle Actions</h2>
             <p>

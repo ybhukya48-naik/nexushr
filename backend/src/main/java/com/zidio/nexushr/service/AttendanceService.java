@@ -423,10 +423,13 @@ public class AttendanceService {
                 }
                 }
 
-            } catch (IOException ex) {
+            } catch (IOException | RuntimeException ex) {
+                if (ex instanceof ResponseStatusException) {
+                    throw (ResponseStatusException) ex;
+                }
                 throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Unable to read Excel file",
+                    "Unable to read Excel file. Please upload a valid .xlsx or .xls sheet.",
                     ex
                 );
             }

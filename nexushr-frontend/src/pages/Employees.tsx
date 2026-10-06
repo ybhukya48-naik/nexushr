@@ -359,7 +359,7 @@ export default function Employees() {
       <section className="employees-page">
         <div className="employees-header">
           <div>
-            <p className="page-eyebrow">F01 Â· Employee Lifecycle</p>
+            <p className="page-eyebrow">Employee Lifecycle</p>
             <h1>Employees</h1>
             <p>Employee directory access is restricted to authorized HR users.</p>
           </div>
@@ -389,7 +389,7 @@ export default function Employees() {
     <section className="employees-page">
       <div className="employees-header">
         <div>
-          <p className="page-eyebrow">F01 Â· Employee Lifecycle</p>
+          <p className="page-eyebrow">Employee Lifecycle</p>
           <h1>Employees</h1>
           <p>Manage your workforce and employee lifecycle.</p>
         </div>
@@ -443,8 +443,8 @@ export default function Employees() {
             <div>
               <p className="page-eyebrow">
                 {editingEmployeeId !== null
-                  ? "F01 Â· Edit Employee"
-                  : "F01 Â· Create Employee"}
+                  ? "Edit Employee"
+                  : "Create Employee"}
               </p>
               <h2>
                 {editingEmployeeId !== null
