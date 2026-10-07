@@ -1,3 +1,4 @@
+﻿import { isCompanyMatch } from "../utils/company";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { FormEvent } from "react";
@@ -214,7 +215,7 @@ export default function Employees() {
         statusLabel(employee.lifecycleStatus) === status;
 
       const matchesCompany =
-        company === "All Companies" || employee.companyCode === (company === "CYOND" ? "CYOND" : "GORLE");
+        isCompanyMatch(employee.companyCode, company);
 
       return (        matchesSearch &&
         matchesDepartment &&
@@ -923,3 +924,5 @@ export default function Employees() {
     </section>
   );
 }
+
+

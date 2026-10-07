@@ -1,3 +1,4 @@
+﻿import { isCompanyMatch } from "../utils/company";
 import { useEffect, useMemo, useState } from "react";
 import {
   createPayroll,
@@ -85,7 +86,7 @@ export default function Payroll() {
         (employee) =>
           employee.active === true &&
           (selectedCompany === "All Companies" ||
-            employee.companyCode === selectedCompany),
+            isCompanyMatch(employee.companyCode, selectedCompany)),
       ),
     [employees, selectedCompany],
   );
@@ -108,7 +109,7 @@ export default function Payroll() {
       records.filter(
         (record) =>
           selectedCompany === "All Companies" ||
-          record.employee.companyCode === selectedCompany,
+          isCompanyMatch(record.employee.companyCode, selectedCompany),
       ),
     [records, selectedCompany],
   );
@@ -937,6 +938,10 @@ export default function Payroll() {
     </section>
   );
 }
+
+
+
+
 
 
 

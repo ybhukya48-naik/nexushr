@@ -1,4 +1,5 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { isCompanyMatch } from "../utils/company";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import "./Notifications.css";
 import {
   getCurrentEmployee,
@@ -82,6 +83,7 @@ export default function Notifications() {
   const [sending, setSending] = useState(false);
   const [success, setSuccess] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+  const [selectedCompany, setSelectedCompany] = useState("All Companies");
   const [notificationType, setNotificationType] = useState<NotificationResponse["notificationType"]>("GENERAL");
   const [channel, setChannel] = useState("IN_APP");
   const [title, setTitle] = useState("");
@@ -92,8 +94,8 @@ export default function Notifications() {
   const canCreate = ["ADMIN", "HR", "MANAGER"].includes(role);
 
   const activeEmployees = useMemo(
-    () => employees.filter((item) => item.active !== false),
-    [employees],
+    () => employees.filter((item) => item.active !== false && isCompanyMatch(item.companyCode, selectedCompany)),
+    [employees, selectedCompany],
   );
 
   const loadEmployeeNotifications = useCallback(
@@ -415,6 +417,25 @@ export default function Notifications() {
               marginBottom: showCreate ? 18 : 0,
             }}
           >
+            {canCreate && (
+              <label>
+                Company
+                <select
+                  value={selectedCompany}
+                  onChange={(event) => {
+                    setSelectedCompany(event.target.value);
+                    setSelectedEmployeeId("");
+                    setEmployee(null);
+                    setNotifications([]);
+                  }}
+                >
+                  <option value="All Companies">All Companies</option>
+                  <option value="CYOND">CYOND</option>
+                  <option value="GORLE">GORLE GROUP</option>
+                </select>
+              </label>
+            )}
+
             <label>
               Employee
               <select
@@ -761,5 +782,6 @@ export default function Notifications() {
     </>
   );
 }
+
 
 

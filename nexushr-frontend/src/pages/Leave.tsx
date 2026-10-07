@@ -1,3 +1,4 @@
+﻿import { isCompanyMatch } from "../utils/company";
 import { useEffect, useMemo, useState } from "react";
 import {
   getCurrentEmployee,
@@ -36,7 +37,7 @@ export default function Leave() {
           (employee.active === true ||
             employee.lifecycleStatus === "ACTIVE") &&
           (selectedCompany === "All Companies" ||
-            employee.companyCode === selectedCompany),
+            isCompanyMatch(employee.companyCode, selectedCompany)),
       ),
     [employees, selectedCompany],
   );
@@ -46,7 +47,7 @@ export default function Leave() {
       leaves.filter(
         (leave) =>
           selectedCompany === "All Companies" ||
-          leave.employee.companyCode === selectedCompany,
+          isCompanyMatch(leave.employee.companyCode, selectedCompany),
       ),
     [leaves, selectedCompany],
   );
@@ -479,3 +480,5 @@ function Stat({ title, value }: { title: string; value: number }) {
     </div>
   );
 }
+
+

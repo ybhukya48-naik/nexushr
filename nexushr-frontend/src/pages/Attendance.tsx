@@ -1,3 +1,4 @@
+﻿import { isCompanyMatch } from "../utils/company";
 import { API_BASE } from "../api";
 import { useEffect, useState } from "react";
 import {
@@ -289,13 +290,13 @@ export default function Attendance() {
     (employee) =>
       employee.active === true &&
       (selectedCompany === "All Companies" ||
-        employee.companyCode === selectedCompany),
+        isCompanyMatch(employee.companyCode, selectedCompany)),
   );
 
   const companyRecords = records.filter(
     (record) =>
       selectedCompany === "All Companies" ||
-      record.employee.companyCode === selectedCompany,
+      isCompanyMatch(record.employee.companyCode, selectedCompany),
   );
 
   const actionEmployee = isManagementRole
@@ -963,6 +964,9 @@ export default function Attendance() {
     </>
   );
 }
+
+
+
 
 
 
