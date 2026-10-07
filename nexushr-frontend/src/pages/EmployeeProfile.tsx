@@ -98,6 +98,7 @@ export default function EmployeeProfile() {
           joiningDate: data.joiningDate,
           baseSalary: data.baseSalary,
           active: data.active,
+          companyCode: data.companyCode || "CYOND",
         });
       })
       .catch((err) => {
@@ -152,6 +153,7 @@ export default function EmployeeProfile() {
       joiningDate: employee.joiningDate,
       baseSalary: employee.baseSalary,
       active: employee.active,
+      companyCode: employee.companyCode || "CYOND",
     });
 
     setEditing(true);
@@ -183,6 +185,7 @@ export default function EmployeeProfile() {
         joiningDate: updated.joiningDate,
         baseSalary: updated.baseSalary,
         active: updated.active,
+        companyCode: updated.companyCode || "CYOND",
       });
 
       setEditing(false);
@@ -421,7 +424,22 @@ export default function EmployeeProfile() {
                   )
                 }
               />
+            </label>            <label>
+              Company
+              <select
+                value={form.companyCode || "CYOND"}
+                onChange={(event) =>
+                  updateForm(
+                    "companyCode",
+                    event.target.value,
+                  )
+                }
+              >
+                <option value="CYOND">CYOND</option>
+                <option value="GORLE">GORLE GROUP</option>
+              </select>
             </label>
+
 
             <label>
               Designation
@@ -540,6 +558,12 @@ export default function EmployeeProfile() {
             <label>
               Department
               <input value={employee.department} readOnly />
+            </label>            <label>
+              Company
+              <input
+                value={employee.companyName || employee.companyCode || "CYOND"}
+                readOnly
+              />
             </label>
 
             <label>
@@ -597,3 +621,5 @@ export default function EmployeeProfile() {
     </section>
   );
 }
+
+
