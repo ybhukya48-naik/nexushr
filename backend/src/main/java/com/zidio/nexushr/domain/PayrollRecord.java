@@ -60,6 +60,18 @@ public class PayrollRecord {
     @Column(name = "net_salary", precision = 15, scale = 2, nullable = false)
     private BigDecimal netSalary;
 
+    @Column(name = "expected_work_minutes", nullable = false)
+    private Integer expectedWorkMinutes = 0;
+
+    @Column(name = "worked_minutes", nullable = false)
+    private Integer workedMinutes = 0;
+
+    @Column(name = "shortfall_minutes", nullable = false)
+    private Integer shortfallMinutes = 0;
+
+    @Column(name = "overtime_minutes", nullable = false)
+    private Integer overtimeMinutes = 0;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private PayrollStatus status;
@@ -176,6 +188,38 @@ public class PayrollRecord {
         this.netSalary = netSalary;
     }
 
+    public Integer getExpectedWorkMinutes() {
+        return expectedWorkMinutes;
+    }
+
+    public void setExpectedWorkMinutes(Integer expectedWorkMinutes) {
+        this.expectedWorkMinutes = expectedWorkMinutes;
+    }
+
+    public Integer getWorkedMinutes() {
+        return workedMinutes;
+    }
+
+    public void setWorkedMinutes(Integer workedMinutes) {
+        this.workedMinutes = workedMinutes;
+    }
+
+    public Integer getShortfallMinutes() {
+        return shortfallMinutes;
+    }
+
+    public void setShortfallMinutes(Integer shortfallMinutes) {
+        this.shortfallMinutes = shortfallMinutes;
+    }
+
+    public Integer getOvertimeMinutes() {
+        return overtimeMinutes;
+    }
+
+    public void setOvertimeMinutes(Integer overtimeMinutes) {
+        this.overtimeMinutes = overtimeMinutes;
+    }
+
     public PayrollStatus getStatus() {
         return status;
     }
@@ -184,3 +228,4 @@ public class PayrollRecord {
         this.status = status;
     }
 }
+

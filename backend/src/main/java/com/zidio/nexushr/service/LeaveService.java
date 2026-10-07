@@ -321,7 +321,7 @@ public class LeaveService {
                 title,
                 message,
                 NotificationType.APPROVAL,
-                NotificationChannel.IN_APP,
+                NotificationChannel.BOTH,
                 request.getEmployee().getEmail(),
                 request.getEmployee().getPhone()
         );

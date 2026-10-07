@@ -216,6 +216,23 @@ public class PayrollService {
 
         payrollRecord.setDeductions(deductions);
         payrollRecord.setNetSalary(netSalary);
+
+        // Store the exact attendance calculation used for this payroll.
+        if (autoComponents != null) {
+            payrollRecord.setExpectedWorkMinutes(
+                    autoComponents.expectedWorkMinutes()
+            );
+            payrollRecord.setWorkedMinutes(
+                    autoComponents.workedMinutes()
+            );
+            payrollRecord.setShortfallMinutes(
+                    autoComponents.shortfallMinutes()
+            );
+            payrollRecord.setOvertimeMinutes(
+                    autoComponents.overtimeMinutes()
+            );
+        }
+
         payrollRecord.setStatus(PayrollStatus.GENERATED);
 
         return payrollRepository.save(payrollRecord);
@@ -513,3 +530,4 @@ public class PayrollService {
         return businessDays;
     }
 }
+

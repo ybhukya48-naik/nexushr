@@ -347,6 +347,81 @@ export default function Performance() {
         />
       </section>
 
+      <section className="performance-panel performance-attendance-panel">
+        <div className="performance-panel-header">
+          <div>
+            <h3>Working Hours Intelligence</h3>
+            <p>
+              Performance calculated from real attendance working hours.
+            </p>
+          </div>
+
+          <strong>
+            {scorecard?.attendancePeriod ?? "Current month"}
+          </strong>
+        </div>
+
+        <div className="performance-attendance-grid">
+          <PerformanceStat
+            label="Expected Hours"
+            value={`${scorecard?.expectedWorkHours ?? 0}`}
+            suffix="h"
+            detail="Expected working hours"
+            icon="Hours"
+          />
+
+          <PerformanceStat
+            label="Worked Hours"
+            value={`${scorecard?.workedHours ?? 0}`}
+            suffix="h"
+            detail="Actual recorded working hours"
+            icon="Worked"
+          />
+
+          <PerformanceStat
+            label="Shortfall"
+            value={`${scorecard?.shortfallHours ?? 0}`}
+            suffix="h"
+            detail="Hours below expected"
+            icon="Shortfall"
+          />
+
+          <PerformanceStat
+            label="Overtime"
+            value={`${scorecard?.overtimeHours ?? 0}`}
+            suffix="h"
+            detail="Hours above standard day"
+            icon="Overtime"
+          />
+        </div>
+
+        <div className="performance-hours-summary">
+          <div>
+            <span>Attendance Performance</span>
+            <strong>
+              {scorecard?.averageScore ?? 0}/100
+            </strong>
+          </div>
+
+          <div className="performance-hours-track">
+            <div
+              style={{
+                width: `${Math.min(
+                  100,
+                  Math.max(0, scorecard?.averageScore ?? 0),
+                )}%`,
+              }}
+            />
+          </div>
+
+          <p>
+            Based on actual check-in/check-out working hours from attendance
+            records. Overtime does not artificially increase the score above
+            100.
+          </p>
+        </div>
+      </section>
+
       <section className="performance-main-grid">
         <div className="performance-panel">
           <div className="performance-panel-header">

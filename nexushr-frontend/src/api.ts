@@ -415,7 +415,24 @@ export interface PerformanceFeedback {
 export interface PerformanceScorecard {
   employeeId: number;
   reviewCount: number;
+
+  // Real attendance/work-hours performance
   averageScore: number;
+  performanceBasis?: string;
+  attendancePeriod?: string;
+  attendanceStartDate?: string;
+  attendanceEndDate?: string;
+  expectedWorkMinutes?: number;
+  workedMinutes?: number;
+  shortfallMinutes?: number;
+  overtimeMinutes?: number;
+  expectedWorkHours?: number;
+  workedHours?: number;
+  shortfallHours?: number;
+  overtimeHours?: number;
+
+  // Manual review statistics
+  reviewAverageScore?: number;
   highestScore: number;
   lowestScore: number;
   latestScore: number;
