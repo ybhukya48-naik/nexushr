@@ -13,14 +13,14 @@ public interface PayrollRepository extends JpaRepository<PayrollRecord, Long> {
     boolean existsByEmployee_IdAndPayMonth(Long employeeId, String payMonth);
 
     @Override
-    @EntityGraph(attributePaths = "employee")
+    @EntityGraph(attributePaths = {"employee", "employee.company"})
     List<PayrollRecord> findAll();
 
     @Override
-    @EntityGraph(attributePaths = "employee")
+    @EntityGraph(attributePaths = {"employee", "employee.company"})
     Optional<PayrollRecord> findById(Long id);
 
-    @EntityGraph(attributePaths = "employee")
+    @EntityGraph(attributePaths = {"employee", "employee.company"})
     List<PayrollRecord> findByEmployee_IdOrderByPayMonthDesc(Long employeeId);
 
     long countByStatus(PayrollStatus status);
