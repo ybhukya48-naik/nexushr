@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { FormEvent } from "react";
 import {
@@ -81,6 +81,7 @@ const emptyForm: EmployeeRequest = {
   joiningDate: "",
   baseSalary: 0,
   active: true,
+  companyCode: "CYOND",
 };
 
 function getStoredRole() {
@@ -98,6 +99,7 @@ export default function Employees() {
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("All Departments");
   const [status, setStatus] = useState("All Statuses");
+  const [company, setCompany] = useState("All Companies");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -211,13 +213,16 @@ export default function Employees() {
         status === "All Statuses" ||
         statusLabel(employee.lifecycleStatus) === status;
 
-      return (
-        matchesSearch &&
+      const matchesCompany =
+        company === "All Companies" || employee.companyCode === (company === "CYOND" ? "CYOND" : "GORLE");
+
+      return (        matchesSearch &&
         matchesDepartment &&
-        matchesStatus
+        matchesStatus &&
+        matchesCompany
       );
     });
-  }, [employees, search, department, status]);
+  }, [employees, search, department, status, company]);
 
   const activeCount = employees.filter(
     (employee) => employee.lifecycleStatus === "ACTIVE",
@@ -553,6 +558,19 @@ export default function Employees() {
             </label>
 
             <label>
+              Company
+              <select
+                value={form.companyCode || "CYOND"}
+                onChange={(event) =>
+                  updateForm("companyCode", event.target.value)
+                }
+              >
+                <option value="CYOND">CYOND</option>
+                <option value="GORLE">GORLE GROUP</option>
+              </select>
+            </label>
+
+            <label>
               Role
               <select
                 value={form.roleType}
@@ -685,6 +703,18 @@ export default function Employees() {
           </label>
 
           <label>
+            <span className="sr-only">Filter by company</span>
+            <select
+              value={company}
+              onChange={(event) => setCompany(event.target.value)}
+            >
+              <option>All Companies</option>
+              <option>CYOND</option>
+              <option>GORLE GROUP</option>
+            </select>
+          </label>
+
+          <label>
             <span className="sr-only">Filter by status</span>
             <select
               value={status}
@@ -731,6 +761,7 @@ export default function Employees() {
                 <thead>
                   <tr>
                     <th>Employee</th>
+                    <th>Company</th>
                     <th>Department</th>
                     <th>Designation</th>
                     <th>Role</th>
@@ -757,6 +788,7 @@ export default function Employees() {
                         </div>
                       </td>
 
+                      <td><strong>{employee.companyName}</strong></td>
                       <td>{employee.department}</td>
                       <td>{employee.designation}</td>
                       <td>{roleLabel(employee.roleType)}</td>
@@ -813,7 +845,7 @@ export default function Employees() {
 
                   {filteredEmployees.length === 0 && (
                     <tr>
-                      <td colSpan={8}>
+                      <td colSpan={9}>
                         <div className="employee-empty-state">
                           <strong>No employees found</strong>
                           <span>
@@ -891,12 +923,3 @@ export default function Employees() {
     </section>
   );
 }
-
-
-
-
-
-
-
-
-

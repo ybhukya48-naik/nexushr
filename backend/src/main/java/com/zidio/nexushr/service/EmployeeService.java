@@ -2,7 +2,9 @@ package com.zidio.nexushr.service;
 
 import com.zidio.nexushr.domain.Employee;
 import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
+import com.zidio.nexushr.domain.Company;
 import com.zidio.nexushr.repository.EmployeeRepository;
+import com.zidio.nexushr.repository.CompanyRepository;
 import com.zidio.nexushr.web.dto.EmployeeRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -15,12 +17,14 @@ import java.util.List;
 public class EmployeeService {
 
     private final EmployeeRepository employeeRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final CompanyRepository companyRepository;    private final PasswordEncoder passwordEncoder;
 
     public EmployeeService(
             EmployeeRepository employeeRepository,
+            CompanyRepository companyRepository,
             PasswordEncoder passwordEncoder) {
         this.employeeRepository = employeeRepository;
+        this.companyRepository = companyRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -37,6 +41,15 @@ public class EmployeeService {
     }
 
     public Employee create(EmployeeRequest request) {
+
+        String requestedCode = request.getCompanyCode();
+        final String companyCode = (requestedCode == null || requestedCode.isBlank())
+                ? "CYOND" : requestedCode;
+
+        Company company = companyRepository.findByCodeIgnoreCase(companyCode)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Unknown company: " + companyCode
+                ));
         if (request.getPassword() == null
                 || request.getPassword().isBlank()) {
             throw new IllegalArgumentException(
@@ -59,7 +72,7 @@ public class EmployeeService {
         }
 
         Employee employee = new Employee();
-
+        employee.setCompany(company);
         employee.setEmployeeCode(request.getEmployeeCode());
         employee.setFullName(request.getFullName());
         employee.setEmail(request.getEmail());
@@ -88,6 +101,15 @@ public class EmployeeService {
 
         Employee employee = findById(id);
 
+
+        if (request.getCompanyCode() != null && !request.getCompanyCode().isBlank()) {
+            Company company = companyRepository.findByCodeIgnoreCase(request.getCompanyCode())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Unknown company: " + request.getCompanyCode()
+                    ));
+
+            employee.setCompany(company);
+        }
         if (request.getEmployeeCode() != null
                 && !request.getEmployeeCode().isBlank()) {
             employee.setEmployeeCode(
@@ -168,12 +190,19 @@ public class EmployeeService {
             );
         }
 
+        if (request.getCompanyCode() != null && !request.getCompanyCode().isBlank()) {
+            Company company = companyRepository.findByCodeIgnoreCase(request.getCompanyCode())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Unknown company: " + request.getCompanyCode()
+                    ));
+            employee.setCompany(company);
+        }
+
         return employeeRepository.save(employee);
     }
 
     public void delete(Long id) {
         Employee employee = findById(id);
-
         employee.setActive(false);
         employee.setLifecycleStatus(
                 EmployeeLifecycleStatus.OFFBOARDED
@@ -182,6 +211,3 @@ public class EmployeeService {
         employeeRepository.save(employee);
     }
 }
-
-
-

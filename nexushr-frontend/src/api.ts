@@ -1,4 +1,4 @@
-﻿export const API_BASE = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8080/api/v1`;
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8080/api/v1`;
 
 export interface LoginResponse {
   accessToken: string;
@@ -46,6 +46,8 @@ export interface EmployeeResponse {
   active: boolean;
  gender?: "MALE" | "FEMALE" | "OTHER" | "PREFER_NOT_TO_SAY";
   lifecycleStatus: EmployeeLifecycleStatus;
+  companyCode: string;
+  companyName: string;
 }
 
 export interface EmployeeRequest {
@@ -61,6 +63,7 @@ export interface EmployeeRequest {
   joiningDate: string;
   baseSalary: number;
   active: boolean;
+  companyCode?: string;
 }
 
 export interface EmployeeLifecycleRequest {

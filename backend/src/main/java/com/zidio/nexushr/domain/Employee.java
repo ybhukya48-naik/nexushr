@@ -14,6 +14,10 @@ public class Employee {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+
     @Column(nullable = false, unique = true)
     private String employeeCode;
 
@@ -75,6 +79,14 @@ public class Employee {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+        public Company getCompany() {
+        return company;
+    }
+
+    public void setCompany(Company company) {
+        this.company = company;
     }
 
     public String getEmployeeCode() {
@@ -203,4 +215,3 @@ public class Employee {
         this.mfaSecret = mfaSecret;
     }
 }
-

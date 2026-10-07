@@ -46,3 +46,10 @@ app:
   jwt:
     secret: ${JWT_SECRET:nexushr-local-dev-secret-key-2026-long-enough-for-hs256}
     expiration-minutes: ${JWT_EXPIRATION_MINUTES:60}
+
+aws:
+  region: ${AWS_REGION:us-east-2}
+  s3-bucket: ${AWS_S3_BUCKET:}
+  endpoint-url-s3: ${AWS_ENDPOINT_URL_S3:}
+  access-key-id: ${AWS_ACCESS_KEY_ID:}
+  secret-access-key: ${AWS_SECRET_ACCESS_KEY:}

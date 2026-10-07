@@ -20,6 +20,16 @@ public class EmployeeRequest {
     private BigDecimal baseSalary;
     private Boolean active;
 
+    private String companyCode;
+
+        public String getCompanyCode() {
+        return companyCode;
+    }
+
+    public void setCompanyCode(String companyCode) {
+        this.companyCode = companyCode;
+    }
+
     public String getEmployeeCode() {
         return employeeCode;
     }
