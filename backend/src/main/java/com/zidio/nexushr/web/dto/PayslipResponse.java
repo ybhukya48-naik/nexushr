@@ -10,6 +10,10 @@ public class PayslipResponse {
     private final String employeeName;
     private final String payMonth;
 
+    private final String companyCode;
+    private final String companyName;
+    private final String companyTagline;
+
     private final BigDecimal basicSalary;
     private final BigDecimal hra;
     private final BigDecimal bonus;
@@ -31,6 +35,9 @@ public class PayslipResponse {
             String employeeCode,
             String employeeName,
             String payMonth,
+            String companyCode,
+            String companyName,
+            String companyTagline,
             BigDecimal basicSalary,
             BigDecimal hra,
             BigDecimal bonus,
@@ -49,6 +56,9 @@ public class PayslipResponse {
         this.employeeCode = employeeCode;
         this.employeeName = employeeName;
         this.payMonth = payMonth;
+        this.companyCode = companyCode;
+        this.companyName = companyName;
+        this.companyTagline = companyTagline;
         this.basicSalary = basicSalary;
         this.hra = hra;
         this.bonus = bonus;
@@ -72,6 +82,12 @@ public class PayslipResponse {
     public String getEmployeeName() { return employeeName; }
 
     public String getPayMonth() { return payMonth; }
+
+    public String getCompanyCode() { return companyCode; }
+
+    public String getCompanyName() { return companyName; }
+
+    public String getCompanyTagline() { return companyTagline; }
 
     public BigDecimal getBasicSalary() { return basicSalary; }
 

@@ -1,4 +1,4 @@
-﻿import { API_BASE } from "../api";
+import { API_BASE } from "../api";
 import { useEffect, useState } from "react";
 import {
   getCurrentEmployee,
@@ -247,6 +247,7 @@ export default function Attendance() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [metrics, setMetrics] = useState<AttendanceMetrics | null>(null);
   const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState("All Companies");
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -284,6 +285,19 @@ export default function Attendance() {
   // Check In / Check Out. "All employees" remains a view-only filter.
   const isManagementRole = ["ADMIN", "HR", "MANAGER"].includes(currentRole);
 
+  const companyEmployees = employees.filter(
+    (employee) =>
+      employee.active === true &&
+      (selectedCompany === "All Companies" ||
+        employee.companyCode === selectedCompany),
+  );
+
+  const companyRecords = records.filter(
+    (record) =>
+      selectedCompany === "All Companies" ||
+      record.employee.companyCode === selectedCompany,
+  );
+
   const actionEmployee = isManagementRole
     ? selectedEmployee
       ? employees.find(
@@ -311,7 +325,7 @@ export default function Attendance() {
 
 
 
-  const attendanceRows = employees
+  const attendanceRows = companyEmployees
     .filter((employee) => employee.active === true)
     .filter(
       (employee) =>
@@ -320,7 +334,7 @@ export default function Attendance() {
     )
     .map((employee) => ({
       employee,
-      record: records.find(
+      record: companyRecords.find(
         (record) => String(record.employee.id) === String(employee.id),
       ),
     }));
@@ -382,6 +396,7 @@ export default function Attendance() {
         );
 
         setEmployees([me]);
+        setSelectedCompany(me.companyCode || "CYOND");
         setSelectedEmployee(String(me.id));
         setRecords(recordsForDate);
         setAttendanceLoaded(true);
@@ -540,7 +555,7 @@ export default function Attendance() {
     }
   }
 
-  const visibleRecords = records.filter(
+  const visibleRecords = companyRecords.filter(
     (record) =>
       !selectedEmployee ||
       String(record.employee.id) === selectedEmployee,
@@ -729,23 +744,39 @@ export default function Attendance() {
           </label>
 
           <label>
+            <span>Company</span>
+            <select
+              value={selectedCompany}
+              onChange={(event) => {
+                if (isManagementRole) {
+                  setSelectedCompany(event.target.value);
+                  setSelectedEmployee("");
+                }
+              }}
+              disabled={!isManagementRole}
+            >
+              <option value="All Companies">All Companies</option>
+              <option value="CYOND">CYOND</option>
+              <option value="GORLE">GORLE GROUP</option>
+            </select>
+          </label>
+
+          <label>
             <span>Employee</span>
             <select
               value={selectedEmployee}
               onChange={(event) => setSelectedEmployee(event.target.value)}
-              disabled={!["ADMIN", "HR", "MANAGER"].includes(currentRole)}
+              disabled={!isManagementRole}
             >
-              {["ADMIN", "HR", "MANAGER"].includes(currentRole) && (
+              {isManagementRole && (
                 <option value="">All employees</option>
               )}
 
-              {employees
-                .filter((employee) => employee.active === true)
-                .map((employee) => (
-                  <option key={employee.id} value={employee.id}>
-                    {employee.fullName} - {employee.employeeCode}
-                  </option>
-                ))}
+              {companyEmployees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.fullName} - {employee.employeeCode}
+                </option>
+              ))}
             </select>
           </label>
 

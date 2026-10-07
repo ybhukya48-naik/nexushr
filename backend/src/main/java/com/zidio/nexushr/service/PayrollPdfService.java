@@ -164,14 +164,24 @@ public class PayrollPdfService {
 
             logoCell.setPadding(0);
 
+            String normalizedLogoPath = companyLogoPath;
+
+            if (normalizedLogoPath == null || normalizedLogoPath.isBlank()) {
+                normalizedLogoPath = "/images/cyond-logo.jpeg";
+            }
+
+            if (!normalizedLogoPath.startsWith("/")) {
+                normalizedLogoPath = "/" + normalizedLogoPath;
+            }
+
             try (InputStream logoStream =
                          getClass().getResourceAsStream(
-                                 "companyLogoPath"
+                                 normalizedLogoPath
                          )) {
 
                 if (logoStream == null) {
                     throw new IllegalStateException(
-                            "CYOND logo not found: companyLogoPath"
+                            "Company logo not found: " + normalizedLogoPath
                     );
                 }
 
@@ -213,7 +223,7 @@ public class PayrollPdfService {
 
             Phrase companyPhrase =
                     new Phrase(
-                            "CYOND",
+                            companyName,
                             COMPANY_FONT
                     );
 
@@ -225,7 +235,7 @@ public class PayrollPdfService {
 
             com.lowagie.text.Paragraph tagline =
                     new com.lowagie.text.Paragraph(
-                            "Waterproofing Diagnosis & Repair Experts",
+                            companyTagline,
                             TAGLINE_FONT
                     );
 
@@ -853,3 +863,4 @@ public class PayrollPdfService {
                 : value;
     }
 }
+

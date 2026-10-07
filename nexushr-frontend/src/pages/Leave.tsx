@@ -15,6 +15,7 @@ import {
 
 export default function Leave() {
   const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState("All Companies");
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -28,6 +29,27 @@ export default function Leave() {
   const role = localStorage.getItem("nexushr_role") || "HR";
 
   const isEmployee = role === "EMPLOYEE";
+  const companyEmployees = useMemo(
+    () =>
+      employees.filter(
+        (employee) =>
+          (employee.active === true ||
+            employee.lifecycleStatus === "ACTIVE") &&
+          (selectedCompany === "All Companies" ||
+            employee.companyCode === selectedCompany),
+      ),
+    [employees, selectedCompany],
+  );
+
+  const companyLeaves = useMemo(
+    () =>
+      leaves.filter(
+        (leave) =>
+          selectedCompany === "All Companies" ||
+          leave.employee.companyCode === selectedCompany,
+      ),
+    [leaves, selectedCompany],
+  );
 
   async function load() {
     setError("");
@@ -41,6 +63,7 @@ export default function Leave() {
 
         setSelectedEmployee(String(me.id));
         setEmployees([me]);
+        setSelectedCompany(me.companyCode || "CYOND");
 
         try {
           setBalance(await getLeaveBalance(me.id));
@@ -158,22 +181,8 @@ export default function Leave() {
     }
   }
 
-  const activeEmployees = useMemo(
-    () =>
-      employees.filter(
-        (employee) =>
-          employee.active === true || employee.lifecycleStatus === "ACTIVE",
-      ),
-    [employees],
-  );
 
-  const pendingCount = leaves.filter(
-    (leave) => leave.status === "PENDING",
-  ).length;
 
-  const approvedCount = leaves.filter(
-    (leave) => leave.status === "APPROVED",
-  ).length;
 
   return (
     <section className="leave-page">
@@ -204,9 +213,9 @@ export default function Leave() {
       )}
 
       <div className="stats-grid">
-        <Stat title="Total Requests" value={leaves.length} />
-        <Stat title="Pending" value={pendingCount} />
-        <Stat title="Approved" value={approvedCount} />
+        <Stat title="Total Requests" value={companyLeaves.length} />
+        <Stat title="Pending" value={companyLeaves.filter((leave) => leave.status === "PENDING").length} />
+        <Stat title="Approved" value={companyLeaves.filter((leave) => leave.status === "APPROVED").length} />
         {balance && (
           <Stat title="Days Remaining" value={balance.remainingDays} />
         )}
@@ -223,12 +232,30 @@ export default function Leave() {
 
         <form onSubmit={submit}>
           <div className="employee-filters">
+            {!isEmployee && (
+              <label>
+                Company
+                <select
+                  value={selectedCompany}
+                  onChange={(event) => {
+                    setSelectedCompany(event.target.value);
+                    setSelectedEmployee("");
+                    setBalance(null);
+                  }}
+                >
+                  <option value="All Companies">All Companies</option>
+                  <option value="CYOND">CYOND</option>
+                  <option value="GORLE">GORLE GROUP</option>
+                </select>
+              </label>
+            )}
+
             <label>
               Employee
               {isEmployee ? (
                 <input
                   value={
-                    activeEmployees.find(
+                    companyEmployees.find(
                       (employee) =>
                         String(employee.id) === selectedEmployee,
                     )?.fullName || "My Profile"
@@ -244,7 +271,7 @@ export default function Leave() {
                   required
                 >
                   <option value="">Select employee</option>
-                  {activeEmployees.map((employee) => (
+                  {companyEmployees.map((employee) => (
                     <option key={employee.id} value={employee.id}>
                       {employee.employeeCode} - {employee.fullName}
                     </option>
@@ -322,9 +349,9 @@ export default function Leave() {
             <p className="eyebrow">REQUEST HISTORY</p>
             <h3>Leave Requests</h3>
             <p>
-              {leaves.length === 0
+              {companyLeaves.length === 0
                 ? "No requests yet."
-                : `${leaves.length} request${leaves.length === 1 ? "" : "s"} recorded.`}
+                : `${companyLeaves.length} request${companyLeaves.length === 1 ? "" : "s"} recorded.`}
             </p>
           </div>
         </div>
@@ -343,7 +370,7 @@ export default function Leave() {
             </thead>
 
             <tbody>
-              {leaves.map((leave) => {
+              {companyLeaves.map((leave) => {
                 const days =
                   Math.floor(
                     (new Date(leave.endDate).getTime() -
@@ -424,7 +451,7 @@ export default function Leave() {
                 );
               })}
 
-              {leaves.length === 0 && (
+              {companyLeaves.length === 0 && (
                 <tr>
                   <td colSpan={isEmployee ? 5 : 6}>
                     <div className="employee-empty-state">

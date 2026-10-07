@@ -46,6 +46,7 @@ export default function Payroll() {
   const isManagementRole = ["ADMIN", "HR", "MANAGER"].includes(role);
 
   const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
+  const [selectedCompany, setSelectedCompany] = useState("All Companies");
   const [records, setRecords] = useState<PayrollRecord[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [payMonth, setPayMonth] = useState(currentMonth());
@@ -78,9 +79,20 @@ export default function Payroll() {
   const [payslipLoading, setPayslipLoading] = useState(false);
   const [emailingPayslip, setEmailingPayslip] = useState(false);
 
+  const companyEmployees = useMemo(
+    () =>
+      employees.filter(
+        (employee) =>
+          employee.active === true &&
+          (selectedCompany === "All Companies" ||
+            employee.companyCode === selectedCompany),
+      ),
+    [employees, selectedCompany],
+  );
+
   const payrollEmployees = useMemo(
-    () => employees.filter((employee) => employee.active === true),
-    [employees],
+    () => companyEmployees,
+    [companyEmployees],
   );
 
   const selectedEmployeeData = useMemo(
@@ -89,6 +101,16 @@ export default function Payroll() {
         (employee) => String(employee.id) === selectedEmployee,
       ) ?? null,
     [payrollEmployees, selectedEmployee],
+  );
+
+  const companyRecords = useMemo(
+    () =>
+      records.filter(
+        (record) =>
+          selectedCompany === "All Companies" ||
+          record.employee.companyCode === selectedCompany,
+      ),
+    [records, selectedCompany],
   );
 
   async function loadData() {
@@ -102,6 +124,7 @@ export default function Payroll() {
         const me = await getCurrentEmployee();
 
         setEmployees([me]);
+        setSelectedCompany(me.companyCode || "CYOND");
         setSelectedEmployee(String(me.id));
 
         const payrollData = await getEmployeePayroll(me.id);
@@ -333,8 +356,12 @@ export default function Payroll() {
       const link = document.createElement("a");
 
       link.href = url;
+      const companyPrefix = (payslip.companyCode || "CYOND")
+        .trim()
+        .replace(/[^A-Za-z0-9]+/g, "-");
+
       link.download =
-        `CYOND-Payslip-${payslip.employeeCode}-${payslip.payMonth}.pdf`;
+        `${companyPrefix}-Payslip-${payslip.employeeCode}-${payslip.payMonth}.pdf`;
 
       document.body.appendChild(link);
       link.click();
@@ -503,6 +530,23 @@ export default function Payroll() {
 
         <form onSubmit={handleGenerate}>
           <div className="employee-filters">
+            {isManagementRole && (
+              <label>
+                Company
+                <select
+                  value={selectedCompany}
+                  onChange={(event) => {
+                    setSelectedCompany(event.target.value);
+                    setSelectedEmployee("");
+                  }}
+                >
+                  <option value="All Companies">All Companies</option>
+                  <option value="CYOND">CYOND</option>
+                  <option value="GORLE">GORLE GROUP</option>
+                </select>
+              </label>
+            )}
+
             <label>
               Employee
               <select
@@ -514,7 +558,7 @@ export default function Payroll() {
               >
                 <option value="">Choose an employee</option>
 
-                {payrollEmployees.map((employee) => (
+                {companyEmployees.map((employee) => (
                   <option key={employee.id} value={employee.id}>
                     {employee.employeeCode} - {employee.fullName}
                   </option>
@@ -728,7 +772,7 @@ export default function Payroll() {
               </thead>
 
               <tbody>
-                {records.map((record) => (
+                {companyRecords.map((record) => (
                   <tr key={record.id}>
                     <td>
                       <strong>{record.employee.fullName}</strong>

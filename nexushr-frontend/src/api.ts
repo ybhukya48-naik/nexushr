@@ -607,6 +607,9 @@ export interface PayslipResponse {
   employeeCode: string;
   employeeName: string;
   payMonth: string;
+  companyCode: string;
+  companyName: string;
+  companyTagline: string;
   basicSalary: number;
   hra: number;
   bonus: number;
