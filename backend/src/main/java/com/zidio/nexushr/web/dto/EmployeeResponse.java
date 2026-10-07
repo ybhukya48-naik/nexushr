@@ -20,7 +20,9 @@ public record EmployeeResponse(
         LocalDate joiningDate,
         BigDecimal baseSalary,
         boolean active,
-        EmployeeLifecycleStatus lifecycleStatus
+        EmployeeLifecycleStatus lifecycleStatus,
+        String companyCode,
+        String companyName
 ) {
 
     public static EmployeeResponse from(Employee employee) {
@@ -37,7 +39,9 @@ public record EmployeeResponse(
                 employee.getJoiningDate(),
                 employee.getBaseSalary(),
                 employee.isActive(),
-                employee.getLifecycleStatus()
+                employee.getLifecycleStatus(),
+                employee.getCompany() == null ? null : employee.getCompany().getCode(),
+                employee.getCompany() == null ? null : employee.getCompany().getName()
         );
     }
 }

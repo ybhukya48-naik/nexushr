@@ -274,6 +274,7 @@ export default function Employees() {
       joiningDate: employee.joiningDate,
       baseSalary: employee.baseSalary,
       active: employee.active,
+      companyCode: employee.companyCode || "CYOND",
     });
 
     setShowCreateForm(true);
@@ -711,7 +712,7 @@ export default function Employees() {
             >
               <option>All Companies</option>
               <option>CYOND</option>
-              <option>GORLE GROUP</option>
+              <option value="GORLE">GORLE GROUP</option>
             </select>
           </label>
 
@@ -924,5 +925,6 @@ export default function Employees() {
     </section>
   );
 }
+
 
 
