@@ -29,6 +29,47 @@ public class PayrollRecord {
 
     @Column(name = "basic_salary", precision = 15, scale = 2, nullable = false)
     private BigDecimal basicSalary;
+    @Column(name = "ctc", precision = 15, scale = 2, nullable = false)
+    private BigDecimal ctc = BigDecimal.ZERO;
+
+    @Column(name = "charge_per_day", precision = 15, scale = 2, nullable = false)
+    private BigDecimal chargePerDay = BigDecimal.ZERO;
+
+    @Column(name = "working_days", nullable = false)
+    private Integer workingDays = 0;
+
+    @Column(name = "required_hours", precision = 5, scale = 2, nullable = false)
+    private BigDecimal requiredHours = BigDecimal.valueOf(9);
+
+    @Column(name = "actual_hours", precision = 10, scale = 2, nullable = false)
+    private BigDecimal actualHours = BigDecimal.ZERO;
+
+    @Column(name = "casual_leave", precision = 5, scale = 2, nullable = false)
+    private BigDecimal casualLeave = BigDecimal.ZERO;
+
+    @Column(name = "other_leave", precision = 5, scale = 2, nullable = false)
+    private BigDecimal otherLeave = BigDecimal.ZERO;
+
+    @Column(name = "earned_gross", precision = 15, scale = 2, nullable = false)
+    private BigDecimal earnedGross = BigDecimal.ZERO;
+
+    @Column(name = "conveyance", precision = 15, scale = 2, nullable = false)
+    private BigDecimal conveyance = BigDecimal.ZERO;
+
+    @Column(name = "medical", precision = 15, scale = 2, nullable = false)
+    private BigDecimal medical = BigDecimal.ZERO;
+
+    @Column(name = "others", precision = 15, scale = 2, nullable = false)
+    private BigDecimal others = BigDecimal.ZERO;
+
+    @Column(name = "esi", precision = 15, scale = 2, nullable = false)
+    private BigDecimal esi = BigDecimal.ZERO;
+
+    @Column(name = "pt", precision = 15, scale = 2, nullable = false)
+    private BigDecimal pt = BigDecimal.ZERO;
+
+    @Column(name = "short_hours_deduction", precision = 15, scale = 2, nullable = false)
+    private BigDecimal shortHoursDeduction = BigDecimal.ZERO;
 
     @Column(name = "hra", precision = 15, scale = 2, nullable = false)
     private BigDecimal hra;
@@ -78,6 +119,117 @@ public class PayrollRecord {
 
     public Long getId() {
         return id;
+    }
+    public BigDecimal getCtc() {
+        return ctc;
+    }
+
+    public void setCtc(BigDecimal ctc) {
+        this.ctc = ctc;
+    }
+
+    public BigDecimal getChargePerDay() {
+        return chargePerDay;
+    }
+
+    public void setChargePerDay(BigDecimal chargePerDay) {
+        this.chargePerDay = chargePerDay;
+    }
+
+    public Integer getWorkingDays() {
+        return workingDays;
+    }
+
+    public void setWorkingDays(Integer workingDays) {
+        this.workingDays = workingDays;
+    }
+
+    public BigDecimal getRequiredHours() {
+        return requiredHours;
+    }
+
+    public void setRequiredHours(BigDecimal requiredHours) {
+        this.requiredHours = requiredHours;
+    }
+
+    public BigDecimal getActualHours() {
+        return actualHours;
+    }
+
+    public void setActualHours(BigDecimal actualHours) {
+        this.actualHours = actualHours;
+    }
+
+    public BigDecimal getCasualLeave() {
+        return casualLeave;
+    }
+
+    public void setCasualLeave(BigDecimal casualLeave) {
+        this.casualLeave = casualLeave;
+    }
+
+    public BigDecimal getOtherLeave() {
+        return otherLeave;
+    }
+
+    public void setOtherLeave(BigDecimal otherLeave) {
+        this.otherLeave = otherLeave;
+    }
+
+    public BigDecimal getEarnedGross() {
+        return earnedGross;
+    }
+
+    public void setEarnedGross(BigDecimal earnedGross) {
+        this.earnedGross = earnedGross;
+    }
+
+    public BigDecimal getConveyance() {
+        return conveyance;
+    }
+
+    public void setConveyance(BigDecimal conveyance) {
+        this.conveyance = conveyance;
+    }
+
+    public BigDecimal getMedical() {
+        return medical;
+    }
+
+    public void setMedical(BigDecimal medical) {
+        this.medical = medical;
+    }
+
+    public BigDecimal getOthers() {
+        return others;
+    }
+
+    public void setOthers(BigDecimal others) {
+        this.others = others;
+    }
+
+    public BigDecimal getEsi() {
+        return esi;
+    }
+
+    public void setEsi(BigDecimal esi) {
+        this.esi = esi;
+    }
+
+    public BigDecimal getPt() {
+        return pt;
+    }
+
+    public void setPt(BigDecimal pt) {
+        this.pt = pt;
+    }
+
+    public BigDecimal getShortHoursDeduction() {
+        return shortHoursDeduction;
+    }
+
+    public void setShortHoursDeduction(BigDecimal shortHoursDeduction) {
+        this.shortHoursDeduction = shortHoursDeduction;
     }
 
     public void setId(Long id) {
@@ -228,4 +380,6 @@ public class PayrollRecord {
         this.status = status;
     }
 }
+
+
 

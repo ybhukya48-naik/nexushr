@@ -1,0 +1,41 @@
+ALTER TABLE payroll_records
+ADD COLUMN ctc DECIMAL(15,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payroll_records
+ADD COLUMN charge_per_day DECIMAL(15,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payroll_records
+ADD COLUMN working_days INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE payroll_records
+ADD COLUMN required_hours DECIMAL(5,2) NOT NULL DEFAULT 9;
+
+ALTER TABLE payroll_records
+ADD COLUMN actual_hours DECIMAL(10,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payroll_records
+ADD COLUMN casual_leave DECIMAL(5,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payroll_records
+ADD COLUMN other_leave DECIMAL(5,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payroll_records
+ADD COLUMN earned_gross DECIMAL(15,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payroll_records
+ADD COLUMN conveyance DECIMAL(15,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payroll_records
+ADD COLUMN medical DECIMAL(15,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payroll_records
+ADD COLUMN others DECIMAL(15,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payroll_records
+ADD COLUMN esi DECIMAL(15,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payroll_records
+ADD COLUMN pt DECIMAL(15,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE payroll_records
+ADD COLUMN short_hours_deduction DECIMAL(15,2) NOT NULL DEFAULT 0;
