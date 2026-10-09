@@ -2,7 +2,7 @@
 # NexusHR Production Docker Build
 # ============================================================
 
-FROM maven:3.9-eclipse-temurin-25 AS builder
+FROM maven:3.9-eclipse-temurin-17 AS builder
 
 WORKDIR /build
 
@@ -13,7 +13,7 @@ COPY src ./src
 RUN mvn -B -DskipTests package
 
 
-FROM eclipse-temurin:25-jre
+FROM eclipse-temurin:17-jre
 
 WORKDIR /app
 
@@ -33,6 +33,6 @@ EXPOSE 8080
 
 ENV SPRING_PROFILES_ACTIVE=prod
 ENV TZ=Asia/Kolkata
-ENV JAVA_TOOL_OPTIONS=-Duser.timezone=Asia/Kolkata
+ENV JAVA_TOOL_OPTIONS="-Xms64m -Xmx320m -XX:MaxMetaspaceSize=128m -Duser.timezone=Asia/Kolkata"
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
