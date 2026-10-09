@@ -6123,3 +6123,83 @@ tbody tr:hover td {
   border-color: #98a2b3;
   transform: translateY(-1px);
 }
+
+
+/* CYOND AND GORLE GROUP dual-logo login branding */
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.login-brand-logos {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.login-brand-logos .brand-logo-large {
+  width: 56px;
+  height: 56px;
+  margin: 0;
+  padding: 4px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.login-brand-text {
+  min-width: 0;
+  max-width: 440px;
+}
+
+.login-brand-text strong {
+  display: block;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.login-mobile-logos {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.login-mobile-logos .brand-logo {
+  width: 48px;
+  height: 48px;
+  padding: 4px;
+  object-fit: contain;
+  background: #ffffff;
+  border-radius: 9px;
+}
+
+.login-mobile-brand-text {
+  text-align: center;
+}
+
+.login-mobile-brand-text strong {
+  display: block;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.login-mobile-brand-text span {
+  display: block;
+  margin-top: 5px;
+  font-size: 10px;
+}
+
+@media (max-width: 960px) {
+  .login-brand {
+    justify-content: center;
+  }
+
+  .login-brand-text {
+    text-align: center;
+  }
+}

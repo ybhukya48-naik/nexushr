@@ -1,4 +1,4 @@
-﻿import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
   BrowserRouter,
@@ -252,21 +252,22 @@ function Login() {
         <div className="login-brand-panel">
 
           <div className="login-brand">
-
-            <img
-              className="brand-logo brand-logo-large"
-              src="/images/cyond-logo.jpeg"
-              alt="Cyond logo"
-            />
-
-            <div>
-              <strong>Cyond</strong>
-
-              <span>
-                Waterproofing Diagnosis &amp; Repair Experts
-              </span>
+            <div className="login-brand-logos">
+              <img
+                className="brand-logo brand-logo-large"
+                src="/images/cyond-logo.jpeg"
+                alt="CYOND logo"
+              />
+              <img
+                className="brand-logo brand-logo-large"
+                src="/images/gorle-group-logo.jpeg"
+                alt="Gorle Group logo"
+              />
             </div>
-
+            <div className="login-brand-text">
+              <strong>CYOND AND GORLE GROUP BUSINESS SOLUTION</strong>
+              <span>Enterprise HR Platform</span>
+            </div>
           </div>
 
           <div className="login-cover-image">
@@ -374,28 +375,27 @@ function Login() {
 
               {/* MOBILE BRAND */}
               <div className="login-mobile-brand">
-
-                <img
-                  className="brand-logo"
-                  src="/images/cyond-logo.jpeg"
-                  alt="Cyond logo"
-                />
-
-                <div>
-                  <strong>
-                    Cyond
-                  </strong>
-
-                  <span>
-                    Waterproofing Diagnosis &amp; Repair Experts
-                  </span>
+                <div className="login-mobile-logos">
+                  <img
+                    className="brand-logo"
+                    src="/images/cyond-logo.jpeg"
+                    alt="CYOND logo"
+                  />
+                  <img
+                    className="brand-logo"
+                    src="/images/gorle-group-logo.jpeg"
+                    alt="Gorle Group logo"
+                  />
                 </div>
-
+                <div className="login-mobile-brand-text">
+                  <strong>CYOND AND GORLE GROUP BUSINESS SOLUTION</strong>
+                  <span>Enterprise HR Platform</span>
+                </div>
               </div>
 
               {/* CYOND BRANDING */}
               <p className="eyebrow">
-                CYOND WATERPROOFING DIAGNOSIS &amp; REPAIR
+                CYOND AND GORLE GROUP BUSINESS SOLUTION
                 EXPERTS
               </p>
 
@@ -404,7 +404,7 @@ function Login() {
               </h2>
 
               <p>
-                Sign in to continue to your Cyond workspace.
+                Sign in to continue to your workspace.
               </p>
 
             </div>
