@@ -12,6 +12,9 @@ public interface PayrollRepository extends JpaRepository<PayrollRecord, Long> {
 
     boolean existsByEmployee_IdAndPayMonth(Long employeeId, String payMonth);
 
+    @EntityGraph(attributePaths = {"employee", "employee.company"})
+    Optional<PayrollRecord> findByEmployee_IdAndPayMonth(Long employeeId, String payMonth);
+
     @Override
     @EntityGraph(attributePaths = {"employee", "employee.company"})
     List<PayrollRecord> findAll();

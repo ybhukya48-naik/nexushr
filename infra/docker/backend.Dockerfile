@@ -1,8 +1,8 @@
-﻿# ============================================================
+# ============================================================
 # NexusHR Backend Deployment Image
 # ============================================================
 
-FROM maven:3.9-eclipse-temurin-25 AS builder
+FROM maven:3.9-eclipse-temurin-17 AS builder
 
 WORKDIR /build
 

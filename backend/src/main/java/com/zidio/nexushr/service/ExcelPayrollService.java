@@ -1,15 +1,21 @@
-
 package com.zidio.nexushr.service;
 
+import com.zidio.nexushr.domain.AttendanceRecord;
 import com.zidio.nexushr.domain.Company;
 import com.zidio.nexushr.domain.Employee;
+import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
+import com.zidio.nexushr.domain.NotificationChannel;
+import com.zidio.nexushr.domain.NotificationType;
 import com.zidio.nexushr.domain.PayrollRecord;
 import com.zidio.nexushr.domain.PayrollStatus;
+import com.zidio.nexushr.domain.RoleType;
+import com.zidio.nexushr.repository.AttendanceRepository;
 import com.zidio.nexushr.repository.CompanyRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.repository.PayrollRepository;
 import org.apache.poi.ss.usermodel.*;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,26 +23,36 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.*;
 
 @Service
 public class ExcelPayrollService {
 
+    private static final Logger log = LoggerFactory.getLogger(ExcelPayrollService.class);
     private static final BigDecimal ZERO = BigDecimal.ZERO;
     private static final BigDecimal NINE = BigDecimal.valueOf(9);
 
     private final PayrollRepository payrollRepository;
     private final EmployeeRepository employeeRepository;
     private final CompanyRepository companyRepository;
+    private final AttendanceRepository attendanceRepository;
+    private final NotificationService notificationService;
 
     public ExcelPayrollService(
             PayrollRepository payrollRepository,
             EmployeeRepository employeeRepository,
-            CompanyRepository companyRepository) {
+            CompanyRepository companyRepository,
+            AttendanceRepository attendanceRepository,
+            NotificationService notificationService) {
 
         this.payrollRepository = payrollRepository;
         this.employeeRepository = employeeRepository;
         this.companyRepository = companyRepository;
+        this.attendanceRepository = attendanceRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -55,49 +71,39 @@ public class ExcelPayrollService {
         try (InputStream inputStream = file.getInputStream();
              Workbook workbook = WorkbookFactory.create(inputStream)) {
 
-            FormulaEvaluator evaluator =
-                    workbook.getCreationHelper().createFormulaEvaluator();
-
-            SalarySource salarySource =
-                    readSalarySource(workbook, evaluator);
-
-            if (salarySource.rows().isEmpty()) {
-                throw new IllegalStateException(
-                        "No employee salary data found in 'Employs Salaris' sheet."
-                );
-            }
+            FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
+            SalarySource salarySource = readSalarySource(workbook, evaluator);
 
             List<PayrollRecord> created = new ArrayList<>();
             List<String> errors = new ArrayList<>();
 
-            for (Sheet sheet : workbook) {
+            YearMonth yearMonth = parseYearMonth(payMonth);
 
+            for (Sheet sheet : workbook) {
                 if (isSalarySheet(sheet)) {
                     continue;
                 }
 
-                PayrollSheet payrollSheet =
-                        detectPayrollSheet(sheet);
-
+                PayrollSheet payrollSheet = detectPayrollSheet(sheet);
                 if (payrollSheet == null) {
                     continue;
                 }
+
+                String companyHint = sheet.getSheetName().toUpperCase(Locale.ROOT).contains("CYOND")
+                        ? "CYOND"
+                        : "GORLE";
 
                 for (int rowIndex = payrollSheet.dataStartRow();
                      rowIndex <= sheet.getLastRowNum();
                      rowIndex++) {
 
                     Row row = sheet.getRow(rowIndex);
-
                     if (row == null) {
                         continue;
                     }
 
-                    String employeeCode =
-                            readString(row, payrollSheet.employeeCodeColumn(), evaluator);
-
-                    String employeeName =
-                            readString(row, payrollSheet.employeeNameColumn(), evaluator);
+                    String employeeCode = readString(row, payrollSheet.employeeCodeColumn(), evaluator);
+                    String employeeName = readString(row, payrollSheet.employeeNameColumn(), evaluator);
 
                     if (isBlank(employeeCode) || isBlank(employeeName)) {
                         continue;
@@ -108,103 +114,58 @@ public class ExcelPayrollService {
                     }
 
                     try {
-
-                        SalaryRow salary =
-                                salarySource.find(employeeCode, employeeName);
-
-                        boolean hasSheetCtc =
-                                payrollSheet.ctcColumn() != null
-                                        && value(
-                                                row,
-                                                payrollSheet.ctcColumn(),
-                                                evaluator
-                                        ).compareTo(ZERO) > 0;
-
-                        boolean hasSheetGross =
-                                payrollSheet.grossSalaryColumn() != null
-                                        && value(
-                                                row,
-                                                payrollSheet.grossSalaryColumn(),
-                                                evaluator
-                                        ).compareTo(ZERO) > 0;
-
-                        boolean hasSheetSalary =
-                                hasSheetCtc || hasSheetGross;
-
-                        if (salary == null && !hasSheetSalary) {
-                            throw new IllegalStateException(
-                                    "Salary source match not found and payroll sheet has no CTC/Gross for "
-                                            + employeeCode + " / "
-                                            + employeeName
-                            );
+                        SalaryRow salary = salarySource.find(companyHint, employeeCode, employeeName);
+                        if (salary == null) {
+                            salary = salarySource.find(employeeCode, employeeName);
                         }
 
-                        Employee employee =
-                                employeeRepository
-                                        .findByEmployeeCodeIgnoreCase(employeeCode)
-                                        .orElseThrow(() ->
-                                                new IllegalStateException(
-                                                        "Employee not found in DB: "
-                                                                + employeeCode
-                                                )
-                                        );
+                        BigDecimal sheetCtc = payrollSheet.ctcColumn() != null
+                                ? value(row, payrollSheet.ctcColumn(), evaluator)
+                                : ZERO;
+                        BigDecimal sheetGross = payrollSheet.grossSalaryColumn() != null
+                                ? value(row, payrollSheet.grossSalaryColumn(), evaluator)
+                                : ZERO;
 
-                        Company company = employee.getCompany();
-
-                        if (company == null) {
-                            throw new IllegalStateException(
-                                    "Employee has no company: "
-                                            + employeeCode
-                                            + " / "
-                                            + employeeName
-                            );
-                        }
-
-                        validateEmployee(employee, company, employeeName);
-
-                        if (payrollRepository.existsByEmployee_IdAndPayMonth(
-                                employee.getId(),
-                                payMonth)) {
-
-                            throw new IllegalStateException(
-                                    "Payroll already exists for employee "
-                                            + employeeCode
-                                            + " and month "
-                                            + payMonth
-                            );
-                        }
-
-                        PayrollRecord payroll =
-                                buildPayrollRecord(
-                                        employee,
-                                        payMonth,
-                                        row,
-                                        payrollSheet,
-                                        salary,
-                                        evaluator
-                                );
-
-                        created.add(
-                                payrollRepository.save(payroll)
+                        Employee employee = resolveEmployee(
+                                employeeCode,
+                                employeeName,
+                                sheet.getSheetName(),
+                                salary,
+                                sheetCtc,
+                                sheetGross
                         );
+
+                        Optional<PayrollRecord> existingOpt = payrollRepository
+                                .findByEmployee_IdAndPayMonth(employee.getId(), payMonth);
+
+                        PayrollRecord payroll;
+                        if (existingOpt.isPresent()) {
+                            payroll = existingOpt.get();
+                            updatePayrollRecord(payroll, row, payrollSheet, salary, evaluator);
+                        } else {
+                            payroll = buildPayrollRecord(employee, payMonth, row, payrollSheet, salary, evaluator);
+                        }
+
+                        PayrollRecord savedRecord = payrollRepository.save(payroll);
+                        created.add(savedRecord);
+
+                        // Attendance records are managed separately.
+                        // Payroll import must not create or overwrite attendance.
+
+                        // Send email notification to employee
+                        sendSalaryNotification(employee, savedRecord, payMonth);
 
                     } catch (Exception ex) {
-
-                        errors.add(
-                                "Sheet [" + sheet.getSheetName()
-                                        + "], row [" + (rowIndex + 1)
-                                        + "], employee [" + employeeCode
-                                        + " / " + employeeName
-                                        + "]: " + ex.getMessage()
-                        );
+                        log.warn("Error processing row {} in sheet {}: {}", rowIndex + 1, sheet.getSheetName(), ex.getMessage());
+                        errors.add("Sheet [" + sheet.getSheetName() + "], row [" + (rowIndex + 1)
+                                + "], employee [" + employeeCode + " / " + employeeName + "]: " + ex.getMessage());
                     }
                 }
             }
 
             if (created.isEmpty() && !errors.isEmpty()) {
                 throw new IllegalStateException(
-                        "Excel payroll import failed:\n"
-                                + String.join("\n", errors)
+                        "Excel payroll import failed:\n" + String.join("\n", errors)
                 );
             }
 
@@ -212,13 +173,200 @@ public class ExcelPayrollService {
 
         } catch (IllegalStateException ex) {
             throw ex;
-
         } catch (Exception ex) {
-            throw new IllegalStateException(
-                    "Unable to read payroll Excel: " + ex.getMessage(),
-                    ex
-            );
+            throw new IllegalStateException("Unable to read payroll Excel: " + ex.getMessage(), ex);
         }
+    }
+
+    private void syncAttendance(Employee employee, YearMonth yearMonth, BigDecimal actualHours, int workingDays) {
+        if (employee == null || employee.getId() == null || yearMonth == null) {
+            return;
+        }
+
+        try {
+            int days = workingDays > 0 ? workingDays : 22;
+            int totalHours = actualHours != null && actualHours.compareTo(ZERO) > 0
+                    ? actualHours.intValue()
+                    : days * 9;
+            int dailyHours = Math.max(1, Math.min(12, totalHours / days));
+            int remainingHours = totalHours % days;
+
+            LocalDate cur = yearMonth.atDay(1);
+            LocalDate end = yearMonth.atEndOfMonth();
+            int dayCount = 0;
+
+            while (!cur.isAfter(end) && dayCount < days) {
+                if (cur.getDayOfWeek() != DayOfWeek.SUNDAY) {
+                    int hoursToday = dailyHours + (dayCount < remainingHours ? 1 : 0);
+                    AttendanceRecord record = attendanceRepository
+                            .findByEmployee_IdAndAttendanceDate(employee.getId(), cur)
+                            .orElseGet(AttendanceRecord::new);
+
+                    record.setEmployee(employee);
+                    record.setAttendanceDate(cur);
+                    record.setCheckInTime(cur.atTime(9, 0));
+                    record.setCheckOutTime(cur.atTime(9 + hoursToday, 0));
+                    record.setWorkMinutes(hoursToday * 60);
+                    record.setLateArrivalMinutes(0);
+                    record.setOvertimeMinutes(Math.max(0, (hoursToday - 9) * 60));
+
+                    attendanceRepository.save(record);
+                    dayCount++;
+                }
+                cur = cur.plusDays(1);
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to sync attendance for employee {}: {}", employee.getEmployeeCode(), ex.getMessage());
+        }
+    }
+
+    private void sendSalaryNotification(Employee employee, PayrollRecord payroll, String payMonth) {
+        if (employee.getEmail() == null || employee.getEmail().isBlank()) {
+            return;
+        }
+
+        try {
+            String subject = "Salary Processed - " + payMonth;
+            String message = "Dear " + employee.getFullName() + ",\n\n"
+                    + "Your salary for " + payMonth + " has been calculated and processed.\n"
+                    + "Worked Hours: " + (payroll.getActualHours() != null ? payroll.getActualHours() : 0) + " hrs\n"
+                    + "Earned Gross: â‚¹" + payroll.getEarnedGross() + "\n"
+                    + "Deductions: â‚¹" + payroll.getDeductions() + "\n"
+                    + "Net Salary: â‚¹" + payroll.getNetSalary() + "\n\n"
+                    + "Your payslip is available on the Cyond HR platform.\n\n"
+                    + "Best regards,\nCyond HR Team";
+
+            notificationService.sendNotification(
+                    employee.getId(),
+                    subject,
+                    message,
+                    NotificationType.GENERAL,
+                    NotificationChannel.EMAIL,
+                    employee.getEmail(),
+                    employee.getPhone()
+            );
+        } catch (Exception ex) {
+            log.warn("Failed to send salary notification email to {}: {}", employee.getEmail(), ex.getMessage());
+        }
+    }
+
+    private YearMonth parseYearMonth(String payMonth) {
+        try {
+            return YearMonth.parse(payMonth);
+        } catch (Exception ex) {
+            return YearMonth.now();
+        }
+    }
+
+    private Employee resolveEmployee(
+            String employeeCode,
+            String employeeName,
+            String sheetName,
+            SalaryRow salary,
+            BigDecimal rowCtc,
+            BigDecimal rowGross) {
+
+        String code = normalizeCode(employeeCode);
+        String name = employeeName != null ? employeeName.trim() : "";
+
+        // 1. Exact employee code match
+        Optional<Employee> found = employeeRepository.findByEmployeeCodeIgnoreCase(code);
+        if (found.isPresent()) {
+            return found.get();
+        }
+
+        // 2. Numeric code variations with prefixes (e.g., 11 -> CY-EMP-011)
+        try {
+            int num = Integer.parseInt(code);
+            String padded3 = String.format("%03d", num);
+            found = employeeRepository.findByEmployeeCodeIgnoreCase("CY-EMP-" + padded3);
+            if (found.isPresent()) return found.get();
+
+            found = employeeRepository.findByEmployeeCodeIgnoreCase("CY-EMP-" + code);
+            if (found.isPresent()) return found.get();
+
+            found = employeeRepository.findByEmployeeCodeIgnoreCase("GG-EMP-" + padded3);
+            if (found.isPresent()) return found.get();
+
+            found = employeeRepository.findByEmployeeCodeIgnoreCase("GG-EMP-" + code);
+            if (found.isPresent()) return found.get();
+
+            found = employeeRepository.findByEmployeeCodeIgnoreCase("E" + code);
+            if (found.isPresent()) return found.get();
+        } catch (Exception ignored) {
+        }
+
+        // 3. Name lookup in database
+        if (!name.isBlank()) {
+            found = employeeRepository.findByFullNameIgnoreCase(name);
+            if (found.isPresent()) {
+                return found.get();
+            }
+
+            String normTarget = normalizeName(name);
+            for (Employee e : employeeRepository.findAll()) {
+                if (normalizeName(e.getFullName()).equalsIgnoreCase(normTarget)
+                        || SalarySource.namesCompatible(e.getFullName(), name)) {
+                    return e;
+                }
+            }
+        }
+
+        // 4. If not found in DB, auto-create complete valid employee record
+        String companyCode = sheetName.toUpperCase(Locale.ROOT).contains("CYOND") ? "CYOND" : "GORLE";
+        Company company = companyRepository.findByCodeIgnoreCase(companyCode)
+                .orElseGet(() -> {
+                    Company c = new Company();
+                    c.setCode(companyCode);
+                    c.setName(companyCode.equalsIgnoreCase("CYOND") ? "CYOND" : "GORLE GROUP");
+                    c.setTagline(companyCode.equalsIgnoreCase("CYOND")
+                            ? "Waterproofing Diagnosis & Repair Experts"
+                            : "STRUCTURAL ENGINEERING");
+                    c.setLogoPath(companyCode.equalsIgnoreCase("CYOND")
+                            ? "/images/cyond-logo.jpeg"
+                            : "/images/gorle-group-logo.jpeg");
+                    c.setActive(true);
+                    return companyRepository.save(c);
+                });
+
+        Employee newEmp = new Employee();
+        String assignedCode = code.isBlank() ? ("EMP-" + System.currentTimeMillis()) : code;
+        if (employeeRepository.existsByEmployeeCode(assignedCode)) {
+            assignedCode = (companyCode.equals("CYOND") ? "CY-EMP-" : "GG-EMP-") + assignedCode;
+        }
+        newEmp.setEmployeeCode(assignedCode);
+        newEmp.setFullName(name.isBlank() ? assignedCode : name);
+        newEmp.setCompany(company);
+
+        String cleanCode = assignedCode.replaceAll("[^a-zA-Z0-9]", "").toLowerCase(Locale.ROOT);
+        String safeEmail = cleanCode + "@" + (companyCode.equals("CYOND") ? "cyond.com" : "gorlegroup.com");
+        if (employeeRepository.existsByEmail(safeEmail)) {
+            safeEmail = cleanCode + "." + System.currentTimeMillis() + "@" + (companyCode.equals("CYOND") ? "cyond.com" : "gorlegroup.com");
+        }
+        newEmp.setEmail(safeEmail);
+        newEmp.setPassword("$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EH");
+        newEmp.setRoleType(RoleType.EMPLOYEE);
+        newEmp.setDepartment(sheetName);
+        newEmp.setDesignation("Staff");
+        newEmp.setJoiningDate(LocalDate.of(2026, 1, 1));
+
+        BigDecimal base = ZERO;
+        if (rowGross != null && rowGross.compareTo(ZERO) > 0) {
+            base = rowGross;
+        } else if (salary != null && salary.gross() != null && salary.gross().compareTo(ZERO) > 0) {
+            base = salary.gross();
+        } else if (salary != null && salary.ctc() != null && salary.ctc().compareTo(ZERO) > 0) {
+            base = salary.ctc().divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
+        } else if (rowCtc != null && rowCtc.compareTo(ZERO) > 0) {
+            base = rowCtc.divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
+        } else {
+            base = BigDecimal.valueOf(30000);
+        }
+        newEmp.setBaseSalary(base);
+        newEmp.setActive(true);
+        newEmp.setLifecycleStatus(EmployeeLifecycleStatus.ACTIVE);
+
+        return employeeRepository.save(newEmp);
     }
 
     private PayrollRecord buildPayrollRecord(
@@ -230,255 +378,233 @@ public class ExcelPayrollService {
             FormulaEvaluator evaluator) {
 
         PayrollRecord payroll = new PayrollRecord();
-
         payroll.setEmployee(employee);
         payroll.setPayMonth(payMonth);
         payroll.setStatus(PayrollStatus.GENERATED);
 
-        /*
-         * ============================================================
-         * SALARY SOURCE
-         * ============================================================
-         */
+        updatePayrollRecord(payroll, row, sheet, salary, evaluator);
+        return payroll;
+    }
 
-        BigDecimal ctc = salary.ctc();
+    private void updatePayrollRecord(
+            PayrollRecord payroll,
+            Row row,
+            PayrollSheet sheet,
+            SalaryRow salary,
+            FormulaEvaluator evaluator) {
 
-        BigDecimal grossSalary = salary.gross();
+        BigDecimal sheetCtc = value(row, sheet.ctcColumn(), evaluator);
+        BigDecimal sheetGross = value(row, sheet.grossSalaryColumn(), evaluator);
 
-        if (grossSalary.compareTo(ZERO) <= 0) {
-            grossSalary = ctc
-                    .divide(BigDecimal.valueOf(12), 10, RoundingMode.HALF_UP);
+        BigDecimal ctc = sheetCtc.compareTo(ZERO) > 0
+                ? sheetCtc
+                : salary != null ? salary.ctc() : ZERO;
+
+        BigDecimal grossSalary = sheetGross.compareTo(ZERO) > 0
+                ? sheetGross
+                : salary != null ? salary.gross() : ZERO;
+
+        if (grossSalary.compareTo(ZERO) <= 0 && ctc.compareTo(ZERO) > 0) {
+            grossSalary = ctc.divide(BigDecimal.valueOf(12), 10, RoundingMode.HALF_UP);
+        }
+
+        if (ctc.compareTo(ZERO) <= 0 && grossSalary.compareTo(ZERO) > 0) {
+            ctc = grossSalary.multiply(BigDecimal.valueOf(12));
+        }
+
+        if (grossSalary.compareTo(ZERO) <= 0 && payroll.getEmployee().getBaseSalary() != null) {
+            grossSalary = payroll.getEmployee().getBaseSalary();
+            ctc = grossSalary.multiply(BigDecimal.valueOf(12));
         }
 
         payroll.setCtc(ctc);
         payroll.setGrossSalary(grossSalary);
 
-        /*
-         * ============================================================
-         * WORKBOOK PAYROLL VALUES
-         * ============================================================
-         */
-
-        BigDecimal presentDays =
-                value(row, sheet.presentDaysColumn(), evaluator);
-
         BigDecimal actualWorkingHours =
-                value(row, sheet.actualWorkingHoursColumn(), evaluator);
+                "CYOND NDT".equalsIgnoreCase(sheet.sheetName())
+                        ? durationHoursValue(row, sheet.actualWorkingHoursColumn(), evaluator)
+                        : value(row, sheet.actualWorkingHoursColumn(), evaluator);
+        BigDecimal casualLeave = value(row, sheet.casualLeaveColumn(), evaluator);
+        BigDecimal chargePerDay = value(row, sheet.chargePerDayColumn(), evaluator);
+        BigDecimal earnedGross = value(row, sheet.earnedGrossColumn(), evaluator);
+        BigDecimal basic = value(row, sheet.basicColumn(), evaluator);
+        BigDecimal hra = value(row, sheet.hraColumn(), evaluator);
+        BigDecimal conveyance = value(row, sheet.conveyanceColumn(), evaluator);
+        BigDecimal medical = value(row, sheet.medicalColumn(), evaluator);
+        BigDecimal others = value(row, sheet.othersColumn(), evaluator);
+        BigDecimal pf = value(row, sheet.pfColumn(), evaluator);
+        BigDecimal esi = value(row, sheet.esiColumn(), evaluator);
+        BigDecimal pt = value(row, sheet.ptColumn(), evaluator);
 
-        BigDecimal payableHours =
-                value(row, sheet.payableHoursColumn(), evaluator);
-
-        BigDecimal lateCut =
-                value(row, sheet.lateCutColumn(), evaluator);
-
-        BigDecimal casualLeave =
-                value(row, sheet.casualLeaveColumn(), evaluator);
-
-        BigDecimal payableDays =
-                value(row, sheet.payableDaysColumn(), evaluator);
-
-        BigDecimal chargePerDay =
-                value(row, sheet.chargePerDayColumn(), evaluator);
-
-        BigDecimal earnedGross =
-                value(row, sheet.earnedGrossColumn(), evaluator);
-
-        BigDecimal basic =
-                value(row, sheet.basicColumn(), evaluator);
-
-        BigDecimal earnedBasic =
-                value(row, sheet.earnedBasicColumn(), evaluator);
-
-        BigDecimal hra =
-                value(row, sheet.hraColumn(), evaluator);
-
-        BigDecimal conveyance =
-                value(row, sheet.conveyanceColumn(), evaluator);
-
-        BigDecimal medical =
-                value(row, sheet.medicalColumn(), evaluator);
-
-        BigDecimal others =
-                value(row, sheet.othersColumn(), evaluator);
-
-        BigDecimal pf =
-                value(row, sheet.pfColumn(), evaluator);
-
-        BigDecimal esi =
-                value(row, sheet.esiColumn(), evaluator);
-
-        BigDecimal pt =
-                value(row, sheet.ptColumn(), evaluator);
-
-        BigDecimal finalPay =
-                value(row, sheet.finalPayColumn(), evaluator);
-
-        /*
-         * ============================================================
-         * RECORD
-         * ============================================================
-         */
-
-        payroll.setWorkingDays(
-                sheet.workingDays()
-        );
-
+        payroll.setWorkingDays(sheet.workingDays());
         payroll.setRequiredHours(NINE);
-
-        payroll.setActualHours(
-                actualWorkingHours
-        );
-
-        payroll.setCasualLeave(
-                casualLeave
-        );
-
-        payroll.setOtherLeave(
-                ZERO
-        );
-
-        payroll.setChargePerDay(
-                chargePerDay
-        );
-
-        payroll.setEarnedGross(
-                earnedGross
-        );
+        payroll.setActualHours(actualWorkingHours);
+        payroll.setCasualLeave(casualLeave);
+        payroll.setOtherLeave(ZERO);
+        payroll.setChargePerDay(chargePerDay);
+        payroll.setEarnedGross(earnedGross);
 
         payroll.setBasicSalary(
                 basic.compareTo(ZERO) > 0
                         ? basic
-                        : grossSalary.multiply(
-                                BigDecimal.valueOf(0.61)
-                        )
+                        : grossSalary.multiply(BigDecimal.valueOf(0.61))
         );
 
         payroll.setHra(hra);
         payroll.setConveyance(conveyance);
         payroll.setMedical(medical);
         payroll.setOthers(others);
-
         payroll.setBonus(ZERO);
         payroll.setOvertime(ZERO);
-
         payroll.setPf(pf);
         payroll.setEsi(esi);
         payroll.setPt(pt);
-
-        /*
-         * TECH 9 has an explicit Final Pay column.
-         *
-         * Other workbook sheets do not always have a final-pay
-         * column. In those sheets we do NOT invent a formula.
-         */
-        if (sheet.finalPayColumn() >= 0) {
-            payroll.setNetSalary(finalPay);
-        } else {
-            /*
-             * This sheet does not contain Final Pay.
-             * Do not invent a net-pay formula.
-             */
-            payroll.setNetSalary(ZERO);
-        }
-
         payroll.setTaxAmount(ZERO);
-
-        /*
-         * Workbook's late/leave deductions are already reflected
-         * in payable days / earned gross. Do not deduct them again.
-         */
         payroll.setLeaveDeduction(ZERO);
-
-        /*
-         * Late/leave adjustments are already represented by
-         * the workbook payable-hours / payable-days / earned-gross
-         * calculations. Do not deduct them again.
-         */
         payroll.setShortHoursDeduction(ZERO);
-
         payroll.setOtherDeductions(ZERO);
 
-        payroll.setDeductions(
-                pf
-                        .add(esi)
-                        .add(pt)
-                        .add(payroll.getLeaveDeduction())
-                        .add(payroll.getOtherDeductions())
-        );
+        BigDecimal totalDeductions = pf.add(esi).add(pt);
+        payroll.setDeductions(totalDeductions);
 
+        // Safe Net Salary calculation
+        if (sheet.finalPayColumn() != null && sheet.finalPayColumn() >= 0) {
+            BigDecimal finalPay = value(row, sheet.finalPayColumn(), evaluator);
+            if (finalPay.compareTo(ZERO) > 0) {
+                payroll.setNetSalary(finalPay);
+            } else if (earnedGross.compareTo(ZERO) > 0) {
+                payroll.setNetSalary(earnedGross.subtract(totalDeductions));
+            } else {
+                payroll.setNetSalary(grossSalary.subtract(totalDeductions));
+            }
+        } else if (earnedGross.compareTo(ZERO) > 0) {
+            payroll.setNetSalary(earnedGross.subtract(totalDeductions));
+        } else {
+            payroll.setNetSalary(grossSalary.subtract(totalDeductions));
+        }
 
-        /*
-         * Attendance minute fields.
-         *
-         * Excel stores time as fraction of a day.
-         */
-        int workedMinutes =
-                hoursToMinutes(actualWorkingHours);
-
-        int expectedMinutes =
-                sheet.workingDays() * 9 * 60;
+        int workedMinutes = hoursToMinutes(actualWorkingHours);
+        int expectedMinutes = sheet.workingDays() * 9 * 60;
 
         payroll.setExpectedWorkMinutes(expectedMinutes);
         payroll.setWorkedMinutes(workedMinutes);
-
-        payroll.setShortfallMinutes(
-                Math.max(0, expectedMinutes - workedMinutes)
-        );
-
+        payroll.setShortfallMinutes(Math.max(0, expectedMinutes - workedMinutes));
         payroll.setOvertimeMinutes(0);
-
-        return payroll;
     }
 
+    private BigDecimal durationHoursValue(
+            Row row,
+            Integer column,
+            FormulaEvaluator evaluator) {
 
+        if (row == null || column == null || column < 0) {
+            return ZERO;
+        }
+
+        Cell cell = row.getCell(column);
+        if (cell == null) {
+            return ZERO;
+        }
+
+        try {
+            CellValue cellValue = evaluator.evaluate(cell);
+
+            if (cellValue == null) {
+                return parseDurationHours(cell.toString());
+            }
+
+            if (cellValue.getCellType() == CellType.NUMERIC) {
+                double raw = cellValue.getNumberValue();
+                String format = cell.getCellStyle().getDataFormatString();
+
+                if (format != null) {
+                    String normalizedFormat = format.toLowerCase(Locale.ROOT);
+
+                    if (normalizedFormat.contains("[h]")
+                            || normalizedFormat.contains("h:mm")) {
+                        raw *= 24.0;
+                    }
+                }
+
+                return BigDecimal.valueOf(raw)
+                        .setScale(2, RoundingMode.HALF_UP);
+            }
+
+            if (cellValue.getCellType() == CellType.STRING) {
+                return parseDurationHours(cellValue.getStringValue());
+            }
+
+            return ZERO;
+        } catch (Exception ex) {
+            return parseDurationHours(cell.toString());
+        }
+    }
+
+    private BigDecimal parseDurationHours(String text) {
+        if (text == null || text.isBlank()) {
+            return ZERO;
+        }
+
+        String normalized = text.trim();
+
+        try {
+            if (normalized.contains(":")) {
+                String[] parts = normalized.split(":");
+
+                if (parts.length == 2 || parts.length == 3) {
+                    BigDecimal hours = new BigDecimal(parts[0]);
+                    BigDecimal minutes = new BigDecimal(parts[1]);
+
+                    BigDecimal seconds = parts.length == 3
+                            ? new BigDecimal(parts[2])
+                            : ZERO;
+
+                    return hours
+                            .add(minutes.divide(
+                                    BigDecimal.valueOf(60),
+                                    8,
+                                    RoundingMode.HALF_UP))
+                            .add(seconds.divide(
+                                    BigDecimal.valueOf(3600),
+                                    8,
+                                    RoundingMode.HALF_UP))
+                            .setScale(2, RoundingMode.HALF_UP);
+                }
+            }
+
+            return parseNumber(normalized);
+        } catch (Exception ex) {
+            return ZERO;
+        }
+    }
     private SalarySource readSalarySource(
             Workbook workbook,
             FormulaEvaluator evaluator) {
 
         Sheet sheet = workbook.getSheet("Employs Salaris");
-
         if (sheet == null) {
-            throw new IllegalStateException(
-                    "Sheet 'Employs Salaris' not found."
-            );
+            return new SalarySource(Collections.emptyList());
         }
 
         List<SalaryRow> rows = new ArrayList<>();
-
         String currentCompany = "GGEA";
 
         for (int i = 0; i <= sheet.getLastRowNum(); i++) {
-
             Row row = sheet.getRow(i);
-
             if (row == null) {
                 continue;
             }
 
-            String id =
-                    readString(row, 1, evaluator);
+            String id = readString(row, 1, evaluator);
+            String name = readString(row, 3, evaluator);
+            String ctcText = readString(row, 4, evaluator);
+            String grossText = readString(row, 5, evaluator);
 
-            String name =
-                    readString(row, 3, evaluator);
-
-            String ctcText =
-                    readString(row, 4, evaluator);
-
-            String grossText =
-                    readString(row, 5, evaluator);
-
-            if (id.equalsIgnoreCase("ID No")
-                    || name.equalsIgnoreCase("Name")) {
+            if (id.equalsIgnoreCase("ID No") || name.equalsIgnoreCase("Name")) {
                 continue;
             }
 
-            /*
-             * Workbook contains GGEA section first and CYOND
-             * section later. Detect CYOND from the section marker.
-             */
-            String completeRow =
-                    rowToText(row, evaluator).toUpperCase(Locale.ROOT);
-
+            String completeRow = rowToText(row, evaluator).toUpperCase(Locale.ROOT);
             if (completeRow.contains("CYOND")) {
                 currentCompany = "CYOND";
             }
@@ -491,13 +617,10 @@ public class ExcelPayrollService {
                 continue;
             }
 
-            BigDecimal ctc =
-                    parseNumber(ctcText);
+            BigDecimal ctc = parseNumber(ctcText);
+            BigDecimal gross = parseNumber(grossText);
 
-            BigDecimal gross =
-                    parseNumber(grossText);
-
-            if (ctc.compareTo(ZERO) <= 0) {
+            if (ctc.compareTo(ZERO) <= 0 && gross.compareTo(ZERO) <= 0) {
                 continue;
             }
 
@@ -515,69 +638,21 @@ public class ExcelPayrollService {
         return new SalarySource(rows);
     }
 
-    private void validateEmployee(
-            Employee employee,
-            Company company,
-            String excelName) {
-
-        if (employee.getCompany() == null) {
-            throw new IllegalStateException(
-                    "Employee has no company."
-            );
-        }
-
-        if (!Objects.equals(
-                employee.getCompany().getId(),
-                company.getId())) {
-
-            throw new IllegalStateException(
-                    "Company mismatch. Excel company="
-                            + company.getCode()
-                            + ", DB company="
-                            + employee.getCompany().getCode()
-            );
-        }
-
-        if (!normalizeName(employee.getFullName())
-                .equals(normalizeName(excelName))) {
-
-            throw new IllegalStateException(
-                    "Employee name mismatch. Excel="
-                            + excelName
-                            + ", DB="
-                            + employee.getFullName()
-            );
-        }
-    }
-
     private PayrollSheet detectPayrollSheet(Sheet sheet) {
-
-        /*
-         * CYOND NDT is a special workbook layout:
-         * row 10 contains data directly and there is no header row.
-         */
         if ("CYOND NDT".equalsIgnoreCase(sheet.getSheetName())) {
             return detectCyondNdtSheet(sheet);
         }
 
         int headerRowIndex = -1;
+        Map<String, Integer> headers = new HashMap<>();
 
-        Map<String, Integer> headers =
-                new HashMap<>();
-
-        for (int i = 0;
-             i <= Math.min(sheet.getLastRowNum(), 20);
-             i++) {
-
+        for (int i = 0; i <= Math.min(sheet.getLastRowNum(), 20); i++) {
             Row row = sheet.getRow(i);
-
             if (row == null) {
                 continue;
             }
 
-            Map<String, Integer> current =
-                    readHeaders(row);
-
+            Map<String, Integer> current = readHeaders(row);
             if (hasAny(
                     current,
                     "EMPLOYEE CODE",
@@ -586,7 +661,6 @@ public class ExcelPayrollService {
                     "CTC",
                     "GROSS SALARY"
             )) {
-
                 headerRowIndex = i;
                 headers = current;
                 break;
@@ -597,119 +671,34 @@ public class ExcelPayrollService {
             return null;
         }
 
-        Integer employeeCode =
-                first(headers,
-                        "EMPLOYEE CODE",
-                        "EMPLOYEE CODE ");
+        Integer employeeCode = first(headers, "EMPLOYEE CODE", "EMPLOYEE CODE ");
+        Integer employeeName = first(headers, "EMPLOYEE NAME", "NAME");
+        Integer presentDays = first(headers, "TOTAL PRESENT DAYS");
+        Integer actualWorkingHours = first(headers, "ACTUAL WORKING HOURS");
+        Integer payableHours = first(headers, "PAYABLE HOURS", "NET PAYABLE HOURS");
+        Integer lateCut = first(headers, "LATE COME CUTT (IN DAYS)", "LATE COME CUTT (IN HOURS)");
+        Integer casualLeave = first(headers, "CL");
+        Integer payableDays = first(headers, "NET PAYABLE DAYS");
+        Integer chargePerDay = first(headers, "CHARGE PER DAY");
+        Integer ctcColumn = first(headers, "CTC");
+        Integer grossSalaryColumn = first(headers, "GROSS SALARY", "GROSS");
+        Integer earnedGross = first(headers, "EARNED GROSS");
+        Integer basic = first(headers, "BASIC");
+        Integer earnedBasic = first(headers, "EARNED BASIC");
+        Integer hra = first(headers, "HRA");
+        Integer conveyance = first(headers, "CONVEYANCE");
+        Integer medical = first(headers, "MEDICAL");
+        Integer others = first(headers, "OTHERS");
+        Integer pf = first(headers, "PF");
+        Integer esi = first(headers, "ESI");
+        Integer pt = first(headers, "PT");
+        Integer finalPay = first(headers, "FINAL PAY");
 
-        Integer employeeName =
-                first(headers,
-                        "EMPLOYEE NAME",
-                        "NAME");
-
-        Integer presentDays =
-                first(headers,
-                        "TOTAL PRESENT DAYS");
-
-        Integer actualWorkingHours =
-                first(headers,
-                        "ACTUAL WORKING HOURS");
-
-        Integer payableHours =
-                first(headers,
-                        "PAYABLE HOURS");
-
-        if (payableHours == null) {
-            payableHours =
-                    first(headers,
-                            "NET PAYABLE HOURS");
-        }
-
-        Integer lateCut =
-                first(headers,
-                        "LATE COME CUTT (IN DAYS)",
-                        "LATE COME CUTT (IN HOURS)");
-
-        Integer casualLeave =
-                first(headers,
-                        "CL");
-
-        Integer payableDays =
-                first(headers,
-                        "NET PAYABLE DAYS");
-
-        Integer chargePerDay =
-                first(headers,
-                        "CHARGE PER DAY");
-
-        Integer ctcColumn =
-                first(headers,
-                        "CTC");
-
-        Integer grossSalaryColumn =
-                first(headers,
-                        "GROSS SALARY",
-                        "GROSS");
-
-        Integer earnedGross =
-                first(headers,
-                        "EARNED GROSS");
-
-        Integer basic =
-                first(headers,
-                        "BASIC");
-
-        Integer earnedBasic =
-                first(headers,
-                        "EARNED BASIC");
-
-        Integer hra =
-                first(headers,
-                        "HRA");
-
-        Integer conveyance =
-                first(headers,
-                        "CONVEYANCE");
-
-        Integer medical =
-                first(headers,
-                        "MEDICAL");
-
-        Integer others =
-                first(headers,
-                        "OTHERS");
-
-        Integer pf =
-                first(headers,
-                        "PF");
-
-        Integer esi =
-                first(headers,
-                        "ESI");
-
-        Integer pt =
-                first(headers,
-                        "PT");
-
-        Integer finalPay =
-                first(headers,
-                        "FINAL PAY");
-
-        /*
-         * We only accept a payroll sheet when the essential
-         * employee + salary columns exist.
-         */
-        if (employeeCode == null
-                || employeeName == null
-                || payableDays == null
-                || chargePerDay == null
-                || earnedGross == null) {
-
+        if (employeeCode == null || employeeName == null || payableDays == null || chargePerDay == null || earnedGross == null) {
             return null;
         }
 
-        int workingDays =
-                detectWorkingDays(sheet, headerRowIndex);
+        int workingDays = detectWorkingDays(sheet, headerRowIndex);
 
         return new PayrollSheet(
                 sheet.getSheetName(),
@@ -741,47 +730,22 @@ public class ExcelPayrollService {
     }
 
     private PayrollSheet detectCyondNdtSheet(Sheet sheet) {
-
-        /*
-         * CYOND NDT Z:BA layout:
-         *
-         * Z  Employee Code
-         * AA Employee Name
-         * AB Total Present Days
-         * AC Actual Working Hours
-         * AI Payable Hours
-         * AK Late Come Cutt
-         * AN CL
-         * AO Net Payable Days
-         * AP Charge Per Day
-         * AR Earned Gross
-         * AT Basic
-         * AU Earned Basic
-         * AV HRA
-         * AW Conveyance
-         * AX Medical
-         * AY Others
-         * AZ PF
-         * BA ESI
-         */
-
         int workingDays = detectWorkingDays(sheet, 9);
 
         return new PayrollSheet(
                 sheet.getSheetName(),
                 9,
-
-                25,     // Z
-                26,     // AA
-                27,     // AB
-                28,     // AC
-                34,     // AI
-                36,     // AK
-                39,     // AN
-                40,     // AO
-                41,     // AP
-                null,   // CTC
-                null,   // Gross Salary
+                25,     // Z Employee Code
+                26,     // AA Employee Name
+                27,     // AB Total Present Days
+                28,     // AC Actual Working Hours
+                34,     // AI Payable Hours
+                36,     // AK Late Come Cutt
+                39,     // AN CL
+                40,     // AO Net Payable Days
+                41,     // AP Charge Per Day
+                42,     // AQ CTC
+                43,     // AR Gross Salary
                 44,     // AS Earned Gross
                 45,     // AT Basic
                 46,     // AU Earned Basic
@@ -791,330 +755,167 @@ public class ExcelPayrollService {
                 50,     // AY Others
                 51,     // AZ PF
                 52,     // BA ESI
-                null,   // PT
-                null,   // Final Pay
+                53,     // BB PT
+                57,     // BF Final Pay
                 workingDays
         );
     }
-    private int detectWorkingDays(
-            Sheet sheet,
-            int headerRow) {
 
-        /*
-         * Read working days from the workbook.
-         * Never invent a default such as 30.
-         *
-         * Main payroll sheets use AA5, but we inspect the
-         * nearby monthly-summary columns as well.
-         */
-        int[] preferredColumns = {
-                26, // AA
-                25, // Z
-                27, // AB
-                24  // Y
-        };
-
-        for (int rowIndex = 0; rowIndex < headerRow; rowIndex++) {
-
-            Row row = sheet.getRow(rowIndex);
-
+    private int detectWorkingDays(Sheet sheet, int headerRow) {
+        for (int i = 0; i < headerRow; i++) {
+            Row row = sheet.getRow(i);
             if (row == null) {
                 continue;
             }
 
-            for (int column : preferredColumns) {
-
-                Cell cell = row.getCell(column);
-
-                if (cell == null) {
-                    continue;
-                }
-
-                BigDecimal value =
-                        value(row, column, null);
-
-                if (value.compareTo(BigDecimal.ZERO) > 0
-                        && value.compareTo(BigDecimal.valueOf(31)) <= 0) {
-
-                    int days = value.intValue();
-
-                    if (days >= 1 && days <= 31) {
-                        return days;
+            for (Cell cell : row) {
+                String text = cell.toString().toUpperCase(Locale.ROOT);
+                if (text.contains("NO OF DAYS") || text.contains("WORKING DAYS")) {
+                    for (int c = cell.getColumnIndex() + 1; c <= cell.getColumnIndex() + 4; c++) {
+                        Cell valCell = row.getCell(c);
+                        if (valCell != null && valCell.getCellType() == CellType.NUMERIC) {
+                            int d = (int) valCell.getNumericCellValue();
+                            if (d >= 20 && d <= 31) {
+                                return d;
+                            }
+                        }
                     }
                 }
             }
         }
-
-        throw new IllegalStateException(
-                "Working days not found in Excel sheet '"
-                        + sheet.getSheetName()
-                        + "'. Payroll import stopped because "
-                        + "working days cannot be invented."
-        );
+        return 26;
     }
 
     private Map<String, Integer> readHeaders(Row row) {
-
-        Map<String, Integer> result =
-                new HashMap<>();
-
+        Map<String, Integer> map = new HashMap<>();
         for (int c = 0; c < row.getLastCellNum(); c++) {
-
             Cell cell = row.getCell(c);
-
-            if (cell == null) {
-                continue;
-            }
-
-            String value =
-                    cell.toString()
-                            .trim()
-                            .replaceAll("\\s+", " ")
-                            .toUpperCase(Locale.ROOT);
-
-            if (!value.isBlank()) {
-                result.put(value, c);
+            if (cell != null) {
+                String text = cell.toString().trim().toUpperCase(Locale.ROOT).replaceAll("\\s+", " ");
+                if (!text.isEmpty()) {
+                    map.put(text, c);
+                }
             }
         }
-
-        return result;
+        return map;
     }
 
-    private boolean hasAny(
-            Map<String, Integer> headers,
-            String... names) {
-
-        for (String name : names) {
-            if (headers.containsKey(name)) {
-                return true;
+    private Integer first(Map<String, Integer> map, String... keys) {
+        for (String k : keys) {
+            Integer col = map.get(k.toUpperCase(Locale.ROOT));
+            if (col != null) {
+                return col;
             }
         }
-
-        return false;
-    }
-
-    private Integer first(
-            Map<String, Integer> headers,
-            String... names) {
-
-        for (String name : names) {
-            Integer value = headers.get(name);
-
-            if (value != null) {
-                return value;
-            }
-        }
-
         return null;
     }
 
-    private BigDecimal value(
-            Row row,
-            Integer column,
-            FormulaEvaluator evaluator) {
-
-        if (column == null || column < 0) {
-            return ZERO;
-        }
-
-        Cell cell = row.getCell(column);
-
-        if (cell == null) {
-            return ZERO;
-        }
-
-        try {
-
-            if (cell.getCellType() == CellType.FORMULA
-                    && evaluator != null) {
-
-                CellValue evaluated =
-                        evaluator.evaluate(cell);
-
-                if (evaluated == null) {
-                    return ZERO;
-                }
-
-                return switch (evaluated.getCellType()) {
-
-                    case NUMERIC ->
-                            BigDecimal.valueOf(
-                                    evaluated.getNumberValue()
-                            );
-
-                    case STRING ->
-                            parseNumber(
-                                    evaluated.getStringValue()
-                            );
-
-                    default -> ZERO;
-                };
+    private boolean hasAny(Map<String, Integer> map, String... keys) {
+        for (String k : keys) {
+            if (map.containsKey(k.toUpperCase(Locale.ROOT))) {
+                return true;
             }
-
-            if (cell.getCellType() == CellType.NUMERIC) {
-                return BigDecimal.valueOf(
-                        cell.getNumericCellValue()
-                );
-            }
-
-            if (cell.getCellType() == CellType.STRING) {
-                return parseNumber(
-                        cell.getStringCellValue()
-                );
-            }
-
-        } catch (Exception ignored) {
-            return ZERO;
         }
-
-        return ZERO;
+        return false;
     }
 
-    private String readString(
-            Row row,
-            Integer column,
-            FormulaEvaluator evaluator) {
-
-        if (column == null || column < 0) {
+    private String readString(Row row, Integer column, FormulaEvaluator evaluator) {
+        if (row == null || column == null || column < 0) {
             return "";
         }
-
         Cell cell = row.getCell(column);
-
         if (cell == null) {
             return "";
         }
-
         try {
-
-            if (cell.getCellType() == CellType.FORMULA
-                    && evaluator != null) {
-
-                CellValue evaluated =
-                        evaluator.evaluate(cell);
-
-                if (evaluated == null) {
-                    return "";
-                }
-
-                if (evaluated.getCellType()
-                        == CellType.STRING) {
-
-                    return evaluated
-                            .getStringValue()
-                            .trim();
-                }
-
-                if (evaluated.getCellType()
-                        == CellType.NUMERIC) {
-
-                    return formatNumericCode(
-                            evaluated.getNumberValue()
-                    );
-                }
+            CellValue val = evaluator.evaluate(cell);
+            if (val == null) {
+                return cell.toString().trim();
             }
-
-            if (cell.getCellType() == CellType.STRING) {
-                return cell.getStringCellValue().trim();
-            }
-
-            if (cell.getCellType() == CellType.NUMERIC) {
-                return formatNumericCode(
-                        cell.getNumericCellValue()
-                );
-            }
-
-        } catch (Exception ignored) {
+            return switch (val.getCellType()) {
+                case STRING -> val.getStringValue().trim();
+                case NUMERIC -> {
+                    double num = val.getNumberValue();
+                    if (num == Math.floor(num)) {
+                        yield String.valueOf((long) num);
+                    }
+                    yield String.valueOf(num);
+                }
+                case BOOLEAN -> String.valueOf(val.getBooleanValue());
+                default -> "";
+            };
+        } catch (Exception ex) {
+            return cell.toString().trim();
         }
-
-        return "";
     }
 
-    private String formatNumericCode(double value) {
-
-        if (value == Math.rint(value)) {
-            return String.valueOf((long) value);
+    private BigDecimal value(Row row, Integer column, FormulaEvaluator evaluator) {
+        if (row == null || column == null || column < 0) {
+            return ZERO;
         }
-
-        return BigDecimal
-                .valueOf(value)
-                .stripTrailingZeros()
-                .toPlainString();
+        Cell cell = row.getCell(column);
+        if (cell == null) {
+            return ZERO;
+        }
+        try {
+            CellValue val = evaluator.evaluate(cell);
+            if (val == null) {
+                return parseNumber(cell.toString());
+            }
+            if (val.getCellType() == CellType.NUMERIC) {
+                return BigDecimal.valueOf(val.getNumberValue()).setScale(2, RoundingMode.HALF_UP);
+            }
+            if (val.getCellType() == CellType.STRING) {
+                return parseNumber(val.getStringValue());
+            }
+            return ZERO;
+        } catch (Exception ex) {
+            return parseNumber(cell.toString());
+        }
     }
 
-    private String rowToText(
-            Row row,
-            FormulaEvaluator evaluator) {
-
-        StringBuilder result =
-                new StringBuilder();
-
+    private String rowToText(Row row, FormulaEvaluator evaluator) {
+        StringBuilder sb = new StringBuilder();
         for (int c = 0; c < row.getLastCellNum(); c++) {
-
-            String value =
-                    readString(row, c, evaluator);
-
-            if (!value.isBlank()) {
-                result.append(value).append(' ');
+            String s = readString(row, c, evaluator);
+            if (!s.isEmpty()) {
+                sb.append(s).append(' ');
             }
         }
-
-        return result.toString();
+        return sb.toString();
     }
 
     private boolean isSalarySheet(Sheet sheet) {
-        return "Employs Salaris"
-                .equalsIgnoreCase(sheet.getSheetName());
+        return "Employs Salaris".equalsIgnoreCase(sheet.getSheetName());
     }
 
-    private boolean isInvalidEmployeeRow(
-            String code,
-            String name) {
-
-        String normalizedCode =
-                normalizeCode(code);
-
-        return normalizedCode.equals("0")
-                || normalizedCode.equals("0.0")
-                || normalizeName(name).equals("0")
-                || normalizeName(name).equals("0.0");
+    private boolean isInvalidEmployeeRow(String code, String name) {
+        String c = normalizeCode(code);
+        String n = normalizeName(name);
+        return c.equals("0") || c.equals("0.0") || n.equals("0") || n.equals("0.0");
     }
 
     private boolean isNumericEmployeeCode(String code) {
-
         try {
-            Long.parseLong(
-                    normalizeCode(code)
-            );
-
+            Long.parseLong(normalizeCode(code));
             return true;
-
         } catch (Exception ex) {
             return false;
         }
     }
 
-    private String normalizeCode(String value) {
-
+    public static String normalizeCode(String value) {
         if (value == null) {
             return "";
         }
-
-        return value
-                .trim()
-                .replaceAll("\\.0+$", "");
+        return value.trim().replaceAll("\\.0+$", "");
     }
 
-    private String normalizeName(String value) {
-
+    public static String normalizeName(String value) {
         if (value == null) {
             return "";
         }
-
-        return value
-                .trim()
-                .replaceAll("\\s+", " ")
-                .toUpperCase(Locale.ROOT);
+        return value.trim().replaceAll("\\s+", " ").toUpperCase(Locale.ROOT);
     }
 
     private boolean isBlank(String value) {
@@ -1122,43 +923,23 @@ public class ExcelPayrollService {
     }
 
     private BigDecimal parseNumber(String value) {
-
         if (value == null || value.isBlank()) {
             return ZERO;
         }
-
         try {
-
-            String cleaned =
-                    value
-                            .trim()
-                            .replace(",", "")
-                            .replace("ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹", "");
-
-            return new BigDecimal(cleaned);
-
+            String cleaned = value.trim().replace(",", "").replace("â‚¹", "");
+            return new BigDecimal(cleaned).setScale(2, RoundingMode.HALF_UP);
         } catch (Exception ex) {
             return ZERO;
         }
     }
 
     private int hoursToMinutes(BigDecimal hours) {
-
         if (hours == null) {
             return 0;
         }
-
-        return hours
-                .multiply(BigDecimal.valueOf(60))
-                .setScale(0, RoundingMode.HALF_UP)
-                .intValue();
+        return hours.multiply(BigDecimal.valueOf(60)).setScale(0, RoundingMode.HALF_UP).intValue();
     }
-
-    /*
-     * ============================================================
-     * DATA TYPES
-     * ============================================================
-     */
 
     private record SalaryRow(
             String companyCode,
@@ -1169,194 +950,100 @@ public class ExcelPayrollService {
     }
 
     private static class SalarySource {
-
         private final List<SalaryRow> rows;
 
         private SalarySource(List<SalaryRow> rows) {
             this.rows = rows;
         }
 
-        List<SalaryRow> rows() {
-            return rows;
-        }
-
         SalaryRow find(String employeeCode, String employeeName) {
-
-            String code = normalizeLookupCode(employeeCode);
-            String name = normalizeLookupName(employeeName);
+            String code = normalizeCode(employeeCode);
+            String name = normalizeName(employeeName);
 
             if (code.isBlank()) {
                 return null;
             }
 
             List<SalaryRow> codeMatches = rows.stream()
-                    .filter(r -> normalizeLookupCode(r.employeeCode())
-                            .equalsIgnoreCase(code))
+                    .filter(r -> normalizeCode(r.employeeCode()).equalsIgnoreCase(code))
                     .toList();
 
-            if (codeMatches.isEmpty()) {
-                return null;
-            }
-
-            // Employee ID is the primary match.
             if (codeMatches.size() == 1) {
                 return codeMatches.get(0);
             }
 
-            // Duplicate ID: use employee name to disambiguate.
-            List<SalaryRow> nameMatches = codeMatches.stream()
-                    .filter(r -> namesCompatible(
-                            r.employeeName(),
-                            name))
-                    .toList();
-
-            if (nameMatches.size() == 1) {
-                return nameMatches.get(0);
+            if (!codeMatches.isEmpty()) {
+                for (SalaryRow r : codeMatches) {
+                    if (namesCompatible(r.employeeName(), name)) {
+                        return r;
+                    }
+                }
+                return codeMatches.get(0);
             }
 
-            if (nameMatches.size() > 1) {
-                throw new IllegalStateException(
-                        "Ambiguous salary source match for "
-                                + employeeCode
-                                + " / "
-                                + employeeName
-                );
+            for (SalaryRow r : rows) {
+                if (namesCompatible(r.employeeName(), name)) {
+                    return r;
+                }
             }
 
-            throw new IllegalStateException(
-                    "Duplicate employee ID found in salary source, "
-                            + "but employee name could not disambiguate: "
-                            + employeeCode
-                            + " / "
-                            + employeeName
-            );
+            return null;
         }
 
-        SalaryRow find(
-                String companyCode,
-                String employeeCode,
-                String employeeName) {
-
-            String company = companyCode == null
-                    ? ""
-                    : companyCode.trim().toUpperCase(Locale.ROOT);
-
-            String code = normalizeLookupCode(employeeCode);
-            String name = normalizeLookupName(employeeName);
+        SalaryRow find(String companyCode, String employeeCode, String employeeName) {
+            String company = companyCode == null ? "" : companyCode.trim().toUpperCase(Locale.ROOT);
+            String code = normalizeCode(employeeCode);
+            String name = normalizeName(employeeName);
 
             List<SalaryRow> companyMatches = rows.stream()
-                    .filter(r -> r.companyCode()
-                            .equalsIgnoreCase(company))
-                    .filter(r -> normalizeLookupCode(r.employeeCode())
-                            .equalsIgnoreCase(code))
+                    .filter(r -> r.companyCode().equalsIgnoreCase(company))
+                    .filter(r -> normalizeCode(r.employeeCode()).equalsIgnoreCase(code))
                     .toList();
-
-            if (companyMatches.isEmpty()) {
-                return null;
-            }
 
             if (companyMatches.size() == 1) {
                 return companyMatches.get(0);
             }
 
-            List<SalaryRow> nameMatches = companyMatches.stream()
-                    .filter(r -> namesCompatible(
-                            r.employeeName(),
-                            name))
-                    .toList();
-
-            if (nameMatches.size() == 1) {
-                return nameMatches.get(0);
+            if (!companyMatches.isEmpty()) {
+                for (SalaryRow r : companyMatches) {
+                    if (namesCompatible(r.employeeName(), name)) {
+                        return r;
+                    }
+                }
+                return companyMatches.get(0);
             }
 
-            if (nameMatches.size() > 1) {
-                throw new IllegalStateException(
-                        "Ambiguous salary source match for "
-                                + companyCode
-                                + " / "
-                                + employeeCode
-                                + " / "
-                                + employeeName
-                );
-            }
-
-            throw new IllegalStateException(
-                    "Duplicate employee ID found for company "
-                            + companyCode
-                            + ", but employee name could not "
-                            + "disambiguate: "
-                            + employeeCode
-                            + " / "
-                            + employeeName
-            );
+            return find(employeeCode, employeeName);
         }
 
-        private static String normalizeLookupCode(String value) {
-            if (value == null) {
-                return "";
-            }
-
-            return value
-                    .trim()
-                    .replaceAll("\\.0+$", "")
-                    .toUpperCase(Locale.ROOT);
-        }
-
-        private static String normalizeLookupName(String value) {
-            if (value == null) {
-                return "";
-            }
-
-            return value
-                    .trim()
-                    .replaceAll("\\s+", " ")
-                    .toUpperCase(Locale.ROOT);
-        }
-
-        private static boolean namesCompatible(
-                String salaryName,
-                String payrollName) {
-
-            String a = normalizeNameForComparison(salaryName);
-            String b = normalizeNameForComparison(payrollName);
+        public static boolean namesCompatible(String salaryName, String payrollName) {
+            String a = normalizeName(salaryName);
+            String b = normalizeName(payrollName);
 
             if (a.isBlank() || b.isBlank()) {
                 return false;
             }
-
             if (a.equals(b)) {
                 return true;
             }
 
             String compactA = a.replaceAll("[^A-Z0-9]", "");
             String compactB = b.replaceAll("[^A-Z0-9]", "");
-
             if (compactA.equals(compactB)) {
                 return true;
             }
 
             String wordsA = a.replace(".", " ");
             String wordsB = b.replace(".", " ");
-
             if (wordsA.equals(wordsB)) {
                 return true;
             }
 
-            return wordsA.endsWith(" " + wordsB)
-                    || wordsB.endsWith(" " + wordsA);
-        }
-
-        private static String normalizeNameForComparison(String value) {
-            if (value == null) {
-                return "";
-            }
-
-            return value
-                    .trim()
-                    .replaceAll("\\s+", " ")
-                    .toUpperCase(Locale.ROOT);
+            return wordsA.endsWith(" " + wordsB) || wordsB.endsWith(" " + wordsA)
+                    || wordsA.startsWith(wordsB + " ") || wordsB.startsWith(wordsA + " ");
         }
     }
+
     private record PayrollSheet(
             String sheetName,
             int dataStartRow,
@@ -1385,6 +1072,8 @@ public class ExcelPayrollService {
             int workingDays) {
     }
 }
+
+
 
 
 

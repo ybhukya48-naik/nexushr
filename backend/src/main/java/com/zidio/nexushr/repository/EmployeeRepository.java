@@ -44,4 +44,6 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
         ORDER BY e.roleType
     """)
     List<Object[]> countEmployeesByRole();
+    Optional<Employee> findByFullNameIgnoreCase(String fullName);
 }
+

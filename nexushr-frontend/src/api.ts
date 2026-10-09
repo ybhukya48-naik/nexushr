@@ -693,6 +693,37 @@ export function importAttendanceExcel(
   );
 }
 
+export interface PayrollExcelImportResponse {
+  payMonth: string;
+  imported: number;
+  message: string;
+}
+
+/**
+ * Upload a multi-sheet salary Excel workbook.
+ * The backend will:
+ *  1. Parse actual worked hours / days for each employee.
+ *  2. Calculate earned salary = (workedDays / totalDays) × CTC.
+ *  3. Sync AttendanceRecord rows so the monthly summary shows real hours.
+ *  4. Send salary-notification emails to every employee.
+ */
+export function importPayrollExcel(
+  payMonth: string,
+  file: File,
+) {
+  const body = new FormData();
+  body.append("file", file);
+  body.append("payMonth", payMonth);
+
+  return request<PayrollExcelImportResponse>(
+    `/payroll/import-excel`,
+    {
+      method: "POST",
+      body,
+    },
+  );
+}
+
 export function markPayrollPaid(id: number) {
   return request<PayrollRecord>(
     `/payroll/${id}/mark-paid`,

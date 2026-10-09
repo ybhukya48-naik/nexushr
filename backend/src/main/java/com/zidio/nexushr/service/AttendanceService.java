@@ -3,8 +3,10 @@ package com.zidio.nexushr.service;
 import com.zidio.nexushr.domain.AttendanceRecord;
 import com.zidio.nexushr.domain.Employee;
 import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
+import com.zidio.nexushr.domain.PayrollRecord;
 import com.zidio.nexushr.repository.AttendanceRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
+import com.zidio.nexushr.repository.PayrollRepository;
 import com.zidio.nexushr.web.dto.AttendanceImportResponse;
 import com.zidio.nexushr.web.dto.AttendanceImportRowError;
 import com.zidio.nexushr.web.dto.AttendanceMonthlyEmployeeSummary;
@@ -17,7 +19,10 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,8 +45,18 @@ import java.util.Objects;
 @Service
 public class AttendanceService {
 
+    private static final Logger log = LoggerFactory.getLogger(AttendanceService.class);
+
+    /** Salary-workbook sheet names that indicate a payroll Excel, not a plain attendance file. */
+    private static final List<String> SALARY_SHEET_SIGNALS = List.of(
+            "employs salaris", "cyond ndt", "g group structural", "tech 9",
+            "gorle group", "salary"
+    );
+
     private final AttendanceRepository attendanceRepository;
     private final EmployeeRepository employeeRepository;
+    private final PayrollRepository payrollRepository;
+    private final ExcelPayrollService excelPayrollService;
 
     @Value("${app.attendance.standard-daily-minutes:480}")
     private int standardDailyMinutes = 480;
@@ -51,10 +66,14 @@ public class AttendanceService {
 
     public AttendanceService(
             AttendanceRepository attendanceRepository,
-            EmployeeRepository employeeRepository) {
+            EmployeeRepository employeeRepository,
+            PayrollRepository payrollRepository,
+            @Lazy ExcelPayrollService excelPayrollService) {
 
         this.attendanceRepository = attendanceRepository;
         this.employeeRepository = employeeRepository;
+        this.payrollRepository = payrollRepository;
+        this.excelPayrollService = excelPayrollService;
     }
 
     public AttendanceRecord create(AttendanceRecord attendanceRecord) {
@@ -286,36 +305,47 @@ public class AttendanceService {
         );
     }
 
-            @Transactional
-            public AttendanceImportResponse importMonthlyExcel(
-                MultipartFile file,
-                String payMonth) {
+    @Transactional
+    public AttendanceImportResponse importMonthlyExcel(
+            MultipartFile file,
+            String payMonth) {
 
-            if (file == null || file.isEmpty()) {
-                throw badRequest("Excel file is required");
-            }
+        if (file == null || file.isEmpty()) {
+            throw badRequest("Excel file is required");
+        }
 
-            YearMonth month = parsePayMonth(payMonth);
-            LocalDate monthStart = month.atDay(1);
-            LocalDate monthEnd = month.atEndOfMonth();
+        // ── Detect salary workbook and delegate to ExcelPayrollService ──────
+        if (isSalaryWorkbook(file)) {
+            log.info("[AttendanceService] Salary workbook detected – delegating to ExcelPayrollService for payMonth={}", payMonth);
+            List<PayrollRecord> payrollRecords = excelPayrollService.importPayroll(file, payMonth);
+            int count = payrollRecords.size();
+            return new AttendanceImportResponse(
+                    payMonth, count, count, 0, 0, List.of()
+            );
+        }
 
-            int totalRows = 0;
-            int importedCount = 0;
-            int updatedCount = 0;
-            int skippedCount = 0;
+        // ── Standard 4-column attendance format ──────────────────────────────
+        YearMonth month = parsePayMonth(payMonth);
+        LocalDate monthStart = month.atDay(1);
+        LocalDate monthEnd = month.atEndOfMonth();
 
-            List<AttendanceImportRowError> errors = new ArrayList<>();
-            DataFormatter formatter = new DataFormatter(Locale.ENGLISH);
+        int totalRows = 0;
+        int importedCount = 0;
+        int updatedCount = 0;
+        int skippedCount = 0;
 
-            try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
+        List<AttendanceImportRowError> errors = new ArrayList<>();
+        DataFormatter formatter = new DataFormatter(Locale.ENGLISH);
 
-                Sheet sheet = workbook.getNumberOfSheets() > 0
+        try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
+
+            Sheet sheet = workbook.getNumberOfSheets() > 0
                     ? workbook.getSheetAt(0)
                     : null;
 
-                if (sheet == null) {
+            if (sheet == null) {
                 throw badRequest("Excel sheet is missing");
-                }
+            }
 
                 for (int i = 1; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
@@ -424,25 +454,54 @@ public class AttendanceService {
                 }
 
             } catch (IOException | RuntimeException ex) {
-                if (ex instanceof ResponseStatusException) {
-                    throw (ResponseStatusException) ex;
-                }
-                throw new ResponseStatusException(
+            if (ex instanceof ResponseStatusException) {
+                throw (ResponseStatusException) ex;
+            }
+            throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Unable to read Excel file. Please upload a valid .xlsx or .xls sheet.",
                     ex
-                );
-            }
+            );
+        }
 
-            return new AttendanceImportResponse(
+        return new AttendanceImportResponse(
                 payMonth,
                 totalRows,
                 importedCount,
                 updatedCount,
                 skippedCount,
                 errors
-            );
+        );
+    }
+
+    /**
+     * Peek at the workbook sheet names to decide whether the file is a
+     * multi-sheet salary workbook (should go through ExcelPayrollService)
+     * or a plain attendance file.
+     */
+    private boolean isSalaryWorkbook(MultipartFile file) {
+        try (Workbook wb = WorkbookFactory.create(file.getInputStream())) {
+            int numSheets = wb.getNumberOfSheets();
+            // Single-sheet files with ≤ 5 columns are treated as attendance
+            if (numSheets <= 1) {
+                Sheet s = numSheets > 0 ? wb.getSheetAt(0) : null;
+                if (s == null) return false;
+                Row header = s.getRow(0);
+                int cols = header == null ? 0 : header.getLastCellNum();
+                if (cols <= 5) return false;
             }
+            for (int i = 0; i < numSheets; i++) {
+                String name = wb.getSheetName(i).toLowerCase(Locale.ENGLISH).strip();
+                for (String signal : SALARY_SHEET_SIGNALS) {
+                    if (name.contains(signal)) return true;
+                }
+            }
+            return numSheets > 1; // Multi-sheet → treat as salary workbook
+        } catch (Exception e) {
+            log.warn("[AttendanceService] Could not peek at workbook sheets: {}", e.getMessage());
+            return false;
+        }
+    }
 
             @Transactional(readOnly = true)
             public AttendanceMonthlySummaryResponse monthlySummary(String payMonth) {
@@ -472,16 +531,28 @@ public class AttendanceService {
                 int expectedMinutes = employeeBusinessDays * standardDailyMinutes;
 
                 int workedMinutes = attendanceRepository
-                    .findByEmployee_IdAndAttendanceDateBetween(
-                        employee.getId(),
-                        start,
-                        end
-                    )
-                    .stream()
-                    .map(AttendanceRecord::getWorkMinutes)
-                    .filter(Objects::nonNull)
-                    .mapToInt(Integer::intValue)
-                    .sum();
+                        .findByEmployee_IdAndAttendanceDateBetween(
+                                employee.getId(),
+                                start,
+                                end
+                        )
+                        .stream()
+                        .map(AttendanceRecord::getWorkMinutes)
+                        .filter(Objects::nonNull)
+                        .mapToInt(Integer::intValue)
+                        .sum();
+
+                // ── Fallback: if no daily attendance punches, use payroll record ──
+                if (workedMinutes == 0) {
+                    workedMinutes = payrollRepository
+                            .findByEmployee_IdAndPayMonth(employee.getId(), payMonth)
+                            .map(pr -> pr.getWorkedMinutes() != null ? pr.getWorkedMinutes() : 0)
+                            .orElse(0);
+                    if (workedMinutes > 0) {
+                        log.debug("[AttendanceService] monthlySummary: used payroll workedMinutes={} for employee={}",
+                                workedMinutes, employee.getEmployeeCode());
+                    }
+                }
 
                 int shortfallMinutes = Math.max(0, expectedMinutes - workedMinutes);
 

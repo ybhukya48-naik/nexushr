@@ -22,6 +22,9 @@ class ExcelPayrollServiceTest {
     private ResendEmailService resendEmailService;
 
     @Autowired
+    private com.zidio.nexushr.repository.EmployeeRepository employeeRepository;
+
+    @Autowired
     private ExcelPayrollService excelPayrollService;
 
     @Test

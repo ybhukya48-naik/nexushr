@@ -1,4 +1,4 @@
-﻿import { isCompanyMatch } from "../utils/company";
+import { isCompanyMatch } from "../utils/company";
 import { useEffect, useMemo, useState } from "react";
 import {
   createPayroll,
@@ -9,6 +9,7 @@ import {
   getPayrollAutoComponents,
   getPayrollRecords,
   importAttendanceExcel,
+  importPayrollExcel,
   getPayslip,
   downloadPayslipPdf,
   emailPayslip,
@@ -17,6 +18,7 @@ import {
   type AttendanceMonthlySummaryResponse,
   type EmployeeResponse,
   type PayrollAutoComponentsResponse,
+  type PayrollExcelImportResponse,
   type PayrollRecord,
   type PayslipResponse,
 } from "../api";
@@ -66,6 +68,13 @@ export default function Payroll() {
     useState<AttendanceImportResponse | null>(null);
   const [attendanceSummary, setAttendanceSummary] =
     useState<AttendanceMonthlySummaryResponse | null>(null);
+
+  // Salary Excel import state
+  const [salaryFile, setSalaryFile] = useState<File | null>(null);
+  const [importingSalary, setImportingSalary] = useState(false);
+  const [salaryImportResult, setSalaryImportResult] =
+    useState<PayrollExcelImportResponse | null>(null);
+
 
   const [autoComponents, setAutoComponents] =
     useState<PayrollAutoComponentsResponse | null>(null);
@@ -229,6 +238,47 @@ export default function Payroll() {
       );
     } finally {
       setImportingAttendance(false);
+    }
+  }
+
+  /**
+   * Upload the provided salary workbook (multi-sheet XLSX).
+   * Backend will:
+   *  1. Parse worked hours/days per employee from the Excel.
+   *  2. Calculate earned salary based on actual working days.
+   *  3. Sync AttendanceRecord rows so monthly summary shows real hours.
+   *  4. Send email notifications to every employee.
+   */
+  async function handleSalaryExcelImport(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!salaryFile) {
+      setError("Please choose a salary Excel file (.xlsx) to import.");
+      return;
+    }
+
+    setImportingSalary(true);
+    setError("");
+    setMessage("");
+    setSalaryImportResult(null);
+
+    try {
+      const result = await importPayrollExcel(payMonth, salaryFile);
+      setSalaryImportResult(result);
+      setMessage(
+        `✅ ${result.message} Attendance summary and payroll records updated.`
+      );
+      // Reload attendance summary and payroll records
+      await loadAttendanceSummary(payMonth);
+      await loadData();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to import salary Excel. Check the file format.",
+      );
+    } finally {
+      setImportingSalary(false);
     }
   }
 
@@ -469,6 +519,50 @@ export default function Payroll() {
             >
               {importingAttendance ? "Importing..." : "Import Attendance"}
             </button>
+          </form>
+
+          {/* ── Salary Excel Import ── */}
+          <form
+            className="payroll-attendance-import"
+            style={{ marginTop: "1rem", borderTop: "1px solid var(--border-color, #e2e8f0)", paddingTop: "1.25rem" }}
+            onSubmit={handleSalaryExcelImport}
+          >
+            <label style={{ fontWeight: 600, color: "var(--accent, #6366f1)" }}>
+              📊 Import Salary Excel (multi-sheet workbook)
+              <span style={{ display: "block", fontSize: "0.78rem", fontWeight: 400, color: "#64748b", marginTop: "0.2rem" }}>
+                Upload the provided salary Excel (e.g. GGEA-CYOND-SALARIES-2026.xlsx).<br />
+                Backend auto-calculates earned salary from working hours, syncs attendance, and emails employees.
+              </span>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                style={{ marginTop: "0.5rem" }}
+                onChange={(event) =>
+                  setSalaryFile(event.target.files?.[0] ?? null)
+                }
+              />
+            </label>
+
+            <button
+              type="submit"
+              className="primary-button"
+              disabled={importingSalary}
+              style={{ marginTop: "0.75rem" }}
+            >
+              {importingSalary
+                ? "Importing & Emailing..."
+                : "📥 Import Salary & Send Email Notifications"}
+            </button>
+
+            {salaryImportResult && (
+              <div className="payroll-attendance-summary" style={{ marginTop: "0.75rem" }}>
+                <strong>Salary Import Result ({salaryImportResult.payMonth})</strong>
+                <span>✅ {salaryImportResult.imported} employee salary record(s) created/updated.</span>
+                <span style={{ fontSize: "0.82rem", color: "#475569" }}>
+                  Email notifications dispatched. Attendance worked-hours updated.
+                </span>
+              </div>
+            )}
           </form>
 
           {attendanceImportResult && (

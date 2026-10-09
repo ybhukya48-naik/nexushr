@@ -1,6 +1,7 @@
 package com.zidio.nexushr.web;
 
 import com.zidio.nexushr.domain.PayrollRecord;
+import com.zidio.nexushr.service.ExcelPayrollService;
 import com.zidio.nexushr.service.PayrollPdfService;
 import com.zidio.nexushr.service.PayrollService;
 import com.zidio.nexushr.service.email.ResendEmailService;
@@ -9,13 +10,17 @@ import com.zidio.nexushr.web.dto.PayrollRequest;
 import com.zidio.nexushr.web.dto.PayrollResponse;
 import com.zidio.nexushr.web.dto.PayslipResponse;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/payroll")
@@ -24,15 +29,18 @@ public class PayrollController {
     private final PayrollService payrollService;
     private final PayrollPdfService payrollPdfService;
     private final ResendEmailService resendEmailService;
+    private final ExcelPayrollService excelPayrollService;
 
     public PayrollController(
             PayrollService payrollService,
             PayrollPdfService payrollPdfService,
-            ResendEmailService resendEmailService) {
+            ResendEmailService resendEmailService,
+            ExcelPayrollService excelPayrollService) {
 
         this.payrollService = payrollService;
         this.payrollPdfService = payrollPdfService;
         this.resendEmailService = resendEmailService;
+        this.excelPayrollService = excelPayrollService;
     }
 
     @GetMapping
@@ -232,6 +240,37 @@ public class PayrollController {
         return PayrollResponse.from(
                 payrollService.markPaid(id)
         );
+    }
+
+    /**
+     * Import salaries from a multi-sheet salary Excel workbook.
+     * Calculates earned salary based on actual working hours/days,
+     * syncs attendance records, and sends email notifications to employees.
+     *
+     * <p>POST /api/v1/payroll/import-excel
+     * <p>Required role: HR, ADMIN, or MANAGER
+     */
+    @PostMapping(value = "/import-excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER')")
+    public ResponseEntity<Map<String, Object>> importExcel(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("payMonth") String payMonth) {
+
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Excel file is required");
+        }
+
+        if (payMonth == null || payMonth.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "payMonth is required (YYYY-MM)");
+        }
+
+        List<PayrollRecord> imported = excelPayrollService.importPayroll(file, payMonth);
+
+        return ResponseEntity.ok(Map.of(
+                "payMonth", payMonth,
+                "imported", imported.size(),
+                "message", "Salary data imported and email notifications dispatched for " + imported.size() + " employee(s)."
+        ));
     }
 }
 
