@@ -29,7 +29,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.zidio.nexushr.domain.PayrollStatus;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -38,9 +43,14 @@ import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class AttendanceService {
@@ -52,6 +62,8 @@ public class AttendanceService {
             "employs salaris", "cyond ndt", "g group structural", "tech 9",
             "gorle group", "salary"
     );
+
+    private static final int BATCH_SIZE = 50;
 
     private final AttendanceRepository attendanceRepository;
     private final EmployeeRepository employeeRepository;
@@ -314,146 +326,203 @@ public class AttendanceService {
             throw badRequest("Excel file is required");
         }
 
-        // ── Detect salary workbook and delegate to ExcelPayrollService ──────
-        if (isSalaryWorkbook(file)) {
-            log.info("[AttendanceService] Salary workbook detected – delegating to ExcelPayrollService for payMonth={}", payMonth);
-            List<PayrollRecord> payrollRecords = excelPayrollService.importPayroll(file, payMonth);
-            int count = payrollRecords.size();
-            return new AttendanceImportResponse(
-                    payMonth, count, count, 0, 0, List.of()
-            );
-        }
-
-        // ── Standard 4-column attendance format ──────────────────────────────
         YearMonth month = parsePayMonth(payMonth);
         LocalDate monthStart = month.atDay(1);
         LocalDate monthEnd = month.atEndOfMonth();
 
-        int totalRows = 0;
-        int importedCount = 0;
-        int updatedCount = 0;
-        int skippedCount = 0;
+        Path tempPath = null;
+        try {
+            tempPath = Files.createTempFile("nexushr_att_", ".xlsx");
+            file.transferTo(tempPath.toFile());
 
-        List<AttendanceImportRowError> errors = new ArrayList<>();
-        DataFormatter formatter = new DataFormatter(Locale.ENGLISH);
+            try (Workbook workbook = WorkbookFactory.create(tempPath.toFile())) {
 
-        try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
+                // ── Detect salary workbook and delegate to ExcelPayrollService ──────
+                if (isSalaryWorkbook(workbook)) {
+                    log.info("[AttendanceService] Salary workbook detected – delegating to ExcelPayrollService for payMonth={}", payMonth);
+                    List<PayrollRecord> payrollRecords = excelPayrollService.importPayroll(workbook, payMonth);
+                    int count = payrollRecords.size();
+                    return new AttendanceImportResponse(
+                            payMonth, count, count, 0, 0, List.of()
+                    );
+                }
 
-            Sheet sheet = workbook.getNumberOfSheets() > 0
-                    ? workbook.getSheetAt(0)
-                    : null;
+                // ── Standard attendance format ──────────────────────────────────────
+                Sheet sheet = workbook.getNumberOfSheets() > 0
+                        ? workbook.getSheetAt(0)
+                        : null;
 
-            if (sheet == null) {
-                throw badRequest("Excel sheet is missing");
-            }
+                if (sheet == null) {
+                    throw badRequest("Excel sheet is missing");
+                }
+
+                // Pre-load all active employees once to eliminate N+1 remote database roundtrips
+                List<Employee> activeEmployees = employeeRepository.findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus.ACTIVE);
+                Map<String, Employee> employeeByCode = new HashMap<>();
+                for (Employee emp : activeEmployees) {
+                    if (emp.getEmployeeCode() != null) {
+                        employeeByCode.put(emp.getEmployeeCode().trim().toUpperCase(Locale.ROOT), emp);
+                    }
+                }
+
+                // Pre-load all attendance records for this month once
+                List<AttendanceRecord> monthRecords = attendanceRepository.findByAttendanceDateBetween(monthStart, monthEnd);
+                Map<String, AttendanceRecord> recordMap = new HashMap<>();
+                for (AttendanceRecord r : monthRecords) {
+                    if (r.getEmployee() != null && r.getEmployee().getId() != null && r.getAttendanceDate() != null) {
+                        recordMap.put(r.getEmployee().getId() + "_" + r.getAttendanceDate(), r);
+                    }
+                }
+
+                int totalRows = 0;
+                int importedCount = 0;
+                int updatedCount = 0;
+                int skippedCount = 0;
+
+                List<AttendanceRecord> recordsToSave = new ArrayList<>();
+                Set<Employee> affectedEmployees = new HashSet<>();
+                List<AttendanceImportRowError> errors = new ArrayList<>();
+                DataFormatter formatter = new DataFormatter(Locale.ENGLISH);
 
                 for (int i = 1; i <= sheet.getLastRowNum(); i++) {
-                Row row = sheet.getRow(i);
+                    Row row = sheet.getRow(i);
 
-                if (row == null || isBlankRow(row, formatter)) {
-                    skippedCount++;
-                    continue;
-                }
-
-                totalRows++;
-
-                try {
-                    String employeeCode = formatter
-                        .formatCellValue(row.getCell(0))
-                        .trim();
-
-                    if (employeeCode.isBlank()) {
-                    throw badRequest("Employee code is required in column A");
+                    if (row == null || isBlankRow(row, formatter)) {
+                        skippedCount++;
+                        continue;
                     }
 
-                    LocalDate attendanceDate = parseAttendanceDate(
-                        row.getCell(1),
-                        month,
-                        i + 1
-                    );
+                    totalRows++;
 
-                    if (attendanceDate.isBefore(monthStart)
-                        || attendanceDate.isAfter(monthEnd)) {
-                    throw badRequest("Attendance date is outside pay month " + payMonth);
-                    }
+                    try {
+                        String employeeCode = formatter
+                                .formatCellValue(row.getCell(0))
+                                .trim();
 
-                    LocalTime checkInTime = parseOptionalTime(row.getCell(2), formatter);
-                    LocalTime checkOutTime = parseOptionalTime(row.getCell(3), formatter);
+                        if (employeeCode.isBlank()) {
+                            throw badRequest("Employee code is required in column A");
+                        }
 
-                    if (checkInTime == null && checkOutTime == null) {
-                    skippedCount++;
-                    continue;
-                    }
+                        LocalDate attendanceDate = parseAttendanceDate(
+                                row.getCell(1),
+                                month,
+                                i + 1
+                        );
 
-                    if (checkInTime == null) {
-                    throw badRequest("Check-in time is required when check-out is present");
-                    }
+                        if (attendanceDate.isBefore(monthStart)
+                                || attendanceDate.isAfter(monthEnd)) {
+                            throw badRequest("Attendance date is outside pay month " + payMonth);
+                        }
 
-                    LocalDateTime checkIn = attendanceDate.atTime(checkInTime);
-                    LocalDateTime checkOut = checkOutTime == null
-                        ? null
-                        : attendanceDate.atTime(checkOutTime);
+                        LocalTime checkInTime = parseOptionalTime(row.getCell(2), formatter);
+                        LocalTime checkOutTime = parseOptionalTime(row.getCell(3), formatter);
 
-                    if (checkOut != null) {
-                    validateCheckTimes(checkIn, checkOut);
-                    }
+                        if (checkInTime == null && checkOutTime == null) {
+                            skippedCount++;
+                            continue;
+                        }
 
-                    Employee employee = employeeRepository
-                        .findByEmployeeCodeIgnoreCase(employeeCode)
-                        .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.NOT_FOUND,
-                            "Employee not found for code: " + employeeCode
+                        if (checkInTime == null) {
+                            throw badRequest("Check-in time is required when check-out is present");
+                        }
+
+                        LocalDateTime checkIn = attendanceDate.atTime(checkInTime);
+                        LocalDateTime checkOut = checkOutTime == null
+                                ? null
+                                : attendanceDate.atTime(checkOutTime);
+
+                        if (checkOut != null) {
+                            validateCheckTimes(checkIn, checkOut);
+                        }
+
+                        Employee employee = employeeByCode.get(employeeCode.toUpperCase(Locale.ROOT));
+                        if (employee == null) {
+                            employee = employeeRepository
+                                    .findByEmployeeCodeIgnoreCase(employeeCode)
+                                    .orElseThrow(() -> new ResponseStatusException(
+                                            HttpStatus.NOT_FOUND,
+                                            "Employee not found for code: " + employeeCode
+                                    ));
+
+                            if (!employee.isActive()
+                                    || employee.getLifecycleStatus() != EmployeeLifecycleStatus.ACTIVE) {
+                                throw badRequest("Employee is not active: " + employeeCode);
+                            }
+                            employeeByCode.put(employeeCode.toUpperCase(Locale.ROOT), employee);
+                        }
+
+                        String key = employee.getId() + "_" + attendanceDate;
+                        AttendanceRecord record = recordMap.get(key);
+                        boolean exists = record != null;
+
+                        if (!exists) {
+                            record = new AttendanceRecord();
+                            recordMap.put(key, record);
+                        }
+
+                        record.setEmployee(employee);
+                        record.setAttendanceDate(attendanceDate);
+                        record.setCheckInTime(checkIn);
+                        record.setCheckOutTime(checkOut);
+
+                        int workMinutes = checkOut == null
+                                ? 0
+                                : calculateWorkMinutes(checkIn, checkOut);
+
+                        record.setWorkMinutes(workMinutes);
+                        record.setLateArrivalMinutes(calculateLateArrivalMinutes(checkIn));
+                        record.setOvertimeMinutes(calculateOvertimeMinutes(workMinutes));
+
+                        recordsToSave.add(record);
+                        affectedEmployees.add(employee);
+
+                        if (exists) {
+                            updatedCount++;
+                        } else {
+                            importedCount++;
+                        }
+
+                        // Flush in manageable batches to minimize memory and transaction overhead
+                        if (recordsToSave.size() >= BATCH_SIZE) {
+                            attendanceRepository.saveAll(recordsToSave);
+                            recordsToSave.clear();
+                        }
+
+                    } catch (Exception ex) {
+                        String employeeCode = formatter
+                                .formatCellValue(row.getCell(0))
+                                .trim();
+
+                        errors.add(new AttendanceImportRowError(
+                                i + 1,
+                                employeeCode,
+                                simplifyMessage(ex)
                         ));
-
-                    if (!employee.isActive()
-                        || employee.getLifecycleStatus() != EmployeeLifecycleStatus.ACTIVE) {
-                    throw badRequest("Employee is not active: " + employeeCode);
                     }
-
-                    AttendanceRecord record = attendanceRepository
-                        .findByEmployee_IdAndAttendanceDate(
-                            employee.getId(),
-                            attendanceDate
-                        )
-                        .orElseGet(AttendanceRecord::new);
-
-                    boolean exists = record.getId() != null;
-
-                    record.setEmployee(employee);
-                    record.setAttendanceDate(attendanceDate);
-                    record.setCheckInTime(checkIn);
-                    record.setCheckOutTime(checkOut);
-
-                    int workMinutes = checkOut == null
-                        ? 0
-                        : calculateWorkMinutes(checkIn, checkOut);
-
-                    record.setWorkMinutes(workMinutes);
-                    record.setLateArrivalMinutes(calculateLateArrivalMinutes(checkIn));
-                    record.setOvertimeMinutes(calculateOvertimeMinutes(workMinutes));
-
-                    attendanceRepository.save(record);
-
-                    if (exists) {
-                    updatedCount++;
-                    } else {
-                    importedCount++;
-                    }
-
-                } catch (Exception ex) {
-                    String employeeCode = formatter
-                        .formatCellValue(row.getCell(0))
-                        .trim();
-
-                    errors.add(new AttendanceImportRowError(
-                        i + 1,
-                        employeeCode,
-                        simplifyMessage(ex)
-                    ));
-                }
                 }
 
-            } catch (IOException | RuntimeException ex) {
+                // Flush remaining attendance records
+                if (!recordsToSave.isEmpty()) {
+                    attendanceRepository.saveAll(recordsToSave);
+                    recordsToSave.clear();
+                }
+
+                // Calculate salary based on the imported attendance for all affected employees
+                if (!affectedEmployees.isEmpty()) {
+                    calculateAndSavePayrollForAttendance(affectedEmployees, month, payMonth);
+                }
+
+                return new AttendanceImportResponse(
+                        payMonth,
+                        totalRows,
+                        importedCount,
+                        updatedCount,
+                        skippedCount,
+                        errors
+                );
+            }
+
+        } catch (IOException | RuntimeException ex) {
             if (ex instanceof ResponseStatusException) {
                 throw (ResponseStatusException) ex;
             }
@@ -462,16 +531,133 @@ public class AttendanceService {
                     "Unable to read Excel file. Please upload a valid .xlsx or .xls sheet.",
                     ex
             );
+        } finally {
+            if (tempPath != null) {
+                try {
+                    Files.deleteIfExists(tempPath);
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    }
+
+    /**
+     * Calculate and update salary records for employees based on attendance worked days and hours.
+     */
+    private void calculateAndSavePayrollForAttendance(
+            Set<Employee> employees,
+            YearMonth month,
+            String payMonth) {
+
+        LocalDate startDate = month.atDay(1);
+        LocalDate endDate = month.atEndOfMonth();
+
+        List<AttendanceRecord> allMonthAttendance = attendanceRepository.findByAttendanceDateBetween(startDate, endDate);
+        Map<Long, List<AttendanceRecord>> attendanceByEmployee = allMonthAttendance.stream()
+                .filter(r -> r.getEmployee() != null && r.getEmployee().getId() != null)
+                .collect(Collectors.groupingBy(r -> r.getEmployee().getId()));
+
+        List<PayrollRecord> existingPayrolls = payrollRepository.findByPayMonth(payMonth);
+        Map<Long, PayrollRecord> existingPayrollMap = new HashMap<>();
+        for (PayrollRecord pr : existingPayrolls) {
+            if (pr.getEmployee() != null && pr.getEmployee().getId() != null) {
+                existingPayrollMap.put(pr.getEmployee().getId(), pr);
+            }
         }
 
-        return new AttendanceImportResponse(
-                payMonth,
-                totalRows,
-                importedCount,
-                updatedCount,
-                skippedCount,
-                errors
-        );
+        List<PayrollRecord> payrollToSave = new ArrayList<>();
+
+        for (Employee employee : employees) {
+            LocalDate effectiveStart = employee.getJoiningDate() != null
+                    && employee.getJoiningDate().isAfter(startDate)
+                    ? employee.getJoiningDate()
+                    : startDate;
+
+            int businessDays = businessDaysBetween(effectiveStart, endDate);
+            int expectedWorkMinutes = businessDays * standardDailyMinutes;
+
+            List<AttendanceRecord> records = attendanceByEmployee.getOrDefault(employee.getId(), List.of());
+
+            int workedMinutes = records.stream()
+                    .map(AttendanceRecord::getWorkMinutes)
+                    .filter(Objects::nonNull)
+                    .mapToInt(Integer::intValue)
+                    .sum();
+
+            int overtimeMinutes = records.stream()
+                    .map(AttendanceRecord::getOvertimeMinutes)
+                    .filter(Objects::nonNull)
+                    .mapToInt(Integer::intValue)
+                    .sum();
+
+            int shortfallMinutes = Math.max(0, expectedWorkMinutes - workedMinutes);
+
+            BigDecimal baseSalary = employee.getBaseSalary() != null && employee.getBaseSalary().compareTo(BigDecimal.ZERO) > 0
+                    ? employee.getBaseSalary()
+                    : BigDecimal.valueOf(30000);
+
+            BigDecimal expectedMinutesVal = BigDecimal.valueOf(Math.max(1, expectedWorkMinutes));
+            BigDecimal perMinuteRate = baseSalary.divide(expectedMinutesVal, 8, RoundingMode.HALF_UP);
+
+            BigDecimal leaveDeduction = perMinuteRate
+                    .multiply(BigDecimal.valueOf(shortfallMinutes))
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            BigDecimal overtimeAmount = perMinuteRate
+                    .multiply(BigDecimal.valueOf(overtimeMinutes))
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            BigDecimal basicSalary = baseSalary.multiply(BigDecimal.valueOf(0.60)).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal hra = baseSalary.multiply(BigDecimal.valueOf(0.40)).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal grossSalary = baseSalary.add(overtimeAmount);
+
+            BigDecimal pf = basicSalary.multiply(BigDecimal.valueOf(0.12)).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal taxAmount = grossSalary.multiply(BigDecimal.valueOf(0.10)).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal deductions = pf.add(leaveDeduction).add(taxAmount);
+            BigDecimal netSalary = grossSalary.subtract(deductions).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+
+            PayrollRecord payroll = existingPayrollMap.get(employee.getId());
+            if (payroll == null) {
+                payroll = new PayrollRecord();
+                payroll.setEmployee(employee);
+                payroll.setPayMonth(payMonth);
+                payroll.setStatus(PayrollStatus.GENERATED);
+                existingPayrollMap.put(employee.getId(), payroll);
+            }
+
+            payroll.setCtc(baseSalary.multiply(BigDecimal.valueOf(12)));
+            payroll.setGrossSalary(grossSalary);
+            payroll.setBasicSalary(basicSalary);
+            payroll.setHra(hra);
+            payroll.setBonus(BigDecimal.ZERO);
+            payroll.setOvertime(overtimeAmount);
+            payroll.setPf(pf);
+            payroll.setTaxAmount(taxAmount);
+            payroll.setLeaveDeduction(leaveDeduction);
+            payroll.setOtherDeductions(BigDecimal.ZERO);
+            payroll.setDeductions(deductions);
+            payroll.setNetSalary(netSalary);
+
+            payroll.setWorkingDays((int) records.stream().filter(r -> r.getCheckInTime() != null).count());
+            payroll.setActualHours(BigDecimal.valueOf(workedMinutes).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP));
+            payroll.setRequiredHours(BigDecimal.valueOf(9));
+            payroll.setExpectedWorkMinutes(expectedWorkMinutes);
+            payroll.setWorkedMinutes(workedMinutes);
+            payroll.setShortfallMinutes(shortfallMinutes);
+            payroll.setOvertimeMinutes(overtimeMinutes);
+
+            payrollToSave.add(payroll);
+            if (payrollToSave.size() >= BATCH_SIZE) {
+                payrollRepository.saveAll(payrollToSave);
+                payrollToSave.clear();
+            }
+        }
+
+        if (!payrollToSave.isEmpty()) {
+            payrollRepository.saveAll(payrollToSave);
+            payrollToSave.clear();
+        }
+        log.info("[AttendanceService] Calculated and saved payroll for employees for payMonth={}", payMonth);
     }
 
     /**
@@ -479,114 +665,140 @@ public class AttendanceService {
      * multi-sheet salary workbook (should go through ExcelPayrollService)
      * or a plain attendance file.
      */
-    private boolean isSalaryWorkbook(MultipartFile file) {
-        try (Workbook wb = WorkbookFactory.create(file.getInputStream())) {
-            int numSheets = wb.getNumberOfSheets();
-            // Single-sheet files with ≤ 5 columns are treated as attendance
-            if (numSheets <= 1) {
-                Sheet s = numSheets > 0 ? wb.getSheetAt(0) : null;
-                if (s == null) return false;
-                Row header = s.getRow(0);
-                int cols = header == null ? 0 : header.getLastCellNum();
-                if (cols <= 5) return false;
+    public boolean isSalaryWorkbook(MultipartFile file) {
+        if (file == null || file.isEmpty()) return false;
+        Path tempPath = null;
+        try {
+            tempPath = Files.createTempFile("nexushr_chk_", ".xlsx");
+            file.transferTo(tempPath.toFile());
+            try (Workbook wb = WorkbookFactory.create(tempPath.toFile())) {
+                return isSalaryWorkbook(wb);
             }
-            for (int i = 0; i < numSheets; i++) {
-                String name = wb.getSheetName(i).toLowerCase(Locale.ENGLISH).strip();
-                for (String signal : SALARY_SHEET_SIGNALS) {
-                    if (name.contains(signal)) return true;
+        } catch (Exception e) {
+            log.warn("[AttendanceService] Could not check workbook sheets: {}", e.getMessage());
+            return false;
+        } finally {
+            if (tempPath != null) {
+                try {
+                    Files.deleteIfExists(tempPath);
+                } catch (Exception ignored) {
                 }
             }
-            return numSheets > 1; // Multi-sheet → treat as salary workbook
-        } catch (Exception e) {
-            log.warn("[AttendanceService] Could not peek at workbook sheets: {}", e.getMessage());
-            return false;
         }
     }
 
-            @Transactional(readOnly = true)
-            public AttendanceMonthlySummaryResponse monthlySummary(String payMonth) {
+    public boolean isSalaryWorkbook(Workbook wb) {
+        if (wb == null) return false;
+        int numSheets = wb.getNumberOfSheets();
+        // Single-sheet files with ≤ 5 columns are treated as attendance
+        if (numSheets <= 1) {
+            Sheet s = numSheets > 0 ? wb.getSheetAt(0) : null;
+            if (s == null) return false;
+            Row header = s.getRow(0);
+            int cols = header == null ? 0 : header.getLastCellNum();
+            if (cols <= 5) return false;
+        }
+        for (int i = 0; i < numSheets; i++) {
+            String name = wb.getSheetName(i).toLowerCase(Locale.ENGLISH).strip();
+            for (String signal : SALARY_SHEET_SIGNALS) {
+                if (name.contains(signal)) return true;
+            }
+        }
+        return numSheets > 1; // Multi-sheet → treat as salary workbook
+    }
 
-            YearMonth month = parsePayMonth(payMonth);
-            LocalDate start = month.atDay(1);
-            LocalDate end = month.atEndOfMonth();
-            int businessDays = businessDaysBetween(start, end);
+    @Transactional(readOnly = true)
+    public AttendanceMonthlySummaryResponse monthlySummary(String payMonth) {
 
-            List<Employee> employees = employeeRepository
-                .findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus.ACTIVE);
+        YearMonth month = parsePayMonth(payMonth);
+        LocalDate start = month.atDay(1);
+        LocalDate end = month.atEndOfMonth();
+        int businessDays = businessDaysBetween(start, end);
 
-            List<AttendanceMonthlyEmployeeSummary> employeeSummaries = new ArrayList<>();
+        List<Employee> employees = employeeRepository
+            .findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus.ACTIVE);
 
-            long totalWorkedMinutes = 0;
-            long totalExpectedMinutes = 0;
-            long totalShortfallMinutes = 0;
+        // ── Bulk-load all month attendance & payroll in exactly 2 queries ─────────
+        List<AttendanceRecord> allMonthAttendance =
+                attendanceRepository.findByAttendanceDateBetween(start, end);
+        Map<Long, Integer> workedMinutesByEmployee = new HashMap<>();
+        for (AttendanceRecord r : allMonthAttendance) {
+            if (r.getEmployee() != null && r.getEmployee().getId() != null
+                    && r.getWorkMinutes() != null) {
+                workedMinutesByEmployee.merge(r.getEmployee().getId(), r.getWorkMinutes(), Integer::sum);
+            }
+        }
 
-            for (Employee employee : employees) {
+        List<PayrollRecord> allMonthPayroll = payrollRepository.findByPayMonth(payMonth);
+        Map<Long, Integer> payrollWorkedMinutesByEmployee = new HashMap<>();
+        for (PayrollRecord pr : allMonthPayroll) {
+            if (pr.getEmployee() != null && pr.getEmployee().getId() != null
+                    && pr.getWorkedMinutes() != null && pr.getWorkedMinutes() > 0) {
+                payrollWorkedMinutesByEmployee.put(pr.getEmployee().getId(), pr.getWorkedMinutes());
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────────
 
-                LocalDate effectiveStart = employee.getJoiningDate() != null
-                    && employee.getJoiningDate().isAfter(start)
-                    ? employee.getJoiningDate()
-                    : start;
+        List<AttendanceMonthlyEmployeeSummary> employeeSummaries = new ArrayList<>();
 
-                int employeeBusinessDays = businessDaysBetween(effectiveStart, end);
-                int expectedMinutes = employeeBusinessDays * standardDailyMinutes;
+        long totalWorkedMinutes = 0;
+        long totalExpectedMinutes = 0;
+        long totalShortfallMinutes = 0;
 
-                int workedMinutes = attendanceRepository
-                        .findByEmployee_IdAndAttendanceDateBetween(
-                                employee.getId(),
-                                start,
-                                end
-                        )
-                        .stream()
-                        .map(AttendanceRecord::getWorkMinutes)
-                        .filter(Objects::nonNull)
-                        .mapToInt(Integer::intValue)
-                        .sum();
+        for (Employee employee : employees) {
 
-                // ── Fallback: if no daily attendance punches, use payroll record ──
-                if (workedMinutes == 0) {
-                    workedMinutes = payrollRepository
-                            .findByEmployee_IdAndPayMonth(employee.getId(), payMonth)
-                            .map(pr -> pr.getWorkedMinutes() != null ? pr.getWorkedMinutes() : 0)
-                            .orElse(0);
-                    if (workedMinutes > 0) {
-                        log.debug("[AttendanceService] monthlySummary: used payroll workedMinutes={} for employee={}",
-                                workedMinutes, employee.getEmployeeCode());
-                    }
+            LocalDate effectiveStart = employee.getJoiningDate() != null
+                && employee.getJoiningDate().isAfter(start)
+                ? employee.getJoiningDate()
+                : start;
+
+            int employeeBusinessDays = businessDaysBetween(effectiveStart, end);
+            int expectedMinutes = employeeBusinessDays * standardDailyMinutes;
+
+            int workedMinutes = workedMinutesByEmployee.getOrDefault(employee.getId(), 0);
+
+            // ── Fallback: if no daily attendance punches, use payroll record ──
+            if (workedMinutes == 0) {
+                workedMinutes = payrollWorkedMinutesByEmployee.getOrDefault(employee.getId(), 0);
+                if (workedMinutes > 0) {
+                    log.debug("[AttendanceService] monthlySummary: used payroll workedMinutes={} for employee={}",
+                            workedMinutes, employee.getEmployeeCode());
                 }
-
-                int shortfallMinutes = Math.max(0, expectedMinutes - workedMinutes);
-
-                totalWorkedMinutes += workedMinutes;
-                totalExpectedMinutes += expectedMinutes;
-                totalShortfallMinutes += shortfallMinutes;
-
-                employeeSummaries.add(
-                    new AttendanceMonthlyEmployeeSummary(
-                        employee.getId(),
-                        employee.getEmployeeCode(),
-                        employee.getFullName(),
-                        employee.getDepartment(),
-                        workedMinutes,
-                        expectedMinutes,
-                        shortfallMinutes,
-                        roundHours(workedMinutes),
-                        roundHours(expectedMinutes),
-                        roundHours(shortfallMinutes)
-                    )
-                );
             }
 
-            return new AttendanceMonthlySummaryResponse(
-                payMonth,
-                standardDailyMinutes,
-                businessDays,
-                employees.size(),
-                totalWorkedMinutes,
-                totalExpectedMinutes,
-                totalShortfallMinutes,
-                employeeSummaries
+            int shortfallMinutes = Math.max(0, expectedMinutes - workedMinutes);
+
+            totalWorkedMinutes += workedMinutes;
+            totalExpectedMinutes += expectedMinutes;
+            totalShortfallMinutes += shortfallMinutes;
+
+            employeeSummaries.add(
+                new AttendanceMonthlyEmployeeSummary(
+                    employee.getId(),
+                    employee.getEmployeeCode(),
+                    employee.getFullName(),
+                    employee.getDepartment(),
+                    workedMinutes,
+                    expectedMinutes,
+                    shortfallMinutes,
+                    roundHours(workedMinutes),
+                    roundHours(expectedMinutes),
+                    roundHours(shortfallMinutes)
+                )
             );
-            }
+        }
+
+        return new AttendanceMonthlySummaryResponse(
+            payMonth,
+            standardDailyMinutes,
+            businessDays,
+            employees.size(),
+            totalWorkedMinutes,
+            totalExpectedMinutes,
+            totalShortfallMinutes,
+            employeeSummaries
+        );
+    }
 
     public Long findEmployeeIdByUsername(String username) {
 

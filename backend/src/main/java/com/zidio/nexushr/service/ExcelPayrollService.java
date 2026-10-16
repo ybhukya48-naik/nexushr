@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.DayOfWeek;
@@ -55,6 +57,8 @@ public class ExcelPayrollService {
         this.notificationService = notificationService;
     }
 
+    private record SalaryNotificationTask(Employee employee, PayrollRecord payroll, String payMonth) {}
+
     @Transactional
     public List<PayrollRecord> importPayroll(
             MultipartFile file,
@@ -68,16 +72,61 @@ public class ExcelPayrollService {
             throw new IllegalArgumentException("payMonth is required.");
         }
 
-        try (InputStream inputStream = file.getInputStream();
-             Workbook workbook = WorkbookFactory.create(inputStream)) {
+        Path tempPath = null;
+        try {
+            tempPath = Files.createTempFile("nexushr_pay_", ".xlsx");
+            file.transferTo(tempPath.toFile());
+            try (Workbook workbook = WorkbookFactory.create(tempPath.toFile())) {
+                return importPayroll(workbook, payMonth);
+            }
+        } catch (IllegalStateException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new IllegalStateException("Unable to read payroll Excel: " + ex.getMessage(), ex);
+        } finally {
+            if (tempPath != null) {
+                try {
+                    Files.deleteIfExists(tempPath);
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    }
 
+    @Transactional
+    public List<PayrollRecord> importPayroll(
+            Workbook workbook,
+            String payMonth) {
+
+        if (workbook == null) {
+            throw new IllegalArgumentException("Workbook cannot be null.");
+        }
+
+        if (payMonth == null || payMonth.isBlank()) {
+            throw new IllegalArgumentException("payMonth is required.");
+        }
+
+        try {
             FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
             SalarySource salarySource = readSalarySource(workbook, evaluator);
 
             List<PayrollRecord> created = new ArrayList<>();
             List<String> errors = new ArrayList<>();
+            List<SalaryNotificationTask> notificationTasks = new ArrayList<>();
 
             YearMonth yearMonth = parseYearMonth(payMonth);
+
+            // Preload all employees once to eliminate N+1 remote database roundtrips
+            List<Employee> allEmployees = new ArrayList<>(employeeRepository.findAll());
+
+            // Preload existing payroll records for this month
+            List<PayrollRecord> existingMonthRecords = payrollRepository.findByPayMonth(payMonth);
+            Map<Long, PayrollRecord> existingMap = new HashMap<>();
+            for (PayrollRecord pr : existingMonthRecords) {
+                if (pr.getEmployee() != null && pr.getEmployee().getId() != null) {
+                    existingMap.put(pr.getEmployee().getId(), pr);
+                }
+            }
 
             for (Sheet sheet : workbook) {
                 if (isSalarySheet(sheet)) {
@@ -132,28 +181,22 @@ public class ExcelPayrollService {
                                 sheet.getSheetName(),
                                 salary,
                                 sheetCtc,
-                                sheetGross
+                                sheetGross,
+                                allEmployees
                         );
 
-                        Optional<PayrollRecord> existingOpt = payrollRepository
-                                .findByEmployee_IdAndPayMonth(employee.getId(), payMonth);
-
-                        PayrollRecord payroll;
-                        if (existingOpt.isPresent()) {
-                            payroll = existingOpt.get();
+                        PayrollRecord payroll = existingMap.get(employee.getId());
+                        if (payroll != null) {
                             updatePayrollRecord(payroll, row, payrollSheet, salary, evaluator);
                         } else {
                             payroll = buildPayrollRecord(employee, payMonth, row, payrollSheet, salary, evaluator);
+                            existingMap.put(employee.getId(), payroll);
                         }
 
-                        PayrollRecord savedRecord = payrollRepository.save(payroll);
-                        created.add(savedRecord);
+                        created.add(payroll);
 
-                        // Attendance records are managed separately.
-                        // Payroll import must not create or overwrite attendance.
-
-                        // Send email notification to employee
-                        sendSalaryNotification(employee, savedRecord, payMonth);
+                        // Queue notification to be dispatched asynchronously
+                        notificationTasks.add(new SalaryNotificationTask(employee, payroll, payMonth));
 
                     } catch (Exception ex) {
                         log.warn("Error processing row {} in sheet {}: {}", rowIndex + 1, sheet.getSheetName(), ex.getMessage());
@@ -167,6 +210,20 @@ public class ExcelPayrollService {
                 throw new IllegalStateException(
                         "Excel payroll import failed:\n" + String.join("\n", errors)
                 );
+            }
+
+            // Batch save all payroll records in one transaction
+            if (!created.isEmpty()) {
+                created = payrollRepository.saveAll(created);
+            }
+
+            // Dispatch salary notifications asynchronously so SMTP latency never blocks the HTTP response
+            if (!notificationTasks.isEmpty()) {
+                java.util.concurrent.CompletableFuture.runAsync(() -> {
+                    for (SalaryNotificationTask task : notificationTasks) {
+                        sendSalaryNotification(task.employee(), task.payroll(), task.payMonth());
+                    }
+                });
             }
 
             return created;
@@ -195,6 +252,8 @@ public class ExcelPayrollService {
             LocalDate end = yearMonth.atEndOfMonth();
             int dayCount = 0;
 
+            List<AttendanceRecord> recordsToSave = new ArrayList<>();
+
             while (!cur.isAfter(end) && dayCount < days) {
                 if (cur.getDayOfWeek() != DayOfWeek.SUNDAY) {
                     int hoursToday = dailyHours + (dayCount < remainingHours ? 1 : 0);
@@ -210,10 +269,14 @@ public class ExcelPayrollService {
                     record.setLateArrivalMinutes(0);
                     record.setOvertimeMinutes(Math.max(0, (hoursToday - 9) * 60));
 
-                    attendanceRepository.save(record);
+                    recordsToSave.add(record);
                     dayCount++;
                 }
                 cur = cur.plusDays(1);
+            }
+
+            if (!recordsToSave.isEmpty()) {
+                attendanceRepository.saveAll(recordsToSave);
             }
         } catch (Exception ex) {
             log.warn("Failed to sync attendance for employee {}: {}", employee.getEmployeeCode(), ex.getMessage());
@@ -264,52 +327,62 @@ public class ExcelPayrollService {
             String sheetName,
             SalaryRow salary,
             BigDecimal rowCtc,
-            BigDecimal rowGross) {
+            BigDecimal rowGross,
+            List<Employee> allEmployees) {
 
         String code = normalizeCode(employeeCode);
         String name = employeeName != null ? employeeName.trim() : "";
 
-        // 1. Exact employee code match
-        Optional<Employee> found = employeeRepository.findByEmployeeCodeIgnoreCase(code);
-        if (found.isPresent()) {
-            return found.get();
+        // 1. Exact employee code match from in-memory cache
+        for (Employee e : allEmployees) {
+            if (e.getEmployeeCode() != null && e.getEmployeeCode().equalsIgnoreCase(code)) {
+                return e;
+            }
         }
 
         // 2. Numeric code variations with prefixes (e.g., 11 -> CY-EMP-011)
         try {
             int num = Integer.parseInt(code);
             String padded3 = String.format("%03d", num);
-            found = employeeRepository.findByEmployeeCodeIgnoreCase("CY-EMP-" + padded3);
-            if (found.isPresent()) return found.get();
-
-            found = employeeRepository.findByEmployeeCodeIgnoreCase("CY-EMP-" + code);
-            if (found.isPresent()) return found.get();
-
-            found = employeeRepository.findByEmployeeCodeIgnoreCase("GG-EMP-" + padded3);
-            if (found.isPresent()) return found.get();
-
-            found = employeeRepository.findByEmployeeCodeIgnoreCase("GG-EMP-" + code);
-            if (found.isPresent()) return found.get();
-
-            found = employeeRepository.findByEmployeeCodeIgnoreCase("E" + code);
-            if (found.isPresent()) return found.get();
+            List<String> variations = List.of(
+                    "CY-EMP-" + padded3,
+                    "CY-EMP-" + code,
+                    "GG-EMP-" + padded3,
+                    "GG-EMP-" + code,
+                    "E" + code
+            );
+            for (String var : variations) {
+                for (Employee e : allEmployees) {
+                    if (e.getEmployeeCode() != null && e.getEmployeeCode().equalsIgnoreCase(var)) {
+                        return e;
+                    }
+                }
+            }
         } catch (Exception ignored) {
         }
 
-        // 3. Name lookup in database
+        // 3. Name lookup from in-memory cache
         if (!name.isBlank()) {
-            found = employeeRepository.findByFullNameIgnoreCase(name);
-            if (found.isPresent()) {
-                return found.get();
+            for (Employee e : allEmployees) {
+                if (e.getFullName() != null && e.getFullName().equalsIgnoreCase(name)) {
+                    return e;
+                }
             }
 
             String normTarget = normalizeName(name);
-            for (Employee e : employeeRepository.findAll()) {
+            for (Employee e : allEmployees) {
                 if (normalizeName(e.getFullName()).equalsIgnoreCase(normTarget)
                         || SalarySource.namesCompatible(e.getFullName(), name)) {
                     return e;
                 }
             }
+        }
+
+        // Fallback DB checks if cache did not have it
+        Optional<Employee> found = employeeRepository.findByEmployeeCodeIgnoreCase(code);
+        if (found.isPresent()) {
+            allEmployees.add(found.get());
+            return found.get();
         }
 
         // 4. If not found in DB, auto-create complete valid employee record
@@ -366,7 +439,9 @@ public class ExcelPayrollService {
         newEmp.setActive(true);
         newEmp.setLifecycleStatus(EmployeeLifecycleStatus.ACTIVE);
 
-        return employeeRepository.save(newEmp);
+        Employee saved = employeeRepository.save(newEmp);
+        allEmployees.add(saved);
+        return saved;
     }
 
     private PayrollRecord buildPayrollRecord(
