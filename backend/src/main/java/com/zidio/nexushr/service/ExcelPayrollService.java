@@ -90,6 +90,7 @@ public class ExcelPayrollService {
         }
     }
 
+    @Transactional
     public List<PayrollRecord> importPayroll(Path workbookPath, String payMonth) {
         if (workbookPath == null) {
             throw new IllegalArgumentException("Workbook cannot be null.");

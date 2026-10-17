@@ -22,6 +22,11 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Map;
 
@@ -270,28 +275,47 @@ public class PayrollController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "payMonth is required (YYYY-MM)");
         }
 
-        // If the uploaded file is a standard attendance Excel sheet, route through AttendanceService
-        if (!attendanceService.isSalaryWorkbook(file)) {
-            AttendanceImportResponse attResult = attendanceService.importMonthlyExcel(file, payMonth);
+        Path tempPath = null;
+        try {
+            tempPath = Files.createTempFile("nexushr_pay_", ".xlsx");
+            try (InputStream in = file.getInputStream()) {
+                Files.copy(in, tempPath, StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            // A standard attendance sheet is not a multi-sheet salary workbook.
+            if (!attendanceService.isSalaryWorkbook(tempPath)) {
+                AttendanceImportResponse attResult = attendanceService.importMonthlyExcel(file, payMonth);
+                return ResponseEntity.ok(Map.of(
+                        "payMonth", payMonth,
+                        "imported", attResult.importedCount(),
+                        "updated", attResult.updatedCount(),
+                        "skipped", attResult.skippedCount(),
+                        "total", attResult.totalRows(),
+                        "errors", attResult.errors(),
+                        "message", "Attendance data processed (" + attResult.importedCount() + " new, "
+                                + attResult.updatedCount() + " updated) and monthly salaries calculated."
+                ));
+            }
+
+            List<PayrollRecord> imported = excelPayrollService.importPayroll(tempPath, payMonth);
+
             return ResponseEntity.ok(Map.of(
                     "payMonth", payMonth,
-                    "imported", attResult.importedCount(),
-                    "updated", attResult.updatedCount(),
-                    "skipped", attResult.skippedCount(),
-                    "total", attResult.totalRows(),
-                    "errors", attResult.errors(),
-                    "message", "Attendance data processed (" + attResult.importedCount() + " new, "
-                            + attResult.updatedCount() + " updated) and monthly salaries calculated."
+                    "imported", imported.size(),
+                    "message", "Salary data imported and email notifications dispatched for " + imported.size() + " employee(s)."
             ));
+        } catch (IllegalStateException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unable to read the Excel file.");
+        } finally {
+            if (tempPath != null) {
+                try {
+                    Files.deleteIfExists(tempPath);
+                } catch (IOException ignored) {
+                }
+            }
         }
-
-        List<PayrollRecord> imported = excelPayrollService.importPayroll(file, payMonth);
-
-        return ResponseEntity.ok(Map.of(
-                "payMonth", payMonth,
-                "imported", imported.size(),
-                "message", "Salary data imported and email notifications dispatched for " + imported.size() + " employee(s)."
-        ));
     }
 }
 

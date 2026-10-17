@@ -31,8 +31,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.zidio.nexushr.domain.PayrollStatus;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
@@ -333,7 +335,9 @@ public class AttendanceService {
         Path tempPath = null;
         try {
             tempPath = Files.createTempFile("nexushr_att_", ".xlsx");
-            file.transferTo(tempPath.toFile());
+            try (InputStream in = file.getInputStream()) {
+                Files.copy(in, tempPath, StandardCopyOption.REPLACE_EXISTING);
+            }
 
             if (isSalaryWorkbook(tempPath)) {
                 log.info("[AttendanceService] Salary workbook detected – delegating to ExcelPayrollService for payMonth={}", payMonth);
@@ -669,7 +673,11 @@ public class AttendanceService {
         Path tempPath = null;
         try {
             tempPath = Files.createTempFile("nexushr_chk_", ".xlsx");
-            file.transferTo(tempPath.toFile());
+            // Copy, do not transferTo: transferTo moves the upload, so the
+            // later payroll import can no longer read the same MultipartFile.
+            try (InputStream in = file.getInputStream()) {
+                Files.copy(in, tempPath, StandardCopyOption.REPLACE_EXISTING);
+            }
             return isSalaryWorkbook(tempPath);
         } catch (Exception e) {
             log.warn("[AttendanceService] Could not check workbook sheets: {}", e.getMessage());
@@ -684,7 +692,7 @@ public class AttendanceService {
         }
     }
 
-    private boolean isSalaryWorkbook(Path path) throws IOException {
+    public boolean isSalaryWorkbook(Path path) throws IOException {
         List<String> names = CachedXlsx.sheetNames(path);
         if (names.isEmpty()) {
             return false;
