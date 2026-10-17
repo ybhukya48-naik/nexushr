@@ -1,4 +1,5 @@
 ﻿import { isCompanyMatch } from "../utils/company";
+import { getWorkspaceCompany, setWorkspaceCompany } from "../utils/workspace";
 import { useEffect, useMemo, useState } from "react";
 import {
   getCurrentEmployee,
@@ -16,7 +17,9 @@ import {
 
 export default function Leave() {
   const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
-  const [selectedCompany, setSelectedCompany] = useState("All Companies");
+  const [selectedCompany, setSelectedCompany] = useState<string>(
+    () => getWorkspaceCompany() ?? "CYOND",
+  );
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -239,12 +242,13 @@ export default function Leave() {
                 <select
                   value={selectedCompany}
                   onChange={(event) => {
-                    setSelectedCompany(event.target.value);
+                    const next = event.target.value === "GORLE" ? "GORLE" : "CYOND";
+                    setSelectedCompany(next);
+                    setWorkspaceCompany(next);
                     setSelectedEmployee("");
                     setBalance(null);
                   }}
                 >
-                  <option value="All Companies">All Companies</option>
                   <option value="CYOND">CYOND</option>
                   <option value="GORLE">GORLE GROUP</option>
                 </select>

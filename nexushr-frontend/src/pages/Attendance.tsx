@@ -1,4 +1,5 @@
 ﻿import { isCompanyMatch } from "../utils/company";
+import { getWorkspaceCompany, setWorkspaceCompany } from "../utils/workspace";
 import { API_BASE } from "../api";
 import { useEffect, useState } from "react";
 import {
@@ -248,7 +249,9 @@ export default function Attendance() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [metrics, setMetrics] = useState<AttendanceMetrics | null>(null);
   const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
-  const [selectedCompany, setSelectedCompany] = useState("All Companies");
+  const [selectedCompany, setSelectedCompany] = useState<string>(
+    () => getWorkspaceCompany() ?? "CYOND",
+  );
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -758,13 +761,14 @@ export default function Attendance() {
               value={selectedCompany}
               onChange={(event) => {
                 if (isManagementRole) {
-                  setSelectedCompany(event.target.value);
+                  const next = event.target.value === "GORLE" ? "GORLE" : "CYOND";
+                  setSelectedCompany(next);
+                  setWorkspaceCompany(next);
                   setSelectedEmployee("");
                 }
               }}
               disabled={!isManagementRole}
             >
-              <option value="All Companies">All Companies</option>
               <option value="CYOND">CYOND</option>
               <option value="GORLE">GORLE GROUP</option>
             </select>

@@ -6203,3 +6203,20 @@ tbody tr:hover td {
     text-align: center;
   }
 }
+
+.sidebar-company {
+  display: grid;
+  gap: 6px;
+  margin: 0 10px 16px;
+  color: #d0d5dd;
+  font-size: 12px;
+}
+
+.sidebar-company select {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: #1d2939;
+  color: #fff;
+  padding: 8px 10px;
+}

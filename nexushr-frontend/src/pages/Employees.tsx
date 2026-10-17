@@ -1,4 +1,5 @@
 ﻿import { isCompanyMatch } from "../utils/company";
+import { getWorkspaceCompany, setWorkspaceCompany } from "../utils/workspace";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { FormEvent } from "react";
@@ -100,7 +101,9 @@ export default function Employees() {
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("All Departments");
   const [status, setStatus] = useState("All Statuses");
-  const [company, setCompany] = useState("All Companies");
+  const [company, setCompany] = useState<string>(
+    () => getWorkspaceCompany() ?? "CYOND",
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -708,10 +711,13 @@ export default function Employees() {
             <span className="sr-only">Filter by company</span>
             <select
               value={company}
-              onChange={(event) => setCompany(event.target.value)}
+              onChange={(event) => {
+                const next = event.target.value === "GORLE" ? "GORLE" : "CYOND";
+                setCompany(next);
+                setWorkspaceCompany(next);
+              }}
             >
-              <option>All Companies</option>
-              <option>CYOND</option>
+              <option value="CYOND">CYOND</option>
               <option value="GORLE">GORLE GROUP</option>
             </select>
           </label>

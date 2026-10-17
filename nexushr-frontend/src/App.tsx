@@ -18,6 +18,16 @@ import {
   type AiWorkforceDashboardResponse,
   type EmployeeResponse,
 } from "./api";
+import {
+  asWorkspaceCompany,
+  clearWorkspaceCompany,
+  getWorkspaceCompany,
+  setWorkspaceCompany,
+  workspaceLogo,
+  workspaceName,
+  workspaceTagline,
+  type WorkspaceCompany,
+} from "./utils/workspace";
 const Employees = lazy(() => import("./pages/Employees"));
 const EmployeeProfile = lazy(() => import("./pages/EmployeeProfile"));
 const Attendance = lazy(() => import("./pages/Attendance"));
@@ -62,12 +72,64 @@ function AppRoutes() {
   const role =
     localStorage.getItem("nexushr_role") || "HR";
 
+  const [workspace, setWorkspace] = useState<WorkspaceCompany | null>(
+    getWorkspaceCompany(),
+  );
+
+  useEffect(() => {
+    const sync = () => setWorkspace(getWorkspaceCompany());
+    window.addEventListener("nexushr-company", sync);
+    return () => window.removeEventListener("nexushr-company", sync);
+  }, []);
+
   function handleLogout() {
     localStorage.removeItem("nexushr_token");
     localStorage.removeItem("nexushr_user");
     localStorage.removeItem("nexushr_role");
+    clearWorkspaceCompany();
     navigate("/login", { replace: true });
   }
+
+  function enterWorkspace(company: WorkspaceCompany) {
+    setWorkspaceCompany(company);
+    setWorkspace(company);
+  }
+
+  if (!workspace) {
+    return (
+      <div className="login-page">
+        <div className="login-form-area" style={{ margin: "auto" }}>
+          <div className="login-card">
+            <div className="login-card-header">
+              <p className="eyebrow">SEPARATE WORKSPACES</p>
+              <h2>Choose an entity</h2>
+              <p>
+                CYOND and Gorle Group are separate. Open one workspace.
+              </p>
+            </div>
+            <div className="login-fields">
+              <button
+                className="login-submit"
+                type="button"
+                onClick={() => enterWorkspace("CYOND")}
+              >
+                <span>Enter CYOND</span>
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => enterWorkspace("GORLE")}
+              >
+                Enter Gorle Group
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const canSwitchWorkspace = role === "ADMIN" || role === "HR" || role === "MANAGER";
 
   return (
     <div className="app-shell">
@@ -75,14 +137,28 @@ function AppRoutes() {
         <div className="brand">
           <img
             className="brand-logo"
-            src="/images/cyond-logo.jpeg"
-            alt="Cyond logo"
+            src={workspaceLogo(workspace)}
+            alt={`${workspaceName(workspace)} logo`}
           />
           <div>
-            <strong>Cyond</strong>
-            <span>Waterproofing Diagnosis & Repair Experts</span>
+            <strong>{workspaceName(workspace)}</strong>
+            <span>{workspaceTagline(workspace)}</span>
           </div>
         </div>
+        {canSwitchWorkspace && (
+          <label className="sidebar-company">
+            <span>Entity</span>
+            <select
+              value={workspace}
+              onChange={(event) =>
+                enterWorkspace(asWorkspaceCompany(event.target.value))
+              }
+            >
+              <option value="CYOND">CYOND</option>
+              <option value="GORLE">Gorle Group</option>
+            </select>
+          </label>
+        )}
 
         <nav>
           {navItems
@@ -114,8 +190,8 @@ function AppRoutes() {
       <main className="main-area">
         <header className="topbar">
           <div>
-            <p className="eyebrow">ENTERPRISE HR PLATFORM</p>
-            <h1>Cyond</h1>
+            <p className="eyebrow">{workspaceName(workspace).toUpperCase()}</p>
+            <h1>{workspaceName(workspace)}</h1>
           </div>
 
           <div className="user-area">
@@ -145,7 +221,7 @@ function AppRoutes() {
           </div>
         </header>
 
-        <section className="content">
+        <section className="content" key={workspace}>
           <Suspense
             fallback={
               <div className="page-loading">
@@ -224,6 +300,16 @@ function Login() {
         response.role,
       );
 
+      clearWorkspaceCompany();
+      if (response.role === "EMPLOYEE") {
+        try {
+          const me = await getCurrentEmployee();
+          setWorkspaceCompany(asWorkspaceCompany(me.companyCode));
+        } catch {
+          // Management-style accounts choose an entity after sign-in.
+        }
+      }
+
       navigate("/", { replace: true });
     } catch (err) {
       console.error(err);
@@ -265,37 +351,9 @@ function Login() {
               />
             </div>
             <div className="login-brand-text">
-              <strong>CYOND AND GORLE GROUP BUSINESS SOLUTION</strong>
+              <strong>GORLE GROUP BUSINESS SOLUTION</strong>
               <span>Enterprise HR Platform</span>
             </div>
-          </div>
-
-          <div className="login-cover-image">
-
-            <img
-              src="/images/cyond-cover.png"
-              alt="Cyond Waterproofing Diagnosis & Repair Experts"
-            />
-
-          </div>
-
-          <div className="login-hero">
-
-            <span className="login-badge">
-              Enterprise HR Platform
-            </span>
-
-            <h1>
-              Manage your
-              <span> workforce smarter.</span>
-            </h1>
-
-            <p>
-              A unified workspace for employee lifecycle,
-              attendance, payroll, performance and workforce
-              intelligence.
-            </p>
-
           </div>
 
           <div className="login-features">
@@ -388,15 +446,14 @@ function Login() {
                   />
                 </div>
                 <div className="login-mobile-brand-text">
-                  <strong>CYOND AND GORLE GROUP BUSINESS SOLUTION</strong>
+                  <strong>GORLE GROUP BUSINESS SOLUTION</strong>
                   <span>Enterprise HR Platform</span>
                 </div>
               </div>
 
               {/* CYOND BRANDING */}
               <p className="eyebrow">
-                CYOND AND GORLE GROUP BUSINESS SOLUTION
-                EXPERTS
+                GORLE GROUP BUSINESS SOLUTION
               </p>
 
               <h2>
@@ -497,7 +554,7 @@ function Login() {
               <span>
                 {loading
                   ? "Signing in..."
-                  : "Sign in to Cyond"}
+                  : "Sign in"}
               </span>
 
               {!loading && (
@@ -523,7 +580,7 @@ function Login() {
             <div className="login-footer">
 
               <span>
-                Cyond
+                Gorle Group Business Solution
               </span>
 
               <span>

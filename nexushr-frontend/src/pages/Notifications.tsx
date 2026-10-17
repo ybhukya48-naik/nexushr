@@ -1,4 +1,5 @@
 ﻿import { isCompanyMatch } from "../utils/company";
+import { getWorkspaceCompany, setWorkspaceCompany } from "../utils/workspace";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import "./Notifications.css";
 import {
@@ -83,7 +84,9 @@ export default function Notifications() {
   const [sending, setSending] = useState(false);
   const [success, setSuccess] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
-  const [selectedCompany, setSelectedCompany] = useState("All Companies");
+  const [selectedCompany, setSelectedCompany] = useState(
+    () => getWorkspaceCompany() ?? "CYOND",
+  );
   const [notificationType, setNotificationType] = useState<NotificationResponse["notificationType"]>("GENERAL");
   const [channel, setChannel] = useState("IN_APP");
   const [title, setTitle] = useState("");
@@ -423,13 +426,14 @@ export default function Notifications() {
                 <select
                   value={selectedCompany}
                   onChange={(event) => {
-                    setSelectedCompany(event.target.value);
+                    const next = event.target.value === "GORLE" ? "GORLE" : "CYOND";
+                    setSelectedCompany(next);
+                    setWorkspaceCompany(next);
                     setSelectedEmployeeId("");
                     setEmployee(null);
                     setNotifications([]);
                   }}
                 >
-                  <option value="All Companies">All Companies</option>
                   <option value="CYOND">CYOND</option>
                   <option value="GORLE">GORLE GROUP</option>
                 </select>

@@ -1,4 +1,5 @@
 import { isCompanyMatch } from "../utils/company";
+import { getWorkspaceCompany, setWorkspaceCompany } from "../utils/workspace";
 import { useEffect, useMemo, useState } from "react";
 import {
   createPayroll,
@@ -49,7 +50,9 @@ export default function Payroll() {
   const isManagementRole = ["ADMIN", "HR", "MANAGER"].includes(role);
 
   const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
-  const [selectedCompany, setSelectedCompany] = useState("All Companies");
+  const [selectedCompany, setSelectedCompany] = useState<string>(
+    () => getWorkspaceCompany() ?? "CYOND",
+  );
   const [records, setRecords] = useState<PayrollRecord[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [payMonth, setPayMonth] = useState(currentMonth());
@@ -654,11 +657,12 @@ export default function Payroll() {
                 <select
                   value={selectedCompany}
                   onChange={(event) => {
-                    setSelectedCompany(event.target.value);
+                    const next = event.target.value === "GORLE" ? "GORLE" : "CYOND";
+                    setSelectedCompany(next);
+                    setWorkspaceCompany(next);
                     setSelectedEmployee("");
                   }}
                 >
-                  <option value="All Companies">All Companies</option>
                   <option value="CYOND">CYOND</option>
                   <option value="GORLE">GORLE GROUP</option>
                 </select>
