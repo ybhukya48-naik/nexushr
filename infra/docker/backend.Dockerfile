@@ -40,6 +40,5 @@ ENTRYPOINT ["java", \
   "-XX:MaxRAMPercentage=70.0", \
   "-XX:+UseContainerSupport", \
   "-Xss512k", \
-  "-XX:+ExitOnOutOfMemoryError", \
-  "-XX:+HeapDumpOnOutOfMemoryError", \
+  "-XX:-ExitOnOutOfMemoryError", \
   "-jar", "/app/app.jar"]

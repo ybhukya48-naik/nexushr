@@ -351,6 +351,14 @@ public class AttendanceService {
                 );
             }
 
+            // A full workbook load is what previously exhausted the Render heap and
+            // took the API down for every user. Large files stay on the streaming path.
+            if (Files.size(tempPath) > 1_048_576L) {
+                throw badRequest(
+                        "This Excel file is too large for the attendance importer. Upload it with Import Salary Excel."
+                );
+            }
+
             try (Workbook workbook = WorkbookFactory.create(tempPath.toFile())) {
 
                 // ── Standard attendance format ──────────────────────────────────────

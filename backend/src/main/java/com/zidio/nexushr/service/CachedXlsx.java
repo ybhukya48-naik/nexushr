@@ -39,6 +39,9 @@ public final class CachedXlsx {
     /** Header and title rows are always kept. Payroll headers sit inside this window. */
     public static final int HEADER_LAST_ROW = 20;
 
+    /** Stop retaining cells past this point so one workbook cannot exhaust the heap. */
+    static final int MAX_STORED_CELLS = 20_000;
+
     private CachedXlsx() {
     }
 
@@ -180,6 +183,8 @@ public final class CachedXlsx {
         private final SheetPlan plan;
         private XlsxRow current;
         private boolean planned;
+        private boolean full;
+        private int storedCells;
         private Set<Integer> keepColumns;
         private Set<Integer> identityColumns;
 
@@ -206,6 +211,16 @@ public final class CachedXlsx {
                 return;
             }
             if (current.getLastCellNum() > 0) {
+                int cells = 0;
+                for (Map.Entry<Integer, String> ignored : current.cells()) {
+                    cells++;
+                }
+                if (storedCells + cells > MAX_STORED_CELLS && rowNum > HEADER_LAST_ROW) {
+                    full = true;
+                    current = null;
+                    return;
+                }
+                storedCells += cells;
                 sheet.put(current);
             }
             current = null;
@@ -213,7 +228,7 @@ public final class CachedXlsx {
 
         @Override
         public void cell(String cellReference, String formattedValue, XSSFComment comment) {
-            if (current == null || cellReference == null || formattedValue == null) {
+            if (full || current == null || cellReference == null || formattedValue == null) {
                 return;
             }
             String value = formattedValue.trim();
