@@ -22,9 +22,7 @@ spring:
   jmx:
     enabled: false
   jpa:
-    properties:
-      hibernate.boot.allow_jdbc_metadata_access: false
-      hibernate.temp.use_jdbc_metadata_defaults: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
   datasource:
     url: ${DB_URL:jdbc:postgresql://ep-red-haze-b5nyszma-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require}
     username: ${DB_USER:}
