@@ -9,6 +9,9 @@ import com.zidio.nexushr.web.dto.PayrollAutoComponentsResponse;
 import com.zidio.nexushr.web.dto.PayrollRequest;
 import com.zidio.nexushr.web.dto.PayrollResponse;
 import com.zidio.nexushr.web.dto.PayslipResponse;
+import com.zidio.nexushr.service.AttendanceService;
+import com.zidio.nexushr.web.dto.AttendanceImportResponse;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -30,17 +33,20 @@ public class PayrollController {
     private final PayrollPdfService payrollPdfService;
     private final ResendEmailService resendEmailService;
     private final ExcelPayrollService excelPayrollService;
+    private final AttendanceService attendanceService;
 
     public PayrollController(
             PayrollService payrollService,
             PayrollPdfService payrollPdfService,
             ResendEmailService resendEmailService,
-            ExcelPayrollService excelPayrollService) {
+            ExcelPayrollService excelPayrollService,
+            @Lazy AttendanceService attendanceService) {
 
         this.payrollService = payrollService;
         this.payrollPdfService = payrollPdfService;
         this.resendEmailService = resendEmailService;
         this.excelPayrollService = excelPayrollService;
+        this.attendanceService = attendanceService;
     }
 
     @GetMapping
@@ -262,6 +268,21 @@ public class PayrollController {
 
         if (payMonth == null || payMonth.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "payMonth is required (YYYY-MM)");
+        }
+
+        // If the uploaded file is a standard attendance Excel sheet, route through AttendanceService
+        if (!attendanceService.isSalaryWorkbook(file)) {
+            AttendanceImportResponse attResult = attendanceService.importMonthlyExcel(file, payMonth);
+            return ResponseEntity.ok(Map.of(
+                    "payMonth", payMonth,
+                    "imported", attResult.importedCount(),
+                    "updated", attResult.updatedCount(),
+                    "skipped", attResult.skippedCount(),
+                    "total", attResult.totalRows(),
+                    "errors", attResult.errors(),
+                    "message", "Attendance data processed (" + attResult.importedCount() + " new, "
+                            + attResult.updatedCount() + " updated) and monthly salaries calculated."
+            ));
         }
 
         List<PayrollRecord> imported = excelPayrollService.importPayroll(file, payMonth);

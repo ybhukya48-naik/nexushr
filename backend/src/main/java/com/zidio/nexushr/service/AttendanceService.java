@@ -335,17 +335,16 @@ public class AttendanceService {
             tempPath = Files.createTempFile("nexushr_att_", ".xlsx");
             file.transferTo(tempPath.toFile());
 
-            try (Workbook workbook = WorkbookFactory.create(tempPath.toFile())) {
+            if (isSalaryWorkbook(tempPath)) {
+                log.info("[AttendanceService] Salary workbook detected – delegating to ExcelPayrollService for payMonth={}", payMonth);
+                List<PayrollRecord> payrollRecords = excelPayrollService.importPayroll(tempPath, payMonth);
+                int count = payrollRecords.size();
+                return new AttendanceImportResponse(
+                        payMonth, count, count, 0, 0, List.of()
+                );
+            }
 
-                // ── Detect salary workbook and delegate to ExcelPayrollService ──────
-                if (isSalaryWorkbook(workbook)) {
-                    log.info("[AttendanceService] Salary workbook detected – delegating to ExcelPayrollService for payMonth={}", payMonth);
-                    List<PayrollRecord> payrollRecords = excelPayrollService.importPayroll(workbook, payMonth);
-                    int count = payrollRecords.size();
-                    return new AttendanceImportResponse(
-                            payMonth, count, count, 0, 0, List.of()
-                    );
-                }
+            try (Workbook workbook = WorkbookFactory.create(tempPath.toFile())) {
 
                 // ── Standard attendance format ──────────────────────────────────────
                 Sheet sheet = workbook.getNumberOfSheets() > 0
@@ -671,9 +670,7 @@ public class AttendanceService {
         try {
             tempPath = Files.createTempFile("nexushr_chk_", ".xlsx");
             file.transferTo(tempPath.toFile());
-            try (Workbook wb = WorkbookFactory.create(tempPath.toFile())) {
-                return isSalaryWorkbook(wb);
-            }
+            return isSalaryWorkbook(tempPath);
         } catch (Exception e) {
             log.warn("[AttendanceService] Could not check workbook sheets: {}", e.getMessage());
             return false;
@@ -685,6 +682,34 @@ public class AttendanceService {
                 }
             }
         }
+    }
+
+    private boolean isSalaryWorkbook(Path path) throws IOException {
+        List<String> names = CachedXlsx.sheetNames(path);
+        if (names.isEmpty()) {
+            return false;
+        }
+        if (names.size() > 1) {
+            return true;
+        }
+        String name = names.get(0).toLowerCase(Locale.ENGLISH).strip();
+        boolean signal = false;
+        for (String candidate : SALARY_SHEET_SIGNALS) {
+            if (name.contains(candidate)) {
+                signal = true;
+                break;
+            }
+        }
+        if (!signal) {
+            return false;
+        }
+        List<CachedXlsx.XlsxSheet> sheets = CachedXlsx.read(path, null);
+        if (sheets.isEmpty()) {
+            return false;
+        }
+        CachedXlsx.XlsxRow header = sheets.get(0).getRow(0);
+        int columns = header == null ? 0 : header.getLastCellNum();
+        return columns > 5;
     }
 
     public boolean isSalaryWorkbook(Workbook wb) {

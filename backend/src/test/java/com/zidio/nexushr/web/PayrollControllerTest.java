@@ -4,6 +4,8 @@ import com.zidio.nexushr.domain.Employee;
 import com.zidio.nexushr.domain.PayrollRecord;
 import com.zidio.nexushr.security.JwtTokenService;
 import com.zidio.nexushr.security.SecurityConfig;
+import com.zidio.nexushr.service.AttendanceService;
+import com.zidio.nexushr.service.ExcelPayrollService;
 import com.zidio.nexushr.service.PayrollPdfService;
 import com.zidio.nexushr.service.PayrollService;
 import com.zidio.nexushr.service.email.ResendEmailService;
@@ -45,6 +47,12 @@ class PayrollControllerTest {
 
         @MockitoBean
         private ResendEmailService resendEmailService;
+
+    @MockitoBean
+    private ExcelPayrollService excelPayrollService;
+
+    @MockitoBean
+    private AttendanceService attendanceService;
 
     private Employee testEmployee() {
         Employee employee = new Employee();

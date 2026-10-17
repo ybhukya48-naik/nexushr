@@ -1,8 +1,10 @@
 package com.zidio.nexushr.service;
 
+import com.zidio.nexushr.domain.Company;
 import com.zidio.nexushr.domain.Employee;
 import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
 import com.zidio.nexushr.domain.RoleType;
+import com.zidio.nexushr.repository.CompanyRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.web.dto.EmployeeRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +29,9 @@ class EmployeeServiceTest {
 
     @Mock
     private EmployeeRepository employeeRepository;
+
+    @Mock
+    private CompanyRepository companyRepository;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -58,6 +63,13 @@ class EmployeeServiceTest {
         request.setJoiningDate(LocalDate.of(2026, 1, 1));
         request.setBaseSalary(new BigDecimal("50000"));
         request.setActive(true);
+
+        Company company = new Company();
+        company.setId(1L);
+        company.setCode("CYOND");
+        company.setName("Cyond");
+        lenient().when(companyRepository.findByCodeIgnoreCase("CYOND"))
+                .thenReturn(Optional.of(company));
     }
 
     @Test

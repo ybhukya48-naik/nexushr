@@ -13,14 +13,13 @@ import com.zidio.nexushr.repository.AttendanceRepository;
 import com.zidio.nexushr.repository.CompanyRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.repository.PayrollRepository;
-import org.apache.poi.ss.usermodel.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.InputStream;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.math.BigDecimal;
@@ -76,9 +75,7 @@ public class ExcelPayrollService {
         try {
             tempPath = Files.createTempFile("nexushr_pay_", ".xlsx");
             file.transferTo(tempPath.toFile());
-            try (Workbook workbook = WorkbookFactory.create(tempPath.toFile())) {
-                return importPayroll(workbook, payMonth);
-            }
+            return importPayroll(tempPath, payMonth);
         } catch (IllegalStateException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -93,12 +90,40 @@ public class ExcelPayrollService {
         }
     }
 
+    public List<PayrollRecord> importPayroll(Path workbookPath, String payMonth) {
+        if (workbookPath == null) {
+            throw new IllegalArgumentException("Workbook cannot be null.");
+        }
+        if (payMonth == null || payMonth.isBlank()) {
+            throw new IllegalArgumentException("payMonth is required.");
+        }
+
+        final List<CachedXlsx.XlsxSheet> sheets;
+        try {
+            sheets = CachedXlsx.read(workbookPath, new CachedXlsx.SheetPlan() {
+                @Override
+                public Set<Integer> columnsAfterHeader(String sheetName, CachedXlsx.XlsxSheet headerRows) {
+                    return columnsToKeep(sheetName, headerRows);
+                }
+
+                @Override
+                public Set<Integer> identityColumns(String sheetName, CachedXlsx.XlsxSheet headerRows) {
+                    return identityColumnsFor(sheetName, headerRows);
+                }
+            });
+        } catch (IOException ex) {
+            throw new IllegalStateException("Unable to read payroll Excel: " + ex.getMessage(), ex);
+        }
+
+        return importSheets(sheets, payMonth);
+    }
+
     @Transactional
-    public List<PayrollRecord> importPayroll(
-            Workbook workbook,
+    public List<PayrollRecord> importSheets(
+            List<CachedXlsx.XlsxSheet> sheets,
             String payMonth) {
 
-        if (workbook == null) {
+        if (sheets == null) {
             throw new IllegalArgumentException("Workbook cannot be null.");
         }
 
@@ -107,14 +132,11 @@ public class ExcelPayrollService {
         }
 
         try {
-            FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
-            SalarySource salarySource = readSalarySource(workbook, evaluator);
+            SalarySource salarySource = readSalarySource(sheets);
 
             List<PayrollRecord> created = new ArrayList<>();
             List<String> errors = new ArrayList<>();
             List<SalaryNotificationTask> notificationTasks = new ArrayList<>();
-
-            YearMonth yearMonth = parseYearMonth(payMonth);
 
             // Preload all employees once to eliminate N+1 remote database roundtrips
             List<Employee> allEmployees = new ArrayList<>(employeeRepository.findAll());
@@ -128,7 +150,7 @@ public class ExcelPayrollService {
                 }
             }
 
-            for (Sheet sheet : workbook) {
+            for (CachedXlsx.XlsxSheet sheet : sheets) {
                 if (isSalarySheet(sheet)) {
                     continue;
                 }
@@ -138,7 +160,7 @@ public class ExcelPayrollService {
                     continue;
                 }
 
-                String companyHint = sheet.getSheetName().toUpperCase(Locale.ROOT).contains("CYOND")
+                String companyHint = sheet.getName().toUpperCase(Locale.ROOT).contains("CYOND")
                         ? "CYOND"
                         : "GORLE";
 
@@ -146,13 +168,13 @@ public class ExcelPayrollService {
                      rowIndex <= sheet.getLastRowNum();
                      rowIndex++) {
 
-                    Row row = sheet.getRow(rowIndex);
+                    CachedXlsx.XlsxRow row = sheet.getRow(rowIndex);
                     if (row == null) {
                         continue;
                     }
 
-                    String employeeCode = readString(row, payrollSheet.employeeCodeColumn(), evaluator);
-                    String employeeName = readString(row, payrollSheet.employeeNameColumn(), evaluator);
+                    String employeeCode = readString(row, payrollSheet.employeeCodeColumn());
+                    String employeeName = readString(row, payrollSheet.employeeNameColumn());
 
                     if (isBlank(employeeCode) || isBlank(employeeName)) {
                         continue;
@@ -169,16 +191,16 @@ public class ExcelPayrollService {
                         }
 
                         BigDecimal sheetCtc = payrollSheet.ctcColumn() != null
-                                ? value(row, payrollSheet.ctcColumn(), evaluator)
+                                ? value(row, payrollSheet.ctcColumn())
                                 : ZERO;
                         BigDecimal sheetGross = payrollSheet.grossSalaryColumn() != null
-                                ? value(row, payrollSheet.grossSalaryColumn(), evaluator)
+                                ? value(row, payrollSheet.grossSalaryColumn())
                                 : ZERO;
 
                         Employee employee = resolveEmployee(
                                 employeeCode,
                                 employeeName,
-                                sheet.getSheetName(),
+                                sheet.getName(),
                                 salary,
                                 sheetCtc,
                                 sheetGross,
@@ -187,9 +209,9 @@ public class ExcelPayrollService {
 
                         PayrollRecord payroll = existingMap.get(employee.getId());
                         if (payroll != null) {
-                            updatePayrollRecord(payroll, row, payrollSheet, salary, evaluator);
+                            updatePayrollRecord(payroll, row, payrollSheet, salary);
                         } else {
-                            payroll = buildPayrollRecord(employee, payMonth, row, payrollSheet, salary, evaluator);
+                            payroll = buildPayrollRecord(employee, payMonth, row, payrollSheet, salary);
                             existingMap.put(employee.getId(), payroll);
                         }
 
@@ -199,8 +221,8 @@ public class ExcelPayrollService {
                         notificationTasks.add(new SalaryNotificationTask(employee, payroll, payMonth));
 
                     } catch (Exception ex) {
-                        log.warn("Error processing row {} in sheet {}: {}", rowIndex + 1, sheet.getSheetName(), ex.getMessage());
-                        errors.add("Sheet [" + sheet.getSheetName() + "], row [" + (rowIndex + 1)
+                        log.warn("Error processing row {} in sheet {}: {}", rowIndex + 1, sheet.getName(), ex.getMessage());
+                        errors.add("Sheet [" + sheet.getName() + "], row [" + (rowIndex + 1)
                                 + "], employee [" + employeeCode + " / " + employeeName + "]: " + ex.getMessage());
                     }
                 }
@@ -310,14 +332,6 @@ public class ExcelPayrollService {
             );
         } catch (Exception ex) {
             log.warn("Failed to send salary notification email to {}: {}", employee.getEmail(), ex.getMessage());
-        }
-    }
-
-    private YearMonth parseYearMonth(String payMonth) {
-        try {
-            return YearMonth.parse(payMonth);
-        } catch (Exception ex) {
-            return YearMonth.now();
         }
     }
 
@@ -447,29 +461,27 @@ public class ExcelPayrollService {
     private PayrollRecord buildPayrollRecord(
             Employee employee,
             String payMonth,
-            Row row,
+            CachedXlsx.XlsxRow row,
             PayrollSheet sheet,
-            SalaryRow salary,
-            FormulaEvaluator evaluator) {
+            SalaryRow salary) {
 
         PayrollRecord payroll = new PayrollRecord();
         payroll.setEmployee(employee);
         payroll.setPayMonth(payMonth);
         payroll.setStatus(PayrollStatus.GENERATED);
 
-        updatePayrollRecord(payroll, row, sheet, salary, evaluator);
+        updatePayrollRecord(payroll, row, sheet, salary);
         return payroll;
     }
 
     private void updatePayrollRecord(
             PayrollRecord payroll,
-            Row row,
+            CachedXlsx.XlsxRow row,
             PayrollSheet sheet,
-            SalaryRow salary,
-            FormulaEvaluator evaluator) {
+            SalaryRow salary) {
 
-        BigDecimal sheetCtc = value(row, sheet.ctcColumn(), evaluator);
-        BigDecimal sheetGross = value(row, sheet.grossSalaryColumn(), evaluator);
+        BigDecimal sheetCtc = value(row, sheet.ctcColumn());
+        BigDecimal sheetGross = value(row, sheet.grossSalaryColumn());
 
         BigDecimal ctc = sheetCtc.compareTo(ZERO) > 0
                 ? sheetCtc
@@ -495,21 +507,18 @@ public class ExcelPayrollService {
         payroll.setCtc(ctc);
         payroll.setGrossSalary(grossSalary);
 
-        BigDecimal actualWorkingHours =
-                "CYOND NDT".equalsIgnoreCase(sheet.sheetName())
-                        ? durationHoursValue(row, sheet.actualWorkingHoursColumn(), evaluator)
-                        : value(row, sheet.actualWorkingHoursColumn(), evaluator);
-        BigDecimal casualLeave = value(row, sheet.casualLeaveColumn(), evaluator);
-        BigDecimal chargePerDay = value(row, sheet.chargePerDayColumn(), evaluator);
-        BigDecimal earnedGross = value(row, sheet.earnedGrossColumn(), evaluator);
-        BigDecimal basic = value(row, sheet.basicColumn(), evaluator);
-        BigDecimal hra = value(row, sheet.hraColumn(), evaluator);
-        BigDecimal conveyance = value(row, sheet.conveyanceColumn(), evaluator);
-        BigDecimal medical = value(row, sheet.medicalColumn(), evaluator);
-        BigDecimal others = value(row, sheet.othersColumn(), evaluator);
-        BigDecimal pf = value(row, sheet.pfColumn(), evaluator);
-        BigDecimal esi = value(row, sheet.esiColumn(), evaluator);
-        BigDecimal pt = value(row, sheet.ptColumn(), evaluator);
+        BigDecimal actualWorkingHours = value(row, sheet.actualWorkingHoursColumn());
+        BigDecimal casualLeave = value(row, sheet.casualLeaveColumn());
+        BigDecimal chargePerDay = value(row, sheet.chargePerDayColumn());
+        BigDecimal earnedGross = value(row, sheet.earnedGrossColumn());
+        BigDecimal basic = value(row, sheet.basicColumn());
+        BigDecimal hra = value(row, sheet.hraColumn());
+        BigDecimal conveyance = value(row, sheet.conveyanceColumn());
+        BigDecimal medical = value(row, sheet.medicalColumn());
+        BigDecimal others = value(row, sheet.othersColumn());
+        BigDecimal pf = value(row, sheet.pfColumn());
+        BigDecimal esi = value(row, sheet.esiColumn());
+        BigDecimal pt = value(row, sheet.ptColumn());
 
         payroll.setWorkingDays(sheet.workingDays());
         payroll.setRequiredHours(NINE);
@@ -544,7 +553,7 @@ public class ExcelPayrollService {
 
         // Safe Net Salary calculation
         if (sheet.finalPayColumn() != null && sheet.finalPayColumn() >= 0) {
-            BigDecimal finalPay = value(row, sheet.finalPayColumn(), evaluator);
+            BigDecimal finalPay = value(row, sheet.finalPayColumn());
             if (finalPay.compareTo(ZERO) > 0) {
                 payroll.setNetSalary(finalPay);
             } else if (earnedGross.compareTo(ZERO) > 0) {
@@ -565,54 +574,6 @@ public class ExcelPayrollService {
         payroll.setWorkedMinutes(workedMinutes);
         payroll.setShortfallMinutes(Math.max(0, expectedMinutes - workedMinutes));
         payroll.setOvertimeMinutes(0);
-    }
-
-    private BigDecimal durationHoursValue(
-            Row row,
-            Integer column,
-            FormulaEvaluator evaluator) {
-
-        if (row == null || column == null || column < 0) {
-            return ZERO;
-        }
-
-        Cell cell = row.getCell(column);
-        if (cell == null) {
-            return ZERO;
-        }
-
-        try {
-            CellValue cellValue = evaluator.evaluate(cell);
-
-            if (cellValue == null) {
-                return parseDurationHours(cell.toString());
-            }
-
-            if (cellValue.getCellType() == CellType.NUMERIC) {
-                double raw = cellValue.getNumberValue();
-                String format = cell.getCellStyle().getDataFormatString();
-
-                if (format != null) {
-                    String normalizedFormat = format.toLowerCase(Locale.ROOT);
-
-                    if (normalizedFormat.contains("[h]")
-                            || normalizedFormat.contains("h:mm")) {
-                        raw *= 24.0;
-                    }
-                }
-
-                return BigDecimal.valueOf(raw)
-                        .setScale(2, RoundingMode.HALF_UP);
-            }
-
-            if (cellValue.getCellType() == CellType.STRING) {
-                return parseDurationHours(cellValue.getStringValue());
-            }
-
-            return ZERO;
-        } catch (Exception ex) {
-            return parseDurationHours(cell.toString());
-        }
     }
 
     private BigDecimal parseDurationHours(String text) {
@@ -652,11 +613,14 @@ public class ExcelPayrollService {
             return ZERO;
         }
     }
-    private SalarySource readSalarySource(
-            Workbook workbook,
-            FormulaEvaluator evaluator) {
-
-        Sheet sheet = workbook.getSheet("Employs Salaris");
+    private SalarySource readSalarySource(List<CachedXlsx.XlsxSheet> sheets) {
+        CachedXlsx.XlsxSheet sheet = null;
+        for (CachedXlsx.XlsxSheet candidate : sheets) {
+            if ("Employs Salaris".equalsIgnoreCase(candidate.getName())) {
+                sheet = candidate;
+                break;
+            }
+        }
         if (sheet == null) {
             return new SalarySource(Collections.emptyList());
         }
@@ -665,21 +629,21 @@ public class ExcelPayrollService {
         String currentCompany = "GGEA";
 
         for (int i = 0; i <= sheet.getLastRowNum(); i++) {
-            Row row = sheet.getRow(i);
+            CachedXlsx.XlsxRow row = sheet.getRow(i);
             if (row == null) {
                 continue;
             }
 
-            String id = readString(row, 1, evaluator);
-            String name = readString(row, 3, evaluator);
-            String ctcText = readString(row, 4, evaluator);
-            String grossText = readString(row, 5, evaluator);
+            String id = readString(row, 1);
+            String name = readString(row, 3);
+            String ctcText = readString(row, 4);
+            String grossText = readString(row, 5);
 
             if (id.equalsIgnoreCase("ID No") || name.equalsIgnoreCase("Name")) {
                 continue;
             }
 
-            String completeRow = rowToText(row, evaluator).toUpperCase(Locale.ROOT);
+            String completeRow = rowToText(row).toUpperCase(Locale.ROOT);
             if (completeRow.contains("CYOND")) {
                 currentCompany = "CYOND";
             }
@@ -713,8 +677,8 @@ public class ExcelPayrollService {
         return new SalarySource(rows);
     }
 
-    private PayrollSheet detectPayrollSheet(Sheet sheet) {
-        if ("CYOND NDT".equalsIgnoreCase(sheet.getSheetName())) {
+    private PayrollSheet detectPayrollSheet(CachedXlsx.XlsxSheet sheet) {
+        if ("CYOND NDT".equalsIgnoreCase(sheet.getName())) {
             return detectCyondNdtSheet(sheet);
         }
 
@@ -722,7 +686,7 @@ public class ExcelPayrollService {
         Map<String, Integer> headers = new HashMap<>();
 
         for (int i = 0; i <= Math.min(sheet.getLastRowNum(), 20); i++) {
-            Row row = sheet.getRow(i);
+            CachedXlsx.XlsxRow row = sheet.getRow(i);
             if (row == null) {
                 continue;
             }
@@ -776,7 +740,7 @@ public class ExcelPayrollService {
         int workingDays = detectWorkingDays(sheet, headerRowIndex);
 
         return new PayrollSheet(
-                sheet.getSheetName(),
+                sheet.getName(),
                 headerRowIndex + 1,
                 employeeCode,
                 employeeName,
@@ -804,11 +768,11 @@ public class ExcelPayrollService {
         );
     }
 
-    private PayrollSheet detectCyondNdtSheet(Sheet sheet) {
+    private PayrollSheet detectCyondNdtSheet(CachedXlsx.XlsxSheet sheet) {
         int workingDays = detectWorkingDays(sheet, 9);
 
         return new PayrollSheet(
-                sheet.getSheetName(),
+                sheet.getName(),
                 9,
                 25,     // Z Employee Code
                 26,     // AA Employee Name
@@ -836,23 +800,20 @@ public class ExcelPayrollService {
         );
     }
 
-    private int detectWorkingDays(Sheet sheet, int headerRow) {
+    private int detectWorkingDays(CachedXlsx.XlsxSheet sheet, int headerRow) {
         for (int i = 0; i < headerRow; i++) {
-            Row row = sheet.getRow(i);
+            CachedXlsx.XlsxRow row = sheet.getRow(i);
             if (row == null) {
                 continue;
             }
 
-            for (Cell cell : row) {
-                String text = cell.toString().toUpperCase(Locale.ROOT);
+            for (Map.Entry<Integer, String> cell : row.cells()) {
+                String text = cell.getValue().toUpperCase(Locale.ROOT);
                 if (text.contains("NO OF DAYS") || text.contains("WORKING DAYS")) {
-                    for (int c = cell.getColumnIndex() + 1; c <= cell.getColumnIndex() + 4; c++) {
-                        Cell valCell = row.getCell(c);
-                        if (valCell != null && valCell.getCellType() == CellType.NUMERIC) {
-                            int d = (int) valCell.getNumericCellValue();
-                            if (d >= 20 && d <= 31) {
-                                return d;
-                            }
+                    for (int c = cell.getKey() + 1; c <= cell.getKey() + 4; c++) {
+                        int days = parseNumber(row.get(c)).intValue();
+                        if (days >= 20 && days <= 31) {
+                            return days;
                         }
                     }
                 }
@@ -861,15 +822,12 @@ public class ExcelPayrollService {
         return 26;
     }
 
-    private Map<String, Integer> readHeaders(Row row) {
+    private Map<String, Integer> readHeaders(CachedXlsx.XlsxRow row) {
         Map<String, Integer> map = new HashMap<>();
         for (int c = 0; c < row.getLastCellNum(); c++) {
-            Cell cell = row.getCell(c);
-            if (cell != null) {
-                String text = cell.toString().trim().toUpperCase(Locale.ROOT).replaceAll("\\s+", " ");
-                if (!text.isEmpty()) {
-                    map.put(text, c);
-                }
+            String text = row.get(c).trim().toUpperCase(Locale.ROOT).replaceAll("\\s+", " ");
+            if (!text.isEmpty()) {
+                map.put(text, c);
             }
         }
         return map;
@@ -894,65 +852,35 @@ public class ExcelPayrollService {
         return false;
     }
 
-    private String readString(Row row, Integer column, FormulaEvaluator evaluator) {
+    private String readString(CachedXlsx.XlsxRow row, Integer column) {
         if (row == null || column == null || column < 0) {
             return "";
         }
-        Cell cell = row.getCell(column);
-        if (cell == null) {
-            return "";
+        String text = row.get(column).trim();
+        if (text.matches("[-+]?\\d+\\.0+")) {
+            return text.substring(0, text.indexOf('.'));
         }
-        try {
-            CellValue val = evaluator.evaluate(cell);
-            if (val == null) {
-                return cell.toString().trim();
-            }
-            return switch (val.getCellType()) {
-                case STRING -> val.getStringValue().trim();
-                case NUMERIC -> {
-                    double num = val.getNumberValue();
-                    if (num == Math.floor(num)) {
-                        yield String.valueOf((long) num);
-                    }
-                    yield String.valueOf(num);
-                }
-                case BOOLEAN -> String.valueOf(val.getBooleanValue());
-                default -> "";
-            };
-        } catch (Exception ex) {
-            return cell.toString().trim();
-        }
+        return text;
     }
 
-    private BigDecimal value(Row row, Integer column, FormulaEvaluator evaluator) {
+    private BigDecimal value(CachedXlsx.XlsxRow row, Integer column) {
         if (row == null || column == null || column < 0) {
             return ZERO;
         }
-        Cell cell = row.getCell(column);
-        if (cell == null) {
+        String text = row.get(column);
+        if (text.isBlank()) {
             return ZERO;
         }
-        try {
-            CellValue val = evaluator.evaluate(cell);
-            if (val == null) {
-                return parseNumber(cell.toString());
-            }
-            if (val.getCellType() == CellType.NUMERIC) {
-                return BigDecimal.valueOf(val.getNumberValue()).setScale(2, RoundingMode.HALF_UP);
-            }
-            if (val.getCellType() == CellType.STRING) {
-                return parseNumber(val.getStringValue());
-            }
-            return ZERO;
-        } catch (Exception ex) {
-            return parseNumber(cell.toString());
+        if (text.indexOf(':') >= 0) {
+            return parseDurationHours(text);
         }
+        return parseNumber(text);
     }
 
-    private String rowToText(Row row, FormulaEvaluator evaluator) {
+    private String rowToText(CachedXlsx.XlsxRow row) {
         StringBuilder sb = new StringBuilder();
         for (int c = 0; c < row.getLastCellNum(); c++) {
-            String s = readString(row, c, evaluator);
+            String s = readString(row, c);
             if (!s.isEmpty()) {
                 sb.append(s).append(' ');
             }
@@ -960,8 +888,62 @@ public class ExcelPayrollService {
         return sb.toString();
     }
 
-    private boolean isSalarySheet(Sheet sheet) {
-        return "Employs Salaris".equalsIgnoreCase(sheet.getSheetName());
+    private boolean isSalarySheet(CachedXlsx.XlsxSheet sheet) {
+        return "Employs Salaris".equalsIgnoreCase(sheet.getName());
+    }
+
+    private Set<Integer> columnsToKeep(String sheetName, CachedXlsx.XlsxSheet headerRows) {
+        if ("Employs Salaris".equalsIgnoreCase(sheetName)) {
+            return null;
+        }
+        PayrollSheet detected = detectPayrollSheet(headerRows);
+        if (detected == null) {
+            return Set.of();
+        }
+        Set<Integer> columns = new HashSet<>();
+        addColumn(columns, detected.employeeCodeColumn());
+        addColumn(columns, detected.employeeNameColumn());
+        addColumn(columns, detected.presentDaysColumn());
+        addColumn(columns, detected.actualWorkingHoursColumn());
+        addColumn(columns, detected.payableHoursColumn());
+        addColumn(columns, detected.lateCutColumn());
+        addColumn(columns, detected.casualLeaveColumn());
+        addColumn(columns, detected.payableDaysColumn());
+        addColumn(columns, detected.chargePerDayColumn());
+        addColumn(columns, detected.ctcColumn());
+        addColumn(columns, detected.grossSalaryColumn());
+        addColumn(columns, detected.earnedGrossColumn());
+        addColumn(columns, detected.basicColumn());
+        addColumn(columns, detected.earnedBasicColumn());
+        addColumn(columns, detected.hraColumn());
+        addColumn(columns, detected.conveyanceColumn());
+        addColumn(columns, detected.medicalColumn());
+        addColumn(columns, detected.othersColumn());
+        addColumn(columns, detected.pfColumn());
+        addColumn(columns, detected.esiColumn());
+        addColumn(columns, detected.ptColumn());
+        addColumn(columns, detected.finalPayColumn());
+        return columns;
+    }
+
+    private Set<Integer> identityColumnsFor(String sheetName, CachedXlsx.XlsxSheet headerRows) {
+        if ("Employs Salaris".equalsIgnoreCase(sheetName)) {
+            return null;
+        }
+        PayrollSheet detected = detectPayrollSheet(headerRows);
+        if (detected == null) {
+            return Set.of();
+        }
+        Set<Integer> columns = new HashSet<>();
+        addColumn(columns, detected.employeeCodeColumn());
+        addColumn(columns, detected.employeeNameColumn());
+        return columns;
+    }
+
+    private void addColumn(Set<Integer> columns, Integer column) {
+        if (column != null && column >= 0) {
+            columns.add(column);
+        }
     }
 
     private boolean isInvalidEmployeeRow(String code, String name) {
@@ -1002,7 +984,16 @@ public class ExcelPayrollService {
             return ZERO;
         }
         try {
-            String cleaned = value.trim().replace(",", "").replace("â‚¹", "");
+            String cleaned = value.trim()
+                    .replace(",", "")
+                    .replace("₹", "")
+                    .replace("â‚¹", "")
+                    .replace("?", "")
+                    .replace("\u00A0", "")
+                    .replace(" ", "");
+            if (cleaned.startsWith("(") && cleaned.endsWith(")") && cleaned.length() > 2) {
+                cleaned = "-" + cleaned.substring(1, cleaned.length() - 1);
+            }
             return new BigDecimal(cleaned).setScale(2, RoundingMode.HALF_UP);
         } catch (Exception ex) {
             return ZERO;
