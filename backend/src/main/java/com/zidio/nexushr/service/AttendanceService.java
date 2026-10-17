@@ -42,6 +42,7 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -56,6 +57,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class AttendanceService {
+
+    public static final ZoneId COMPANY_ZONE = ZoneId.of("Asia/Kolkata");
 
     private static final Logger log = LoggerFactory.getLogger(AttendanceService.class);
 
@@ -163,8 +166,8 @@ public class AttendanceService {
 
         Employee employee = getActiveEmployee(employeeId);
 
-        LocalDate today = LocalDate.now();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDate today = LocalDate.now(COMPANY_ZONE);
+        LocalDateTime now = LocalDateTime.now(COMPANY_ZONE);
 
         if (attendanceRepository
                 .existsByEmployee_IdAndAttendanceDate(employeeId, today)) {
@@ -194,7 +197,7 @@ public class AttendanceService {
 
         getActiveEmployee(employeeId);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(COMPANY_ZONE);
 
         AttendanceRecord record =
                 attendanceRepository
@@ -218,7 +221,7 @@ public class AttendanceService {
             );
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(COMPANY_ZONE);
 
         validateCheckTimes(record.getCheckInTime(), now);
 

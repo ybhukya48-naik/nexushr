@@ -113,7 +113,7 @@ class AttendanceServiceTest {
                 new AttendanceRecord();
 
         savedRecord.setEmployee(employee);
-        savedRecord.setAttendanceDate(LocalDate.now());
+        savedRecord.setAttendanceDate(LocalDate.now(AttendanceService.COMPANY_ZONE));
         savedRecord.setWorkMinutes(0);
 
         when(attendanceRepository.save(
@@ -128,7 +128,7 @@ class AttendanceServiceTest {
                 .isSameAs(employee);
 
         assertThat(result.getAttendanceDate())
-                .isEqualTo(LocalDate.now());
+                .isEqualTo(LocalDate.now(AttendanceService.COMPANY_ZONE));
 
         assertThat(result.getCheckInTime())
                 .isNotNull();
@@ -145,7 +145,7 @@ class AttendanceServiceTest {
         verify(attendanceRepository)
                 .existsByEmployee_IdAndAttendanceDate(
                         eq(100L),
-                        eq(LocalDate.now()));
+                        eq(LocalDate.now(AttendanceService.COMPANY_ZONE)));
 
         verify(attendanceRepository)
                 .save(any(AttendanceRecord.class));
@@ -159,10 +159,10 @@ class AttendanceServiceTest {
 
         todayRecord.setId(10L);
         todayRecord.setEmployee(employee);
-        todayRecord.setAttendanceDate(LocalDate.now());
+        todayRecord.setAttendanceDate(LocalDate.now(AttendanceService.COMPANY_ZONE));
 
         todayRecord.setCheckInTime(
-                LocalDateTime.now().minusHours(8)
+                LocalDateTime.now(AttendanceService.COMPANY_ZONE).minusHours(8)
         );
 
         todayRecord.setCheckOutTime(null);
@@ -174,7 +174,7 @@ class AttendanceServiceTest {
         when(attendanceRepository
                 .findByEmployee_IdAndAttendanceDate(
                         eq(100L),
-                        eq(LocalDate.now())))
+                        eq(LocalDate.now(AttendanceService.COMPANY_ZONE))))
                 .thenReturn(Optional.of(todayRecord));
 
         when(attendanceRepository.save(todayRecord))
@@ -198,7 +198,7 @@ class AttendanceServiceTest {
         verify(attendanceRepository)
                 .findByEmployee_IdAndAttendanceDate(
                         100L,
-                        LocalDate.now());
+                        LocalDate.now(AttendanceService.COMPANY_ZONE));
 
         verify(attendanceRepository)
                 .save(todayRecord);

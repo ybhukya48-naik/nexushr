@@ -368,10 +368,12 @@ export default function Attendance() {
     };
   }
 
-  async function load() {
+  async function load(options?: { keepMessage?: boolean }) {
     setLoading(true);
     setError("");
-    setMessage("");
+    if (!options?.keepMessage) {
+      setMessage("");
+    }
     setAttendanceLoaded(false);
 
     try {
@@ -543,9 +545,20 @@ export default function Attendance() {
     }
 
     try {
-      await action();
-      setMessage(success);
-      await load();
+      const saved = await action();
+      const exactTime = formatTime(saved.checkOutTime || saved.checkInTime);
+      setRecords((current) => {
+        const savedDate = normalizeAttendanceDate(saved.attendanceDate);
+        const savedEmployeeId = String(saved.employee?.id ?? "");
+        const rest = current.filter(
+          (record) =>
+            String(record.employee.id) !== savedEmployeeId ||
+            normalizeAttendanceDate(record.attendanceDate) !== savedDate,
+        );
+        return [saved, ...rest];
+      });
+      setMessage(`${success.replace(/\.$/, "")} at ${exactTime}.`);
+      await load({ keepMessage: true });
     } catch (err) {
       console.error(err);
       setError(
@@ -574,17 +587,12 @@ export default function Attendance() {
       return "-";
     }
 
-    const parsed = new Date(value);
-
-    if (Number.isNaN(parsed.getTime())) {
+    const match = String(value).match(/(\d{2}):(\d{2}):(\d{2})/);
+    if (!match) {
       return value;
     }
 
-    return parsed.toLocaleTimeString("en-IN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
+    return `${match[1]}:${match[2]}:${match[3]}`;
   }
 
   function formatDate(value: string) {
@@ -677,7 +685,7 @@ export default function Attendance() {
             {loading
               ? "Checking..."
               : hasCheckedIn
-                ? "Checked In"
+                ? `Checked In ${formatTime(actionEmployeeRecord?.checkInTime)}`
                 : "Check In"}
           </button>
 
@@ -711,7 +719,7 @@ export default function Attendance() {
             {loading
               ? "Checking..."
               : hasCheckedOut
-                ? "Checked Out"
+                ? `Checked Out ${formatTime(actionEmployeeRecord?.checkOutTime)}`
                 : "Check Out"}
           </button>
         </div>

@@ -7,6 +7,7 @@ import com.zidio.nexushr.domain.PerformanceReview;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.repository.PerformanceReviewRepository;
 import com.zidio.nexushr.repository.NotificationRepository;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +15,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Service
+@Lazy(false)
 public class NotificationReminderScheduler {
 
     private final EmployeeRepository employeeRepository;

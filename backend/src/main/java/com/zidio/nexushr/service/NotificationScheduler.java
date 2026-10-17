@@ -1,9 +1,11 @@
 package com.zidio.nexushr.service;
 
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
+@Lazy(false)
 public class NotificationScheduler {
 
     private final NotificationService notificationService;

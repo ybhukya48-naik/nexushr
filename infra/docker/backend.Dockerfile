@@ -32,7 +32,11 @@ USER 10001
 
 EXPOSE 8080
 
+ENV TZ=Asia/Kolkata
+
 ENTRYPOINT ["java", \
+  "-Duser.timezone=Asia/Kolkata", \
+  "-XX:TieredStopAtLevel=1", \
   "-XX:MaxRAMPercentage=70.0", \
   "-XX:+UseContainerSupport", \
   "-Xss512k", \
