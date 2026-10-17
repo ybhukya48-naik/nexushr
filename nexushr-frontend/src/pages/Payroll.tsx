@@ -117,10 +117,11 @@ export default function Payroll() {
     () =>
       records.filter(
         (record) =>
-          selectedCompany === "All Companies" ||
-          isCompanyMatch(record.employee.companyCode, selectedCompany),
+          record.payMonth === payMonth &&
+          (selectedCompany === "All Companies" ||
+            isCompanyMatch(record.employee.companyCode, selectedCompany)),
       ),
-    [records, selectedCompany],
+    [records, selectedCompany, payMonth],
   );
 
   async function loadData() {
@@ -561,6 +562,28 @@ export default function Payroll() {
                 <span style={{ fontSize: "0.82rem", color: "#475569" }}>
                   Email notifications dispatched. Attendance worked-hours updated.
                 </span>
+                {salaryImportResult.employees && salaryImportResult.employees.length > 0 && (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Gross</th>
+                        <th>Net</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {salaryImportResult.employees.map((employee) => (
+                        <tr key={`${employee.employeeCode}-${employee.fullName}`}>
+                          <td>{employee.employeeCode}</td>
+                          <td>{employee.fullName}</td>
+                          <td>{money(employee.grossSalary)}</td>
+                          <td>{money(employee.netSalary)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             )}
           </form>
@@ -846,10 +869,10 @@ export default function Payroll() {
             <strong>Loading payroll...</strong>
             <span>Fetching salary records from the backend.</span>
           </div>
-        ) : records.length === 0 ? (
+        ) : companyRecords.length === 0 ? (
           <div className="employee-empty-state">
-            <strong>No payroll records</strong>
-            <span>Generate the first payroll record above.</span>
+            <strong>No payroll records for {payMonth}</strong>
+            <span>Import the salary Excel or generate a payroll record for this month.</span>
           </div>
         ) : (
           <div className="table-wrapper">

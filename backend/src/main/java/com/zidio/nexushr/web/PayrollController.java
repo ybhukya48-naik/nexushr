@@ -22,11 +22,16 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.zidio.nexushr.domain.Employee;
+
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -298,12 +303,23 @@ public class PayrollController {
             }
 
             List<PayrollRecord> imported = excelPayrollService.importPayroll(tempPath, payMonth);
+            List<Map<String, Object>> employees = new ArrayList<>();
+            for (PayrollRecord record : imported) {
+                Employee employee = record.getEmployee();
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("employeeCode", employee == null || employee.getEmployeeCode() == null ? "" : employee.getEmployeeCode());
+                row.put("fullName", employee == null || employee.getFullName() == null ? "" : employee.getFullName());
+                row.put("grossSalary", record.getGrossSalary() == null ? BigDecimal.ZERO : record.getGrossSalary());
+                row.put("netSalary", record.getNetSalary() == null ? BigDecimal.ZERO : record.getNetSalary());
+                employees.add(row);
+            }
 
-            return ResponseEntity.ok(Map.of(
-                    "payMonth", payMonth,
-                    "imported", imported.size(),
-                    "message", "Salary data imported and email notifications dispatched for " + imported.size() + " employee(s)."
-            ));
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("payMonth", payMonth);
+            body.put("imported", imported.size());
+            body.put("employees", employees);
+            body.put("message", "Salary data imported and email notifications dispatched for " + imported.size() + " employee(s).");
+            return ResponseEntity.ok(body);
         } catch (IllegalStateException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
         } catch (IOException ex) {

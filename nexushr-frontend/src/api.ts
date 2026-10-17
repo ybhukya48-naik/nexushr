@@ -693,10 +693,18 @@ export function importAttendanceExcel(
   );
 }
 
+export interface PayrollExcelImportEmployee {
+  employeeCode: string;
+  fullName: string;
+  grossSalary: number;
+  netSalary: number;
+}
+
 export interface PayrollExcelImportResponse {
   payMonth: string;
   imported: number;
   message: string;
+  employees?: PayrollExcelImportEmployee[];
 }
 
 /**
