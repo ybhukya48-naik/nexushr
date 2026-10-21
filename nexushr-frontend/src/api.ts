@@ -726,6 +726,13 @@ export function getAttendanceMonthlySummary(payMonth: string) {
   );
 }
 
+export function importAttendancePaste(payMonth: string, text: string) {
+  return request<AttendanceImportResponse>("/attendance/import-paste", {
+    method: "POST",
+    body: JSON.stringify({ payMonth, text }),
+  });
+}
+
 export function importAttendanceExcel(
   payMonth: string,
   file: File,

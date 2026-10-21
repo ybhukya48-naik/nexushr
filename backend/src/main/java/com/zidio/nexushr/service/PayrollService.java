@@ -42,7 +42,7 @@ public class PayrollService {
     @Value("${app.payroll.tax-rate:0.10}")
     private BigDecimal taxRate;
 
-        @Value("${app.attendance.standard-daily-minutes:480}")
+        @Value("${app.attendance.standard-daily-minutes:540}")
         private int standardDailyMinutes;
 
     public PayrollService(
@@ -442,8 +442,10 @@ public class PayrollService {
                 ? employee.getJoiningDate()
                 : startDate;
 
-        int businessDays = businessDaysBetween(effectiveStart, endDate);
-        int expectedWorkMinutes = businessDays * standardDailyMinutes;
+        boolean gorle = HoursPayPolicy.gorle(
+                employee.getCompany() == null ? null : employee.getCompany().getCode());
+        int businessDays = HoursPayPolicy.expectedMinutes(effectiveStart, endDate, gorle) / HoursPayPolicy.DAY_MINUTES;
+        int expectedWorkMinutes = businessDays * HoursPayPolicy.DAY_MINUTES;
 
         List<AttendanceRecord> records = attendanceRepository
                 .findByEmployee_IdAndAttendanceDateBetween(
@@ -464,7 +466,7 @@ public class PayrollService {
                 .mapToInt(Integer::intValue)
                 .sum();
 
-        int shortfallMinutes = Math.max(0, expectedWorkMinutes - workedMinutes);
+        int shortfallMinutes = HoursPayPolicy.deductibleShortfall(expectedWorkMinutes, workedMinutes);
 
         if (expectedWorkMinutes <= 0) {
             return new PayrollAutoComponentsResponse(

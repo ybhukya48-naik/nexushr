@@ -555,6 +555,141 @@ public class AttendanceService {
         }
     }
 
+    @Transactional
+    public AttendanceImportResponse importPastedAttendance(String payMonth, String text) {
+        if (payMonth == null || payMonth.isBlank()) {
+            throw badRequest("Pay month is required");
+        }
+        if (text == null || text.isBlank()) {
+            throw badRequest("Paste the Excel rows first");
+        }
+        YearMonth month = YearMonth.parse(payMonth.trim());
+        String[] lines = text.split("\\R");
+        int importedCount = 0;
+        int updatedCount = 0;
+        int skippedCount = 0;
+        List<AttendanceImportRowError> errors = new ArrayList<>();
+        Set<Employee> affected = new HashSet<>();
+        int rowNumber = 0;
+
+        for (String raw : lines) {
+            String line = raw == null ? "" : raw.trim();
+            if (line.isEmpty()) {
+                continue;
+            }
+            rowNumber++;
+            String lower = line.toLowerCase(Locale.ROOT);
+            if (lower.contains("employee") && (lower.contains("check") || lower.contains("code"))) {
+                skippedCount++;
+                continue;
+            }
+            String[] cols = line.split("\\t|\\s*,\\s*");
+            try {
+                ParsedPasteRow parsed = parsePasteRow(cols, month);
+                Employee employee = employeeRepository
+                        .findByEmployeeCodeIgnoreCase(parsed.code())
+                        .orElseThrow(() -> badRequest("Employee not found: " + parsed.code()));
+                AttendanceRecord record = attendanceRepository
+                        .findByEmployee_IdAndAttendanceDate(employee.getId(), parsed.date())
+                        .orElseGet(AttendanceRecord::new);
+                boolean exists = record.getId() != null;
+                record.setEmployee(employee);
+                record.setAttendanceDate(parsed.date());
+                record.setCheckInTime(parsed.checkIn());
+                record.setCheckOutTime(parsed.checkOut());
+                int workMinutes = calculateWorkMinutes(parsed.checkIn(), parsed.checkOut());
+                record.setWorkMinutes(workMinutes);
+                record.setLateArrivalMinutes(calculateLateArrivalMinutes(parsed.checkIn()));
+                record.setOvertimeMinutes(calculateOvertimeMinutes(workMinutes));
+                attendanceRepository.save(record);
+                affected.add(employee);
+                if (exists) {
+                    updatedCount++;
+                } else {
+                    importedCount++;
+                }
+            } catch (Exception ex) {
+                errors.add(new AttendanceImportRowError(rowNumber, cols.length > 0 ? cols[0] : "", simplifyMessage(ex)));
+            }
+        }
+
+        if (!affected.isEmpty()) {
+            calculateAndSavePayrollForAttendance(affected, month, payMonth.trim());
+        }
+
+        return new AttendanceImportResponse(
+                payMonth.trim(),
+                rowNumber,
+                importedCount,
+                updatedCount,
+                skippedCount,
+                errors
+        );
+    }
+
+    private ParsedPasteRow parsePasteRow(String[] cols, YearMonth month) {
+        List<String> values = new ArrayList<>();
+        for (String col : cols) {
+            if (col != null && !col.isBlank()) {
+                values.add(col.trim());
+            }
+        }
+        if (values.size() < 3) {
+            throw badRequest("Use columns: date, employee code, check in, check out");
+        }
+        LocalDate date;
+        String code;
+        String inText;
+        String outText;
+        if (values.size() >= 4 && looksLikeDate(values.get(0))) {
+            date = parsePasteDate(values.get(0), month);
+            code = values.get(1);
+            inText = values.get(2);
+            outText = values.get(3);
+        } else {
+            date = month.atDay(1);
+            code = values.get(0);
+            inText = values.get(1);
+            outText = values.get(2);
+        }
+        LocalTime in = LocalTime.parse(normalizeClock(inText));
+        LocalTime out = LocalTime.parse(normalizeClock(outText));
+        return new ParsedPasteRow(code, date.atTime(in), date.atTime(out), date);
+    }
+
+    private static boolean looksLikeDate(String value) {
+        return value.chars().anyMatch(ch -> ch == '-' || ch == '/');
+    }
+
+    private static LocalDate parsePasteDate(String value, YearMonth month) {
+        String text = value.trim();
+        try {
+            if (text.length() <= 5) {
+                String[] parts = text.split("[/-]");
+                int day = Integer.parseInt(parts[0]);
+                int mon = parts.length > 1 ? Integer.parseInt(parts[1]) : month.getMonthValue();
+                return LocalDate.of(month.getYear(), mon, day);
+            }
+            return LocalDate.parse(text.length() >= 10 ? text.substring(0, 10) : text);
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Could not read date: " + value);
+        }
+    }
+
+    private static String normalizeClock(String value) {
+        String text = value.trim();
+        if (text.length() == 4 && text.charAt(1) == ':') {
+            text = "0" + text;
+        }
+        if (text.length() == 5) {
+            return text + ":00";
+        }
+        return text;
+    }
+
+    private record ParsedPasteRow(String code, LocalDateTime checkIn, LocalDateTime checkOut, LocalDate date) {
+    }
+
     /**
      * Calculate and update salary records for employees based on attendance worked days and hours.
      */
@@ -587,8 +722,9 @@ public class AttendanceService {
                     ? employee.getJoiningDate()
                     : startDate;
 
-            int businessDays = businessDaysBetween(effectiveStart, endDate);
-            int expectedWorkMinutes = businessDays * standardDailyMinutes;
+            boolean gorle = HoursPayPolicy.gorle(
+                    employee.getCompany() == null ? null : employee.getCompany().getCode());
+            int expectedWorkMinutes = HoursPayPolicy.expectedMinutes(effectiveStart, endDate, gorle);
 
             List<AttendanceRecord> records = attendanceByEmployee.getOrDefault(employee.getId(), List.of());
 
@@ -604,7 +740,7 @@ public class AttendanceService {
                     .mapToInt(Integer::intValue)
                     .sum();
 
-            int shortfallMinutes = Math.max(0, expectedWorkMinutes - workedMinutes);
+            int shortfallMinutes = HoursPayPolicy.deductibleShortfall(expectedWorkMinutes, workedMinutes);
 
             BigDecimal baseSalary = employee.getBaseSalary() != null && employee.getBaseSalary().compareTo(BigDecimal.ZERO) > 0
                     ? employee.getBaseSalary()
@@ -654,6 +790,7 @@ public class AttendanceService {
 
             payroll.setWorkingDays((int) records.stream().filter(r -> r.getCheckInTime() != null).count());
             payroll.setActualHours(BigDecimal.valueOf(workedMinutes).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP));
+            payroll.setCasualLeave(BigDecimal.ONE);
             payroll.setRequiredHours(BigDecimal.valueOf(9));
             payroll.setExpectedWorkMinutes(expectedWorkMinutes);
             payroll.setWorkedMinutes(workedMinutes);

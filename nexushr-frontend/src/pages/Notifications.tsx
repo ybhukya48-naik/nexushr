@@ -88,7 +88,7 @@ export default function Notifications() {
     () => getWorkspaceCompany() ?? "CYOND",
   );
   const [notificationType, setNotificationType] = useState<NotificationResponse["notificationType"]>("GENERAL");
-  const [channel, setChannel] = useState("IN_APP");
+  const [channel, setChannel] = useState("BOTH");
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
@@ -292,7 +292,7 @@ export default function Notifications() {
       setMessage("");
       setScheduledAt("");
       setNotificationType("GENERAL");
-      setChannel("IN_APP");
+      setChannel("BOTH");
 
       setSelectedEmployeeId(String(selected.id));
 

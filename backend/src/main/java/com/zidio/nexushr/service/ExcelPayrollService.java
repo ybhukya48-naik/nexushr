@@ -334,7 +334,7 @@ public class ExcelPayrollService {
                     subject,
                     message,
                     NotificationType.GENERAL,
-                    NotificationChannel.EMAIL,
+                    NotificationChannel.BOTH,
                     employee.getEmail(),
                     employee.getPhone()
             );
@@ -556,31 +556,32 @@ public class ExcelPayrollService {
         payroll.setShortHoursDeduction(ZERO);
         payroll.setOtherDeductions(ZERO);
 
-        BigDecimal totalDeductions = pf.add(esi).add(pt);
-        payroll.setDeductions(totalDeductions);
-
-        // Safe Net Salary calculation
-        if (sheet.finalPayColumn() != null && sheet.finalPayColumn() >= 0) {
-            BigDecimal finalPay = value(row, sheet.finalPayColumn());
-            if (finalPay.compareTo(ZERO) > 0) {
-                payroll.setNetSalary(finalPay);
-            } else if (earnedGross.compareTo(ZERO) > 0) {
-                payroll.setNetSalary(earnedGross.subtract(totalDeductions));
-            } else {
-                payroll.setNetSalary(grossSalary.subtract(totalDeductions));
-            }
-        } else if (earnedGross.compareTo(ZERO) > 0) {
-            payroll.setNetSalary(earnedGross.subtract(totalDeductions));
-        } else {
-            payroll.setNetSalary(grossSalary.subtract(totalDeductions));
-        }
-
         int workedMinutes = hoursToMinutes(actualWorkingHours);
-        int expectedMinutes = sheet.workingDays() * 9 * 60;
+        boolean gorle = HoursPayPolicy.gorle(
+                payroll.getEmployee() == null || payroll.getEmployee().getCompany() == null
+                        ? null
+                        : payroll.getEmployee().getCompany().getCode());
+        int expectedMinutes = Math.max(0, sheet.workingDays() - (gorle ? 1 : 0)) * HoursPayPolicy.DAY_MINUTES;
+        int shortfallMinutes = HoursPayPolicy.deductibleShortfall(expectedMinutes, workedMinutes);
+
+        BigDecimal payableBase = earnedGross.compareTo(ZERO) > 0 ? earnedGross : grossSalary;
+        BigDecimal perMinute = expectedMinutes <= 0
+                ? ZERO
+                : payableBase.divide(BigDecimal.valueOf(expectedMinutes), 8, RoundingMode.HALF_UP);
+        BigDecimal hoursDeduction = perMinute
+                .multiply(BigDecimal.valueOf(shortfallMinutes))
+                .setScale(2, RoundingMode.HALF_UP);
+
+        payroll.setCasualLeave(BigDecimal.ONE);
+        payroll.setLeaveDeduction(hoursDeduction);
+        payroll.setShortHoursDeduction(hoursDeduction);
+        BigDecimal totalDeductions = pf.add(esi).add(pt).add(hoursDeduction);
+        payroll.setDeductions(totalDeductions);
+        payroll.setNetSalary(payableBase.subtract(totalDeductions).max(ZERO).setScale(2, RoundingMode.HALF_UP));
 
         payroll.setExpectedWorkMinutes(expectedMinutes);
         payroll.setWorkedMinutes(workedMinutes);
-        payroll.setShortfallMinutes(Math.max(0, expectedMinutes - workedMinutes));
+        payroll.setShortfallMinutes(shortfallMinutes);
         payroll.setOvertimeMinutes(0);
     }
 

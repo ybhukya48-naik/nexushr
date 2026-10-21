@@ -110,6 +110,15 @@ public class AttendanceController {
         return attendanceService.importMonthlyExcel(file, payMonth);
     }
 
+    @PostMapping("/import-paste")
+    @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER')")
+    public AttendanceImportResponse importPaste(
+            @RequestBody java.util.Map<String, String> body) {
+        return attendanceService.importPastedAttendance(
+                body == null ? null : body.get("payMonth"),
+                body == null ? null : body.get("text"));
+    }
+
     @GetMapping("/monthly-summary")
     @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER')")
     public AttendanceMonthlySummaryResponse monthlySummary(

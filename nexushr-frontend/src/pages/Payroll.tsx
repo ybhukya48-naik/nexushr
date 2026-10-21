@@ -10,6 +10,7 @@ import {
   getPayrollAutoComponents,
   getPayrollRecords,
   importAttendanceExcel,
+  importAttendancePaste,
   importPayrollExcel,
   getPayslip,
   downloadPayslipPdf,
@@ -67,6 +68,8 @@ export default function Payroll() {
 
   const [attendanceFile, setAttendanceFile] = useState<File | null>(null);
   const [importingAttendance, setImportingAttendance] = useState(false);
+  const [pastedAttendance, setPastedAttendance] = useState("");
+  const [pastingAttendance, setPastingAttendance] = useState(false);
   const [attendanceImportResult, setAttendanceImportResult] =
     useState<AttendanceImportResponse | null>(null);
   const [attendanceSummary, setAttendanceSummary] =
@@ -242,6 +245,28 @@ export default function Payroll() {
       );
     } finally {
       setImportingAttendance(false);
+    }
+  }
+
+  async function handleAttendancePaste(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!pastedAttendance.trim()) {
+      setError("Paste Excel rows first.");
+      return;
+    }
+    setPastingAttendance(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await importAttendancePaste(payMonth, pastedAttendance);
+      setAttendanceImportResult(result);
+      setMessage("Pasted attendance saved. Salary uses the 9 hour day.");
+      setPastedAttendance("");
+      await loadAttendanceSummary(payMonth);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to paste attendance.");
+    } finally {
+      setPastingAttendance(false);
     }
   }
 
@@ -522,6 +547,24 @@ export default function Payroll() {
               disabled={importingAttendance}
             >
               {importingAttendance ? "Importing..." : "Import Attendance"}
+            </button>
+          </form>
+
+          <form className="payroll-attendance-import" onSubmit={handleAttendancePaste}>
+            <label>
+              Paste from Excel
+              <span>
+                Copy rows from Excel and paste them here. Columns: date, employee code, check in, check out.
+              </span>
+              <textarea
+                rows={5}
+                value={pastedAttendance}
+                onChange={(event) => setPastedAttendance(event.target.value)}
+                placeholder={"2026-10-21\tCY-EMP-003\t10:00\t19:00"}
+              />
+            </label>
+            <button type="submit" className="secondary-button" disabled={pastingAttendance}>
+              {pastingAttendance ? "Saving..." : "Save pasted rows"}
             </button>
           </form>
 
