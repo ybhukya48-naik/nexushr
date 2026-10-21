@@ -204,7 +204,21 @@ export async function login(
   });
 
   if (!response.ok) {
-    throw new Error("Invalid username or password");
+    let message = "Invalid username or password";
+    try {
+      const errorBody = await response.json();
+      if (
+        errorBody &&
+        typeof errorBody === "object" &&
+        typeof errorBody.message === "string" &&
+        errorBody.message.trim()
+      ) {
+        message = errorBody.message;
+      }
+    } catch {
+      // Keep the fallback when the server sends an empty error.
+    }
+    throw new Error(message);
   }
 
   return response.json();

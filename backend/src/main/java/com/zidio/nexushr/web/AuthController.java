@@ -21,8 +21,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -136,7 +136,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthDtos.LoginResponse> login(
+    public ResponseEntity<?> login(
             @RequestBody AuthDtos.LoginRequest request) {
 
         if (request == null ||
@@ -149,7 +149,6 @@ public class AuthController {
         }
 
         String normalizedUsername = request.username().trim();
-        String normalizedEmail = normalizedUsername.toLowerCase();
 
         // Demo users are development/test accounts only.
         // Override DEMO_USERS_ENABLED=false in production for strict auth.
@@ -180,54 +179,86 @@ public class AuthController {
             }
         }
 
-        // Real employee login using employee code or email.
-        Optional<Employee> employeeOpt =
-                employeeRepository.findByEmployeeCodeIgnoreCase(normalizedUsername);
-
-        if (employeeOpt.isEmpty()) {
-            employeeOpt = employeeRepository.findByEmailIgnoreCase(normalizedEmail);
-        }
-
-        if (employeeOpt.isEmpty()) {
-            return ResponseEntity.status(401).build();
-        }
-
-        Employee employee = employeeOpt.get();
-
-        if (!employee.isActive()
-                || employee.getLifecycleStatus() == EmployeeLifecycleStatus.OFFBOARDED
-                || employee.getLifecycleStatus() == EmployeeLifecycleStatus.OFFBOARDING) {
-            return ResponseEntity.status(401).build();
-        }
-
-        boolean passwordMatches;
         try {
-            passwordMatches = employee.getPassword() != null
-                    && passwordEncoder.matches(request.password(), employee.getPassword());
+            List<Object[]> rows = employeeRepository.findLoginMatches(normalizedUsername);
+            boolean sawInactive = false;
+            for (Object[] row : rows) {
+                String life = text(row, 5);
+                if (!isActiveFlag(row.length > 4 ? row[4] : null)
+                        || "OFFBOARDED".equalsIgnoreCase(life)
+                        || "OFFBOARDING".equalsIgnoreCase(life)) {
+                    sawInactive = true;
+                    continue;
+                }
+                if (!passwordMatches(request.password(), text(row, 1))) {
+                    continue;
+                }
+
+                String email = text(row, 0);
+                if (email == null || email.isBlank()) {
+                    email = normalizedUsername.toLowerCase();
+                }
+                String role = text(row, 3);
+                if (role == null || role.isBlank()) {
+                    role = RoleType.EMPLOYEE.name();
+                }
+                String name = text(row, 6);
+                if (name == null || name.isBlank()) {
+                    name = email;
+                }
+
+                String token = jwtTokenService.generate(email, Map.of("role", role));
+                return ResponseEntity.ok(new AuthDtos.LoginResponse(token, role, name));
+            }
+
+            String message = rows.isEmpty()
+                    ? "No employee uses that email or employee code."
+                    : sawInactive
+                    ? "This employee account is not active."
+                    : "Password does not match. Sign in with the password you just created.";
+            return ResponseEntity.status(401).body(Map.of("message", message));
+        } catch (Exception ex) {
+            log.error("LOGIN_FAILED", ex);
+            return ResponseEntity.status(401).body(Map.of(
+                    "message",
+                    "Sign-in could not check this account. Use the employee email and the new password."
+            ));
+        }
+    }
+
+    private boolean passwordMatches(String rawPassword, String storedHash) {
+        if (storedHash == null || storedHash.isBlank()) {
+            return false;
+        }
+        try {
+            return passwordEncoder.matches(rawPassword, storedHash);
         } catch (RuntimeException ex) {
-            passwordMatches = false;
+            return false;
         }
+    }
 
-        if (!passwordMatches) {
-            return ResponseEntity.status(401).build();
+    private static String text(Object[] row, int index) {
+        if (row == null || index >= row.length || row[index] == null) {
+            return null;
         }
+        String value = row[index].toString().trim();
+        return value.isEmpty() ? null : value;
+    }
 
-        String role = employee.getRoleType() == null
-                ? RoleType.EMPLOYEE.name()
-                : employee.getRoleType().name();
-
-        String token = jwtTokenService.generate(
-                employee.getEmail(),
-                Map.of("role", role)
-        );
-
-        return ResponseEntity.ok(
-                new AuthDtos.LoginResponse(
-                        token,
-                        role,
-                        employee.getFullName()
-                )
-        );
+    private static boolean isActiveFlag(Object value) {
+        if (value == null) {
+            return true;
+        }
+        if (value instanceof Boolean active) {
+            return active;
+        }
+        if (value instanceof Number number) {
+            return number.intValue() != 0;
+        }
+        String text = value.toString().trim();
+        return !text.equalsIgnoreCase("false")
+                && !text.equalsIgnoreCase("f")
+                && !text.equals("0");
     }
 
     @PostMapping("/create-password")

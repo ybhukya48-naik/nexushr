@@ -152,6 +152,33 @@ class AuthControllerTest {
     }
 
     @Test
+    void login_withEmployeeCodeAndPassword_returnsToken() throws Exception {
+        String hash = new BCryptPasswordEncoder().encode("newpassword1");
+        when(employeeRepository.findLoginMatches("GG100"))
+                .thenReturn(List.<Object[]>of(new Object[]{
+                        "staff@gorlegroup.com",
+                        hash,
+                        "GG100",
+                        "EMPLOYEE",
+                        true,
+                        "ACTIVE",
+                        "Staff Name"
+                }));
+        when(jwtTokenService.generate(anyString(), anyMap()))
+                .thenReturn("employee-token");
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"GG100","password":"newpassword1"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("employee-token"))
+                .andExpect(jsonPath("$.role").value("EMPLOYEE"))
+                .andExpect(jsonPath("$.username").value("Staff Name"));
+    }
+
+    @Test
     void createPassword_forExistingEmployee_storesNewPassword() throws Exception {
         when(employeeRepository.updateEmployeePassword(eq("staff@gorlegroup.com"), anyString()))
                 .thenReturn(1);

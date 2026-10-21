@@ -18,6 +18,14 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     Optional<Employee> findByEmailIgnoreCase(String email);
 
+    @Query(value = """
+            SELECT email, password, employee_code, role_type, active, lifecycle_status, full_name
+            FROM employees
+            WHERE lower(employee_code) = lower(:login)
+               OR lower(email) = lower(:login)
+            """, nativeQuery = true)
+    List<Object[]> findLoginMatches(@Param("login") String login);
+
     @Modifying(clearAutomatically = true)
     @Transactional
     @Query(value = """
