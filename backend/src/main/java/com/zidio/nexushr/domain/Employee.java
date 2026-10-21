@@ -89,6 +89,16 @@ public class Employee {
         this.company = company;
     }
 
+    @Transient
+    public String getCompanyCode() {
+        return company == null ? null : company.getCode();
+    }
+
+    @Transient
+    public String getCompanyName() {
+        return company == null ? null : company.getName();
+    }
+
     public String getEmployeeCode() {
         return employeeCode;
     }

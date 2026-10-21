@@ -75,8 +75,8 @@ public class AttendanceService {
     private final PayrollRepository payrollRepository;
     private final ExcelPayrollService excelPayrollService;
 
-    @Value("${app.attendance.standard-daily-minutes:480}")
-    private int standardDailyMinutes = 480;
+    @Value("${app.attendance.standard-daily-minutes:540}")
+    private int standardDailyMinutes = 540;
 
     @Value("${app.attendance.workday-start:09:00}")
     private String workdayStart = "09:00";

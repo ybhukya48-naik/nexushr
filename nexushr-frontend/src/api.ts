@@ -172,16 +172,18 @@ export async function createPassword(
     let message = "Could not create the password";
     try {
       const errorBody = await response.json();
-      if (
-        errorBody &&
-        typeof errorBody === "object" &&
-        typeof errorBody.message === "string" &&
-        errorBody.message.trim()
-      ) {
-        message = errorBody.message;
+      if (errorBody && typeof errorBody === "object") {
+        const body = errorBody as { message?: string };
+        if (typeof body.message === "string" && body.message.trim()) {
+          message = body.message;
+        } else if (response.status === 404) {
+          message = "Password setup is not on the server yet. Wait for the update, then try again.";
+        }
       }
     } catch {
-      // Keep the fallback message when the response has no JSON body.
+      if (response.status === 404) {
+        message = "Password setup is not on the server yet. Wait for the update, then try again.";
+      }
     }
     throw new Error(message);
   }

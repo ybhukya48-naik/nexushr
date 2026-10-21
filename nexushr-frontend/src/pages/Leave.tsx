@@ -1,5 +1,5 @@
 ﻿import { isCompanyMatch } from "../utils/company";
-import { getWorkspaceCompany, setWorkspaceCompany } from "../utils/workspace";
+import { asWorkspaceCompany, getWorkspaceCompany, setWorkspaceCompany } from "../utils/workspace";
 import { useEffect, useMemo, useState } from "react";
 import {
   getCurrentEmployee,
@@ -47,12 +47,20 @@ export default function Leave() {
 
   const companyLeaves = useMemo(
     () =>
-      leaves.filter(
-        (leave) =>
-          selectedCompany === "All Companies" ||
-          isCompanyMatch(leave.employee.companyCode, selectedCompany),
-      ),
-    [leaves, selectedCompany],
+      leaves.filter((leave) => {
+        if (isEmployee) {
+          return true;
+        }
+        const employee = leave.employee as LeaveRequest["employee"] & {
+          company?: { code?: string };
+        };
+        const code = employee?.companyCode || employee?.company?.code || "";
+        if (!code || selectedCompany === "All Companies") {
+          return true;
+        }
+        return asWorkspaceCompany(code) === asWorkspaceCompany(selectedCompany);
+      }),
+    [leaves, selectedCompany, isEmployee],
   );
 
   async function load() {

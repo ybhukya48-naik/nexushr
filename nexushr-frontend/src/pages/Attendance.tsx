@@ -613,39 +613,78 @@ export default function Attendance() {
   }
 
 
-  function formatWorkDuration(record?: AttendanceRecord) {
-    if (!record?.checkInTime) {
-      return "-";
-    }
+  const SHIFT_SECONDS = 9 * 60 * 60;
 
-    const start = new Date(record.checkInTime);
-
-    if (Number.isNaN(start.getTime())) {
-      return "-";
-    }
-
-    const end = record.checkOutTime
-      ? new Date(record.checkOutTime)
-      : currentTime;
-
-    if (Number.isNaN(end.getTime())) {
-      return "-";
-    }
-
-    const elapsedSeconds = Math.max(
-      0,
-      Math.floor((end.getTime() - start.getTime()) / 1000),
-    );
-
-    const hours = Math.floor(elapsedSeconds / 3600);
-    const minutes = Math.floor((elapsedSeconds % 3600) / 60);
-    const seconds = elapsedSeconds % 60;
+  function formatClock(totalSeconds: number) {
+    const safe = Math.max(0, totalSeconds);
+    const hours = Math.floor(safe / 3600);
+    const minutes = Math.floor((safe % 3600) / 60);
+    const seconds = safe % 60;
 
     return [
       String(hours).padStart(2, "0"),
       String(minutes).padStart(2, "0"),
       String(seconds).padStart(2, "0"),
     ].join(":");
+  }
+
+  function elapsedSeconds(record?: AttendanceRecord) {
+    if (!record?.checkInTime) {
+      return null;
+    }
+
+    const start = new Date(record.checkInTime);
+    if (Number.isNaN(start.getTime())) {
+      return null;
+    }
+
+    const end = record.checkOutTime
+      ? new Date(record.checkOutTime)
+      : currentTime;
+    if (Number.isNaN(end.getTime())) {
+      return null;
+    }
+
+    return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000));
+  }
+
+  function scheduledLogout(record?: AttendanceRecord) {
+    const match = String(record?.checkInTime ?? "").match(/(\d{2}):(\d{2}):(\d{2})/);
+    if (!match) {
+      return "-";
+    }
+
+    const total =
+      (Number(match[1]) * 3600 +
+        Number(match[2]) * 60 +
+        Number(match[3]) +
+        SHIFT_SECONDS) %
+      86400;
+
+    return formatClock(total);
+  }
+
+  function workAndBreak(record?: AttendanceRecord) {
+    const elapsed = elapsedSeconds(record);
+    if (elapsed == null) {
+      return { work: "-", breakTime: "-" };
+    }
+
+    if (!record?.checkOutTime) {
+      return {
+        work: formatClock(Math.min(elapsed, SHIFT_SECONDS)),
+        breakTime: "-",
+      };
+    }
+
+    if (elapsed >= SHIFT_SECONDS) {
+      return { work: formatClock(SHIFT_SECONDS), breakTime: "00:00:00" };
+    }
+
+    return {
+      work: formatClock(elapsed),
+      breakTime: formatClock(SHIFT_SECONDS - elapsed),
+    };
   }
 
   return (
@@ -879,6 +918,7 @@ export default function Attendance() {
                 <th>Check In</th>
                 <th>Check Out</th>
                 <th>Work Hours</th>
+                <th>Break</th>
                 <th>Late</th>
                 <th>Overtime</th>
               </tr>
@@ -904,18 +944,29 @@ export default function Attendance() {
 
       <td>
         <span className="attendance-time">
-          {record ? formatTime(record.checkOutTime) : "-"}
+          {record?.checkOutTime
+            ? formatTime(record.checkOutTime)
+            : record?.checkInTime
+              ? scheduledLogout(record)
+              : "-"}
         </span>
+        {record?.checkInTime && !record.checkOutTime && (
+          <span>9 hr shift</span>
+        )}
       </td>
 
       <td>
         {record ? (
           <span className="attendance-work-duration">
-            {formatWorkDuration(record)}
+            {workAndBreak(record).work}
           </span>
         ) : (
           "-"
         )}
+      </td>
+
+      <td>
+        {record ? workAndBreak(record).breakTime : "-"}
       </td>
 
       <td>
@@ -958,7 +1009,7 @@ export default function Attendance() {
 
   {!loading && attendanceRows.length === 0 && (
     <tr>
-      <td colSpan={7}>
+      <td colSpan={8}>
         <div className="attendance-empty">
           <div className="attendance-empty-icon">-</div>
           <strong>No active employees found</strong>
