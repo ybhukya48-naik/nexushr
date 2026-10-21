@@ -24,8 +24,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
             UPDATE employees
             SET password = :password
             WHERE lower(email) = lower(:email)
-              AND role_type = 'EMPLOYEE'
-              AND active = true
+              AND COALESCE(active, true) = true
+              AND (role_type IS NULL OR role_type NOT IN ('ADMIN', 'HR', 'MANAGER'))
             """, nativeQuery = true)
     int updateEmployeePassword(@Param("email") String email, @Param("password") String password);
 

@@ -8,6 +8,8 @@ import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.security.JwtTokenService;
 import com.zidio.nexushr.web.dto.AuthDtos;
 import com.zidio.nexushr.web.dto.RegisterRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +27,8 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final JwtTokenService jwtTokenService;
     private final EmployeeRepository employeeRepository;
@@ -181,9 +185,7 @@ public class AuthController {
                 employeeRepository.findByEmployeeCodeIgnoreCase(normalizedUsername);
 
         if (employeeOpt.isEmpty()) {
-            employeeOpt =
-                    employeeRepository.findByEmail(
-                            normalizedEmail);
+            employeeOpt = employeeRepository.findByEmailIgnoreCase(normalizedEmail);
         }
 
         if (employeeOpt.isEmpty()) {
@@ -192,20 +194,27 @@ public class AuthController {
 
         Employee employee = employeeOpt.get();
 
-        if (!employee.isActive() ||
-                employee.getLifecycleStatus() != EmployeeLifecycleStatus.ACTIVE) {
+        if (!employee.isActive()
+                || employee.getLifecycleStatus() == EmployeeLifecycleStatus.OFFBOARDED
+                || employee.getLifecycleStatus() == EmployeeLifecycleStatus.OFFBOARDING) {
             return ResponseEntity.status(401).build();
         }
 
-        if (employee.getPassword() == null ||
-                !passwordEncoder.matches(
-                        request.password(),
-                        employee.getPassword())) {
+        boolean passwordMatches;
+        try {
+            passwordMatches = employee.getPassword() != null
+                    && passwordEncoder.matches(request.password(), employee.getPassword());
+        } catch (RuntimeException ex) {
+            passwordMatches = false;
+        }
 
+        if (!passwordMatches) {
             return ResponseEntity.status(401).build();
         }
 
-        String role = employee.getRoleType().name();
+        String role = employee.getRoleType() == null
+                ? RoleType.EMPLOYEE.name()
+                : employee.getRoleType().name();
 
         String token = jwtTokenService.generate(
                 employee.getEmail(),
@@ -225,52 +234,53 @@ public class AuthController {
     public ResponseEntity<?> createPassword(
             @RequestBody AuthDtos.CreatePasswordRequest request) {
 
-        if (request == null ||
-                request.email() == null ||
-                request.email().isBlank() ||
-                request.password() == null ||
-                request.password().isBlank()) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "Email and password are required"));
-        }
-
-        String email = request.email().trim().toLowerCase();
-        String password = request.password();
-
-        if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "Please enter a valid email address"));
-        }
-
-        if (password.length() < 8) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "Password must contain at least 8 characters"));
-        }
-
         try {
+            if (request == null ||
+                    request.email() == null ||
+                    request.email().isBlank() ||
+                    request.password() == null ||
+                    request.password().isBlank()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("message", "Email and password are required"));
+            }
+
+            String email = request.email().trim().toLowerCase();
+            String password = request.password();
+
+            if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("message", "Please enter a valid email address"));
+            }
+
+            if (password.length() < 8) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("message", "Password must contain at least 8 characters"));
+            }
+
             int updated = employeeRepository.updateEmployeePassword(
                     email,
                     passwordEncoder.encode(password));
             if (updated > 0) {
                 return ResponseEntity.ok(Map.of(
-                        "message", "Password created. Sign in with your email and password.",
+                        "message", "Password created. Sign in with this email and the new password.",
                         "email", email
                 ));
             }
-        } catch (RuntimeException ex) {
+
+            if (employeeRepository.findRoleTypesByEmail(email).isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("message",
+                                "No employee account uses this email"));
+            }
+
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message",
+                            "This account cannot create a password here. Sign in with the password already on the employee."));
+        } catch (Exception ex) {
+            log.error("CREATE_PASSWORD_FAILED", ex);
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(Map.of("message",
-                            "Could not save the new password for this email. Ask HR."));
+                            "Could not save the new password. Use the email and password already saved on the employee, or ask HR."));
         }
-
-        if (employeeRepository.findRoleTypesByEmail(email).isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("message",
-                            "No employee account uses this email"));
-        }
-
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(Map.of("message",
-                        "This account cannot create a password here. Sign in, or ask HR."));
     }
 }

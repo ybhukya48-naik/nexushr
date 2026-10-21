@@ -163,7 +163,7 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message")
-                        .value("Password created. Sign in with your email and password."));
+                        .value("Password created. Sign in with this email and the new password."));
 
         ArgumentCaptor<String> hash = ArgumentCaptor.forClass(String.class);
         verify(employeeRepository).updateEmployeePassword(eq("staff@gorlegroup.com"), hash.capture());
