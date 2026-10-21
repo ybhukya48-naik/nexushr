@@ -169,26 +169,27 @@ public class AttendanceService {
         LocalDate today = LocalDate.now(COMPANY_ZONE);
         LocalDateTime now = LocalDateTime.now(COMPANY_ZONE);
 
-        if (attendanceRepository
-                .existsByEmployee_IdAndAttendanceDate(employeeId, today)) {
+        AttendanceRecord record = attendanceRepository
+                .findByEmployee_IdAndAttendanceDate(employeeId, today)
+                .orElseGet(AttendanceRecord::new);
 
+        AttendanceDay day = dayFrom(record);
+        try {
+            day.checkIn(now);
+        } catch (IllegalStateException ex) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Employee has already checked in today"
+                    "Employee is already checked in"
             );
         }
 
-        AttendanceRecord record = new AttendanceRecord();
-
         record.setEmployee(employee);
         record.setAttendanceDate(today);
-        record.setCheckInTime(now);
-        record.setCheckOutTime(null);
-        record.setWorkMinutes(0);
-        record.setLateArrivalMinutes(
-                calculateLateArrivalMinutes(now)
-        );
-        record.setOvertimeMinutes(0);
+        applyDay(record, day);
+        if (record.getLateArrivalMinutes() == null || record.getLateArrivalMinutes() == 0) {
+            record.setLateArrivalMinutes(calculateLateArrivalMinutes(record.getCheckInTime()));
+        }
+        record.setOvertimeMinutes(calculateOvertimeMinutes(day.closedWorkMinutes()));
 
         return attendanceRepository.save(record);
     }
@@ -210,32 +211,19 @@ public class AttendanceService {
                                 "No check-in found for employee today"
                         ));
 
-        if (record.getCheckInTime() == null) {
-            throw badRequest("Employee has not checked in");
-        }
-
-        if (record.getCheckOutTime() != null) {
+        LocalDateTime now = LocalDateTime.now(COMPANY_ZONE);
+        AttendanceDay day = dayFrom(record);
+        try {
+            day.checkOut(now);
+        } catch (IllegalStateException ex) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Employee has already checked out today"
+                    ex.getMessage()
             );
         }
 
-        LocalDateTime now = LocalDateTime.now(COMPANY_ZONE);
-
-        validateCheckTimes(record.getCheckInTime(), now);
-
-        record.setCheckOutTime(now);
-
-        int workMinutes = calculateWorkMinutes(
-                record.getCheckInTime(),
-                now
-        );
-
-        record.setWorkMinutes(workMinutes);
-        record.setOvertimeMinutes(
-                calculateOvertimeMinutes(workMinutes)
-        );
+        applyDay(record, day);
+        record.setOvertimeMinutes(calculateOvertimeMinutes(day.closedWorkMinutes()));
 
         if (record.getLateArrivalMinutes() == null) {
             record.setLateArrivalMinutes(
@@ -244,6 +232,60 @@ public class AttendanceService {
         }
 
         return attendanceRepository.save(record);
+    }
+
+    public java.util.Map<String, Object> myStatus(Long employeeId) {
+        LocalDate today = LocalDate.now(COMPANY_ZONE);
+        AttendanceRecord record = attendanceRepository
+                .findByEmployee_IdAndAttendanceDate(employeeId, today)
+                .orElse(null);
+        String status = record == null || record.getAttendanceStatus() == null
+                ? "NONE"
+                : record.getAttendanceStatus();
+        boolean open = record != null
+                && record.getCheckInTime() != null
+                && record.getCheckOutTime() == null
+                && !"INACTIVE".equals(status);
+        String message = switch (status) {
+            case "OPEN" -> "Checked in";
+            case "CLOSED" -> "Checked out";
+            case "INACTIVE" -> "Marked inactive. Check in or check out is missing.";
+            default -> open ? "Checked in" : "Check in is missing";
+        };
+        java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("status", open ? "OPEN" : status);
+        body.put("checkedIn", record != null && record.getCheckInTime() != null);
+        body.put("checkedOut", record != null && record.getCheckOutTime() != null);
+        body.put("message", message);
+        return body;
+    }
+
+    private AttendanceDay dayFrom(AttendanceRecord record) {
+        AttendanceDay day = new AttendanceDay();
+        int closed = record.getClosedWorkMinutes() == null ? 0 : record.getClosedWorkMinutes();
+        if (closed == 0
+                && record.getCheckOutTime() != null
+                && record.getWorkMinutes() != null) {
+            closed = record.getWorkMinutes();
+        }
+        day.restore(
+                record.getCheckInTime(),
+                record.getCheckOutTime(),
+                record.getSessionStartedAt(),
+                closed,
+                record.getBreakMinutes() == null ? 0 : record.getBreakMinutes(),
+                record.getAttendanceStatus());
+        return day;
+    }
+
+    private void applyDay(AttendanceRecord record, AttendanceDay day) {
+        record.setCheckInTime(day.firstCheckIn());
+        record.setCheckOutTime(day.lastCheckOut());
+        record.setSessionStartedAt(day.sessionStartedAt());
+        record.setClosedWorkMinutes(day.closedWorkMinutes());
+        record.setBreakMinutes(day.breakMinutes());
+        record.setWorkMinutes(day.closedWorkMinutes());
+        record.setAttendanceStatus(day.status());
     }
 
     public AttendanceRecord biometricCheckIn(Long employeeId) {

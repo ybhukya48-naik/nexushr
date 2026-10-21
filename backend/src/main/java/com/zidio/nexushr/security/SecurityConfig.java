@@ -420,6 +420,9 @@ public class SecurityConfig {
                     "MANAGER"
                 )
 
+                .requestMatchers("/api/v1/admin/**")
+                .hasRole("ADMIN")
+
 
                 // =========================================================
                 // EVERYTHING ELSE

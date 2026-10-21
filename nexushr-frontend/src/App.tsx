@@ -12,6 +12,7 @@ import {
 import {
   getDashboardSummary,
   getCurrentEmployee,
+  getMyAttendanceStatus,
   createPassword,
   login as apiLogin,
   getAiWorkforceDashboard,
@@ -36,6 +37,7 @@ const Leave = lazy(() => import("./pages/Leave"));
 const Payroll = lazy(() => import("./pages/Payroll"));
 const Performance = lazy(() => import("./pages/Performance"));
 const Notifications = lazy(() => import("./pages/Notifications"));
+const Admin = lazy(() => import("./pages/Admin"));
 
 const navItems: ReadonlyArray<
   readonly [string, string, readonly string[]]
@@ -48,6 +50,7 @@ const navItems: ReadonlyArray<
   ["Performance", "/performance", ["ADMIN", "HR", "MANAGER", "EMPLOYEE"]],
   ["AI Insights", "/ai", ["ADMIN", "HR", "MANAGER"]],
   ["Notifications", "/notifications", ["ADMIN", "HR", "MANAGER", "EMPLOYEE"]],
+  ["Admin", "/admin", ["ADMIN"]],
 ] as const;
 
 function isAuthenticated() {
@@ -76,12 +79,39 @@ function AppRoutes() {
   const [workspace, setWorkspace] = useState<WorkspaceCompany | null>(
     getWorkspaceCompany(),
   );
+  const [attendanceAlert, setAttendanceAlert] = useState("");
 
   useEffect(() => {
     const sync = () => setWorkspace(getWorkspaceCompany());
     window.addEventListener("nexushr-company", sync);
     return () => window.removeEventListener("nexushr-company", sync);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    function loadStatus() {
+      getMyAttendanceStatus()
+        .then((status) => {
+          if (cancelled) {
+            return;
+          }
+          setAttendanceAlert(status.status === "INACTIVE" ? status.message : "");
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setAttendanceAlert("");
+          }
+        });
+    }
+
+    loadStatus();
+    const timer = window.setInterval(loadStatus, 60000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [workspace]);
 
   function handleLogout() {
     localStorage.removeItem("nexushr_token");
@@ -184,10 +214,10 @@ function AppRoutes() {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="status-dot"></div>
+          <div className={attendanceAlert ? "status-dot status-dot-alert" : "status-dot"}></div>
           <div>
-            <strong>System Online</strong>
-            <span>All services operational</span>
+            <strong>{attendanceAlert ? "Attendance inactive" : "System Online"}</strong>
+            <span>{attendanceAlert || "All services operational"}</span>
           </div>
         </div>
       </aside>
@@ -209,7 +239,7 @@ function AppRoutes() {
             </button>
 
             <div className="avatar">
-              {role === "ADMIN" ? "AD" : role === "MANAGER" ? "MG" : "HR"}
+              {role === "ADMIN" ? "AD" : role === "MANAGER" ? "MG" : role === "EMPLOYEE" ? "EM" : "HR"}
             </div>
 
             <div>
@@ -255,6 +285,10 @@ function AppRoutes() {
               <Route path="/performance" element={<Performance />} />
               <Route path="/ai" element={<AIInsights />} />
               <Route path="/notifications" element={<Notifications />} />
+              <Route
+                path="/admin"
+                element={role === "ADMIN" ? <Admin /> : <Navigate to="/" replace />}
+              />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>

@@ -6323,3 +6323,119 @@ tbody tr:hover td {
     grid-template-columns: 1fr;
   }
 }
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  font-size: 14px;
+}
+
+.content {
+  max-width: none;
+  padding: 28px 32px 40px;
+}
+
+.content .page-heading {
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+
+.content .page-heading h2,
+.dashboard-hero-copy h2 {
+  font-size: 26px;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.content .page-heading p,
+.dashboard-hero-copy > p:last-child {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.dashboard-kpi-grid,
+.stats-grid {
+  align-items: stretch;
+}
+
+.dashboard-kpi > strong,
+.stat-card h3 {
+  font-size: 26px;
+  line-height: 1.15;
+}
+
+.dashboard-page .dashboard-grid > .panel,
+.panel,
+.stat-card,
+.dashboard-kpi {
+  min-width: 0;
+}
+
+.employees-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.employees-table th,
+.employees-table td {
+  vertical-align: middle;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.4;
+  padding: 12px 14px;
+}
+
+.employees-table th {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.attendance-actions,
+.dashboard-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.status-dot-alert {
+  background: #f04438;
+}
+
+.attendance-inactive,
+.page-alert {
+  display: inline-block;
+  margin-top: 4px;
+  color: #b42318;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.page-alert {
+  display: block;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fef3f2;
+  font-size: 14px;
+}
+
+.admin-sub {
+  display: block;
+  color: #667085;
+  font-size: 12px;
+}
+
+.admin-stats {
+  margin-bottom: 18px;
+}
+
+.sidebar-footer span {
+  font-size: 12px;
+  line-height: 1.35;
+}

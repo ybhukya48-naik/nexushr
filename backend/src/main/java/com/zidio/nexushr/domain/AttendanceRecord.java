@@ -53,6 +53,18 @@ public class AttendanceRecord {
     @Column(name = "overtime_minutes", nullable = false)
     private Integer overtimeMinutes = 0;
 
+    @Column(name = "session_started_at")
+    private LocalDateTime sessionStartedAt;
+
+    @Column(name = "closed_work_minutes", nullable = false)
+    private Integer closedWorkMinutes = 0;
+
+    @Column(name = "break_minutes", nullable = false)
+    private Integer breakMinutes = 0;
+
+    @Column(name = "attendance_status", length = 20)
+    private String attendanceStatus;
+
     public Long getId() {
         return id;
     }
@@ -115,5 +127,37 @@ public class AttendanceRecord {
 
     public void setOvertimeMinutes(Integer overtimeMinutes) {
         this.overtimeMinutes = overtimeMinutes;
+    }
+
+    public LocalDateTime getSessionStartedAt() {
+        return sessionStartedAt;
+    }
+
+    public void setSessionStartedAt(LocalDateTime sessionStartedAt) {
+        this.sessionStartedAt = sessionStartedAt;
+    }
+
+    public Integer getClosedWorkMinutes() {
+        return closedWorkMinutes;
+    }
+
+    public void setClosedWorkMinutes(Integer closedWorkMinutes) {
+        this.closedWorkMinutes = closedWorkMinutes;
+    }
+
+    public Integer getBreakMinutes() {
+        return breakMinutes;
+    }
+
+    public void setBreakMinutes(Integer breakMinutes) {
+        this.breakMinutes = breakMinutes;
+    }
+
+    public String getAttendanceStatus() {
+        return attendanceStatus;
+    }
+
+    public void setAttendanceStatus(String attendanceStatus) {
+        this.attendanceStatus = attendanceStatus;
     }
 }

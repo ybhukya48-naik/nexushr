@@ -17,6 +17,10 @@ export interface AttendanceRecord {
   workMinutes: number;
   lateArrivalMinutes: number;
   overtimeMinutes: number;
+  sessionStartedAt?: string | null;
+  closedWorkMinutes?: number;
+  breakMinutes?: number;
+  attendanceStatus?: string | null;
 }
 
 export interface AttendanceMetrics {
@@ -324,8 +328,10 @@ export default function Attendance() {
       : undefined;
 
   const isToday = date === today;
-  const hasCheckedIn = Boolean(actionEmployeeRecord?.checkInTime);
-  const hasCheckedOut = Boolean(actionEmployeeRecord?.checkOutTime);
+  const sessionOpen = Boolean(
+    actionEmployeeRecord?.checkInTime && !actionEmployeeRecord?.checkOutTime,
+  );
+  const canResume = Boolean(actionEmployeeRecord?.checkOutTime);
 
 
 
@@ -613,8 +619,6 @@ export default function Attendance() {
   }
 
 
-  const SHIFT_SECONDS = 9 * 60 * 60;
-
   function formatClock(totalSeconds: number) {
     const safe = Math.max(0, totalSeconds);
     const hours = Math.floor(safe / 3600);
@@ -648,42 +652,37 @@ export default function Attendance() {
     return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000));
   }
 
-  function scheduledLogout(record?: AttendanceRecord) {
-    const match = String(record?.checkInTime ?? "").match(/(\d{2}):(\d{2}):(\d{2})/);
-    if (!match) {
-      return "-";
-    }
-
-    const total =
-      (Number(match[1]) * 3600 +
-        Number(match[2]) * 60 +
-        Number(match[3]) +
-        SHIFT_SECONDS) %
-      86400;
-
-    return formatClock(total);
-  }
-
   function workAndBreak(record?: AttendanceRecord) {
-    const elapsed = elapsedSeconds(record);
-    if (elapsed == null) {
+    if (!record?.checkInTime) {
       return { work: "-", breakTime: "-" };
     }
 
-    if (!record?.checkOutTime) {
+    const closedSeconds = Math.max(0, record.closedWorkMinutes ?? 0) * 60;
+    const breakSeconds = Math.max(0, record.breakMinutes ?? 0) * 60;
+    const open = Boolean(record.checkInTime) && !record.checkOutTime;
+
+    if (open) {
+      const start = new Date(record.sessionStartedAt || record.checkInTime);
+      const live = Number.isNaN(start.getTime())
+        ? 0
+        : Math.max(0, Math.floor((currentTime.getTime() - start.getTime()) / 1000));
       return {
-        work: formatClock(Math.min(elapsed, SHIFT_SECONDS)),
-        breakTime: "-",
+        work: formatClock(closedSeconds + live),
+        breakTime: formatClock(breakSeconds),
       };
     }
 
-    if (elapsed >= SHIFT_SECONDS) {
-      return { work: formatClock(SHIFT_SECONDS), breakTime: "00:00:00" };
+    if ((record.closedWorkMinutes ?? 0) > 0 || (record.breakMinutes ?? 0) > 0) {
+      return {
+        work: formatClock(closedSeconds),
+        breakTime: formatClock(breakSeconds),
+      };
     }
 
+    const elapsed = elapsedSeconds(record);
     return {
-      work: formatClock(elapsed),
-      breakTime: formatClock(SHIFT_SECONDS - elapsed),
+      work: elapsed == null ? "-" : formatClock(elapsed),
+      breakTime: formatClock(0),
     };
   }
 
@@ -714,21 +713,25 @@ export default function Attendance() {
               !attendanceLoaded ||
               !isToday ||
               !actionEmployee ||
-              hasCheckedIn
+              sessionOpen
             }
             title={
               !isToday
                 ? "Check-in is available only for today."
-                : hasCheckedIn
-                  ? "You have already checked in today."
-                  : undefined
+                : sessionOpen
+                  ? "Check out before starting again. The gap is break time."
+                  : canResume
+                    ? "Check in again. Work time resumes and the gap counts as break."
+                    : undefined
             }
           >
             {loading
               ? "Checking..."
-              : hasCheckedIn
+              : sessionOpen
                 ? `Checked In ${formatTime(actionEmployeeRecord?.checkInTime)}`
-                : "Check In"}
+                : canResume
+                  ? "Check In Again"
+                  : "Check In"}
           </button>
 
           <button
@@ -745,24 +748,23 @@ export default function Attendance() {
               !attendanceLoaded ||
               !isToday ||
               !actionEmployee ||
-              !hasCheckedIn ||
-              hasCheckedOut
+              !sessionOpen
             }
             title={
               !isToday
                 ? "Check-out is available only for today."
-                : !hasCheckedIn
+                : !sessionOpen
                   ? "Check in before checking out."
-                  : hasCheckedOut
-                    ? "You have already checked out today."
-                    : undefined
+                  : undefined
             }
           >
             {loading
               ? "Checking..."
-              : hasCheckedOut
-                ? `Checked Out ${formatTime(actionEmployeeRecord?.checkOutTime)}`
-                : "Check Out"}
+              : sessionOpen
+                ? "Check Out"
+                : actionEmployeeRecord?.checkOutTime
+                  ? `Checked Out ${formatTime(actionEmployeeRecord.checkOutTime)}`
+                  : "Check Out"}
           </button>
         </div>
       </div>
@@ -931,6 +933,9 @@ export default function Attendance() {
         <div className="attendance-employee-cell">
           <strong>{employee.fullName}</strong>
           <span>{employee.employeeCode}</span>
+          {record?.attendanceStatus === "INACTIVE" && (
+            <span className="attendance-inactive">Inactive</span>
+          )}
         </div>
       </td>
 
@@ -947,11 +952,11 @@ export default function Attendance() {
           {record?.checkOutTime
             ? formatTime(record.checkOutTime)
             : record?.checkInTime
-              ? scheduledLogout(record)
+              ? "In progress"
               : "-"}
         </span>
         {record?.checkInTime && !record.checkOutTime && (
-          <span>9 hr shift</span>
+          <span>Working</span>
         )}
       </td>
 

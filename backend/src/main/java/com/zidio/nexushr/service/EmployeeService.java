@@ -201,6 +201,12 @@ public class EmployeeService {
         return employeeRepository.save(employee);
     }
 
+    public Employee setActive(Long id, boolean active) {
+        Employee employee = findById(id);
+        employee.setActive(active);
+        return employeeRepository.save(employee);
+    }
+
     public void delete(Long id) {
         Employee employee = findById(id);
         employee.setActive(false);

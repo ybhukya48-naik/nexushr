@@ -279,6 +279,53 @@ export function getEmployees() {
   return request<EmployeeResponse[]>("/employees");
 }
 
+export type AttendanceStatusResponse = {
+  status: string;
+  checkedIn: boolean;
+  checkedOut: boolean;
+  message: string;
+};
+
+export function getMyAttendanceStatus() {
+  return request<AttendanceStatusResponse>("/attendance/my-status");
+}
+
+export type AdminEmployeeRow = {
+  id: number;
+  employeeCode: string;
+  fullName: string;
+  email: string;
+  role: string;
+  company: string;
+  active: boolean;
+  attendanceStatus: string;
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
+};
+
+export type AdminOverview = {
+  employees: number;
+  active: number;
+  inactiveAccounts: number;
+  missingCheckIn: number;
+  missingCheckOut: number;
+  rows: AdminEmployeeRow[];
+};
+
+export function getAdminOverview() {
+  return request<AdminOverview>("/admin/overview");
+}
+
+export function setEmployeeActive(id: number, active: boolean) {
+  return request<{ id: number; active: boolean }>(
+    `/admin/employees/${id}/active`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ active }),
+    },
+  );
+}
+
 export function getCurrentEmployee() {
   return request<EmployeeResponse>("/employees/me");
 }

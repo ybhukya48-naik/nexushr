@@ -83,6 +83,20 @@ public class AttendanceController {
         return attendanceService.biometricCheckOut(targetEmployeeId);
     }
 
+    @GetMapping("/my-status")
+    public java.util.Map<String, Object> myStatus(Authentication authentication) {
+        try {
+            Long employeeId = attendanceService.findEmployeeIdByUsername(authentication.getName());
+            return attendanceService.myStatus(employeeId);
+        } catch (RuntimeException ex) {
+            return java.util.Map.of(
+                    "status", "NONE",
+                    "checkedIn", false,
+                    "checkedOut", false,
+                    "message", "Check in is missing");
+        }
+    }
+
     @GetMapping
     public List<AttendanceRecord> listByDate(
             @RequestParam LocalDate date) {
