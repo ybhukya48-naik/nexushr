@@ -700,7 +700,7 @@ function EmployeeDashboard() {
   }
 
   return (
-    <div className="dashboard-page">
+    <div className="dashboard-page employee-dashboard">
 
       <div className="dashboard-hero">
         <div className="dashboard-hero-copy">
