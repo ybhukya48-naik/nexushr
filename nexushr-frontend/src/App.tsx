@@ -99,28 +99,32 @@ function AppRoutes() {
     return (
       <div className="login-page">
         <div className="login-form-area" style={{ margin: "auto" }}>
-          <div className="login-card">
+          <div className="login-card entity-picker-card">
             <div className="login-card-header">
               <p className="eyebrow">SEPARATE WORKSPACES</p>
-              <h2>Choose an entity</h2>
+              <h2>Choose a company</h2>
               <p>
                 CYOND and Gorle Group are separate. Open one workspace.
               </p>
             </div>
-            <div className="login-fields">
+            <div className="entity-choice">
               <button
-                className="login-submit"
                 type="button"
+                className="entity-card"
                 onClick={() => enterWorkspace("CYOND")}
               >
-                <span>Enter CYOND</span>
+                <img src={workspaceLogo("CYOND")} alt="CYOND logo" />
+                <strong>CYOND</strong>
+                <span>{workspaceTagline("CYOND")}</span>
               </button>
               <button
-                className="secondary-button"
                 type="button"
+                className="entity-card"
                 onClick={() => enterWorkspace("GORLE")}
               >
-                Enter Gorle Group
+                <img src={workspaceLogo("GORLE")} alt="Gorle Group logo" />
+                <strong>Gorle Group</strong>
+                <span>{workspaceTagline("GORLE")}</span>
               </button>
             </div>
           </div>
@@ -330,94 +334,7 @@ function Login() {
 
       <div className="login-background-orb login-orb-two"></div>
 
-      <div className="login-layout">
-
-        {/* =====================================================
-            LEFT BRAND PANEL
-        ====================================================== */}
-        <div className="login-brand-panel">
-
-          <div className="login-brand">
-            <div className="login-brand-logos">
-              <img
-                className="brand-logo brand-logo-large"
-                src="/images/cyond-logo.jpeg"
-                alt="CYOND logo"
-              />
-              <img
-                className="brand-logo brand-logo-large"
-                src="/images/gorle-group-logo.jpeg"
-                alt="Gorle Group logo"
-              />
-            </div>
-            <div className="login-brand-text">
-              <strong>GORLE GROUP BUSINESS SOLUTION</strong>
-              <span>Enterprise HR Platform</span>
-            </div>
-          </div>
-
-          <div className="login-features">
-
-            <div className="login-feature">
-
-              <div className="login-feature-icon">
-                W
-              </div>
-
-              <div>
-                <strong>
-                  Workforce Management
-                </strong>
-
-                <span>
-                  Centralized employee and lifecycle
-                  operations
-                </span>
-              </div>
-
-            </div>
-
-            <div className="login-feature">
-
-              <div className="login-feature-icon">
-                I
-              </div>
-
-              <div>
-                <strong>
-                  Real-time Intelligence
-                </strong>
-
-                <span>
-                  Insights that help HR teams make
-                  better decisions
-                </span>
-              </div>
-
-            </div>
-
-            <div className="login-feature">
-
-              <div className="login-feature-icon">
-                S
-              </div>
-
-              <div>
-                <strong>
-                  Secure by Design
-                </strong>
-
-                <span>
-                  Role-based access protected by
-                  enterprise security
-                </span>
-              </div>
-
-            </div>
-
-          </div>
-
-        </div>
+      <div className="login-layout login-layout-single">
 
         {/* =====================================================
             LOGIN FORM
@@ -430,31 +347,6 @@ function Login() {
           >
 
             <div className="login-card-header">
-
-              {/* MOBILE BRAND */}
-              <div className="login-mobile-brand">
-                <div className="login-mobile-logos">
-                  <img
-                    className="brand-logo"
-                    src="/images/cyond-logo.jpeg"
-                    alt="CYOND logo"
-                  />
-                  <img
-                    className="brand-logo"
-                    src="/images/gorle-group-logo.jpeg"
-                    alt="Gorle Group logo"
-                  />
-                </div>
-                <div className="login-mobile-brand-text">
-                  <strong>GORLE GROUP BUSINESS SOLUTION</strong>
-                  <span>Enterprise HR Platform</span>
-                </div>
-              </div>
-
-              {/* CYOND BRANDING */}
-              <p className="eyebrow">
-                GORLE GROUP BUSINESS SOLUTION
-              </p>
 
               <h2>
                 Welcome back
