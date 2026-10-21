@@ -39,7 +39,8 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        if (!LOGIN_PATH.equals(request.getServletPath())) {
+        String path = request.getServletPath();
+        if (!LOGIN_PATH.equals(path) && !"/api/v1/auth/create-password".equals(path)) {
             filterChain.doFilter(request, response);
             return;
         }

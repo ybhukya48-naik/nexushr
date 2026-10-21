@@ -2,23 +2,33 @@
 package com.zidio.nexushr.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zidio.nexushr.domain.Employee;
+import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
+import com.zidio.nexushr.domain.RoleType;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.security.JwtTokenService;
 import com.zidio.nexushr.security.SecurityConfig;
+import com.zidio.nexushr.service.ExcelPayrollService;
 import com.zidio.nexushr.web.dto.AuthDtos;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @WebMvcTest(AuthController.class)
@@ -143,5 +153,65 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createPassword_forImportedEmployee_replacesPlaceholder() throws Exception {
+        Employee employee = importedEmployee("staff@gorlegroup.com");
+        when(employeeRepository.findByEmailIgnoreCase("staff@gorlegroup.com"))
+                .thenReturn(Optional.of(employee));
+
+        mockMvc.perform(post("/api/v1/auth/create-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"staff@gorlegroup.com","password":"newpassword1"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message")
+                        .value("Password created. Sign in with your email and password."));
+
+        assertNotEquals(ExcelPayrollService.UNSET_PASSWORD_HASH, employee.getPassword());
+        assertTrue(new BCryptPasswordEncoder().matches("newpassword1", employee.getPassword()));
+        verify(employeeRepository).save(employee);
+    }
+
+    @Test
+    void createPassword_whenPasswordAlreadySet_returnsConflict() throws Exception {
+        Employee employee = importedEmployee("staff@gorlegroup.com");
+        employee.setPassword(new BCryptPasswordEncoder().encode("already-set"));
+        when(employeeRepository.findByEmailIgnoreCase("staff@gorlegroup.com"))
+                .thenReturn(Optional.of(employee));
+
+        mockMvc.perform(post("/api/v1/auth/create-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"staff@gorlegroup.com","password":"newpassword1"}
+                                """))
+                .andExpect(status().isConflict());
+
+        verify(employeeRepository, never()).save(employee);
+    }
+
+    @Test
+    void createPassword_whenEmailMissing_returnsNotFound() throws Exception {
+        when(employeeRepository.findByEmailIgnoreCase("missing@gorlegroup.com"))
+                .thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/api/v1/auth/create-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"missing@gorlegroup.com","password":"newpassword1"}
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
+    private static Employee importedEmployee(String email) {
+        Employee employee = new Employee();
+        employee.setEmail(email);
+        employee.setPassword(ExcelPayrollService.UNSET_PASSWORD_HASH);
+        employee.setRoleType(RoleType.EMPLOYEE);
+        employee.setActive(true);
+        employee.setLifecycleStatus(EmployeeLifecycleStatus.ACTIVE);
+        return employee;
     }
 }

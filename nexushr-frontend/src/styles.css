@@ -6221,6 +6221,54 @@ tbody tr:hover td {
   padding: 8px 10px;
 }
 
+.login-card-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+  text-align: center;
+  color: #101828;
+}
+
+.login-card-brand img {
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.login-card-brand strong {
+  display: block;
+  font-size: 0.92rem;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+}
+
+.login-notice {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #ecfdf3;
+  color: #067647;
+  font-size: 14px;
+}
+
+.login-switch {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #6941c6;
+  font: inherit;
+  font-size: 14px;
+  text-align: center;
+  cursor: pointer;
+}
+
 .login-layout-single {
   grid-template-columns: minmax(320px, 460px);
   justify-content: center;

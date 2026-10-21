@@ -156,6 +156,39 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json();
 }
 
+export async function createPassword(
+  email: string,
+  password: string,
+): Promise<{ message: string; email: string }> {
+  const response = await fetch(`${API_BASE}/auth/create-password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!response.ok) {
+    let message = "Could not create the password";
+    try {
+      const errorBody = await response.json();
+      if (
+        errorBody &&
+        typeof errorBody === "object" &&
+        typeof errorBody.message === "string" &&
+        errorBody.message.trim()
+      ) {
+        message = errorBody.message;
+      }
+    } catch {
+      // Keep the fallback message when the response has no JSON body.
+    }
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
 export async function login(
   username: string,
   password: string,

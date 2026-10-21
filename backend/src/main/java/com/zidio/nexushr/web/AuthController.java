@@ -6,6 +6,7 @@ import com.zidio.nexushr.domain.GenderType;
 import com.zidio.nexushr.domain.RoleType;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.security.JwtTokenService;
+import com.zidio.nexushr.service.ExcelPayrollService;
 import com.zidio.nexushr.web.dto.AuthDtos;
 import com.zidio.nexushr.web.dto.RegisterRequest;
 import org.springframework.beans.factory.annotation.Value;
@@ -219,5 +220,65 @@ public class AuthController {
                         employee.getFullName()
                 )
         );
+    }
+
+    @PostMapping("/create-password")
+    public ResponseEntity<?> createPassword(
+            @RequestBody AuthDtos.CreatePasswordRequest request) {
+
+        if (request == null ||
+                request.email() == null ||
+                request.email().isBlank() ||
+                request.password() == null ||
+                request.password().isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "Email and password are required"));
+        }
+
+        String email = request.email().trim().toLowerCase();
+        String password = request.password();
+
+        if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "Please enter a valid email address"));
+        }
+
+        if (password.length() < 8) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "Password must contain at least 8 characters"));
+        }
+
+        Optional<Employee> employeeOpt = employeeRepository.findByEmailIgnoreCase(email);
+        if (employeeOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message",
+                            "No employee account uses this email"));
+        }
+
+        Employee employee = employeeOpt.get();
+        if (!employee.isActive() ||
+                employee.getLifecycleStatus() != EmployeeLifecycleStatus.ACTIVE ||
+                employee.getRoleType() != RoleType.EMPLOYEE) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message",
+                            "This account cannot create a password here. Sign in, or ask HR."));
+        }
+
+        String current = employee.getPassword();
+        if (current != null &&
+                !current.isBlank() &&
+                !ExcelPayrollService.UNSET_PASSWORD_HASH.equals(current)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message",
+                            "A password is already set. Sign in with your email and password."));
+        }
+
+        employee.setPassword(passwordEncoder.encode(password));
+        employeeRepository.save(employee);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Password created. Sign in with your email and password.",
+                "email", employee.getEmail()
+        ));
     }
 }

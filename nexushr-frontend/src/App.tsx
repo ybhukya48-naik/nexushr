@@ -12,6 +12,7 @@ import {
 import {
   getDashboardSummary,
   getCurrentEmployee,
+  createPassword,
   login as apiLogin,
   getAiWorkforceDashboard,
   type DashboardSummary,
@@ -267,12 +268,16 @@ function Login() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [mode, setMode] = useState<"signin" | "create">("signin");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setNotice("");
 
     if (!username.trim() || !password) {
       setError(
@@ -328,6 +333,44 @@ function Login() {
     }
   }
 
+  async function handleCreatePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+
+    const email = username.trim();
+    if (!email || !password) {
+      setError("Enter your email and a new password.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must contain at least 8 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await createPassword(email, password);
+      setUsername(response.email || email);
+      setPassword("");
+      setConfirmPassword("");
+      setMode("signin");
+      setNotice("Password created. Sign in with your email and password.");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not create the password.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="login-page">
       <div className="login-background-orb login-orb-one"></div>
@@ -343,20 +386,34 @@ function Login() {
 
           <form
             className="login-card"
-            onSubmit={handleSubmit}
+            onSubmit={mode === "create" ? handleCreatePassword : handleSubmit}
           >
+
+            <div className="login-card-brand">
+              <img
+                src="/images/gorle-group-logo.jpeg"
+                alt="Gorle Group logo"
+              />
+              <strong>GORLE GROUP BUSINESS SOLUTION</strong>
+            </div>
 
             <div className="login-card-header">
 
               <h2>
-                Welcome back
+                {mode === "create" ? "Create password" : "Welcome back"}
               </h2>
 
               <p>
-                Sign in to continue to your workspace.
+                {mode === "create"
+                  ? "Employees use their email to create a password, then sign in."
+                  : "Sign in with your email and password."}
               </p>
 
             </div>
+
+            {notice && (
+              <p className="login-notice">{notice}</p>
+            )}
 
             {/* ERROR MESSAGE */}
             {error && (
@@ -369,7 +426,7 @@ function Login() {
                 <div>
 
                   <strong>
-                    Sign-in failed
+                    {mode === "create" ? "Could not create password" : "Sign-in failed"}
                   </strong>
 
                   <span>
@@ -390,18 +447,22 @@ function Login() {
               <label>
 
                 <span>
-                  Employee Code or Email
+                  {mode === "create" ? "Email" : "Email or employee code"}
                 </span>
 
                 <div className="login-input-wrap">
 
                   <input
-                    type="text"
+                    type={mode === "create" ? "email" : "text"}
                     value={username}
                     onChange={(event) =>
                       setUsername(event.target.value)
                     }
-                    placeholder="Enter employee code or email"
+                    placeholder={
+                      mode === "create"
+                        ? "Enter your email"
+                        : "Enter email or employee code"
+                    }
                     autoComplete="username"
                     required
                   />
@@ -414,7 +475,7 @@ function Login() {
               <label>
 
                 <span>
-                  Password
+                  {mode === "create" ? "New password" : "Password"}
                 </span>
 
                 <div className="login-input-wrap">
@@ -425,14 +486,36 @@ function Login() {
                     onChange={(event) =>
                       setPassword(event.target.value)
                     }
-                    placeholder="Enter your password"
-                    autoComplete="current-password"
+                    placeholder={
+                      mode === "create"
+                        ? "At least 8 characters"
+                        : "Enter your password"
+                    }
+                    autoComplete={mode === "create" ? "new-password" : "current-password"}
                     required
                   />
 
                 </div>
 
               </label>
+
+              {mode === "create" && (
+                <label>
+                  <span>Confirm password</span>
+                  <div className="login-input-wrap">
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(event) =>
+                        setConfirmPassword(event.target.value)
+                      }
+                      placeholder="Repeat the password"
+                      autoComplete="new-password"
+                      required
+                    />
+                  </div>
+                </label>
+              )}
 
             </div>
 
@@ -445,8 +528,12 @@ function Login() {
 
               <span>
                 {loading
-                  ? "Signing in..."
-                  : "Sign in"}
+                  ? mode === "create"
+                    ? "Creating password..."
+                    : "Signing in..."
+                  : mode === "create"
+                    ? "Create password"
+                    : "Sign in"}
               </span>
 
               {!loading && (
@@ -455,6 +542,22 @@ function Login() {
                 </span>
               )}
 
+            </button>
+
+            <button
+              className="login-switch"
+              type="button"
+              onClick={() => {
+                setMode(mode === "create" ? "signin" : "create");
+                setError("");
+                setNotice("");
+                setPassword("");
+                setConfirmPassword("");
+              }}
+            >
+              {mode === "create"
+                ? "Already created a password? Sign in"
+                : "Employee? Create your password"}
             </button>
 
             {/* SECURITY */}

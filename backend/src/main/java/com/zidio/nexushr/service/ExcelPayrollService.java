@@ -35,6 +35,9 @@ import java.util.*;
 public class ExcelPayrollService {
 
     private static final Logger log = LoggerFactory.getLogger(ExcelPayrollService.class);
+    /** Stored for salary-imported staff until they create their own password. */
+    public static final String UNSET_PASSWORD_HASH =
+            "$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EH";
     private static final BigDecimal ZERO = BigDecimal.ZERO;
     private static final BigDecimal NINE = BigDecimal.valueOf(9);
 
@@ -436,7 +439,7 @@ public class ExcelPayrollService {
             safeEmail = cleanCode + "." + System.currentTimeMillis() + "@" + (companyCode.equals("CYOND") ? "cyond.com" : "gorlegroup.com");
         }
         newEmp.setEmail(safeEmail);
-        newEmp.setPassword("$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EH");
+        newEmp.setPassword(UNSET_PASSWORD_HASH);
         newEmp.setRoleType(RoleType.EMPLOYEE);
         newEmp.setDepartment(sheetName);
         newEmp.setDesignation("Staff");
