@@ -807,7 +807,26 @@ export interface PayrollExcelImportResponse {
   payMonth: string;
   imported: number;
   message: string;
+  emailsSent?: number;
+  emailsFailed?: number;
+  emailErrors?: string[];
   employees?: PayrollExcelImportEmployee[];
+}
+
+export async function downloadSampleAttendance(): Promise<Blob> {
+  const token = localStorage.getItem("nexushr_token");
+  const headers = new Headers();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const response = await fetch(`${API_BASE}/payroll/sample-attendance`, {
+    method: "GET",
+    headers,
+  });
+  if (!response.ok) {
+    throw new Error("Unable to download the sample attendance sheet.");
+  }
+  return response.blob();
 }
 
 /**

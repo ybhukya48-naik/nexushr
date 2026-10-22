@@ -12,6 +12,7 @@ import {
 import {
   getDashboardSummary,
   getCurrentEmployee,
+  getEmployeePayroll,
   getMyAttendanceStatus,
   createPassword,
   login as apiLogin,
@@ -20,6 +21,12 @@ import {
   type AiWorkforceDashboardResponse,
   type EmployeeResponse,
 } from "./api";
+import {
+  getEmployeeAttendance,
+  getLeaves,
+  type AttendanceRecord,
+  type LeaveRequest,
+} from "./pages/Attendance";
 import {
   asWorkspaceCompany,
   clearWorkspaceCompany,
@@ -344,16 +351,14 @@ function Login() {
       );
 
       clearWorkspaceCompany();
-      if (response.role === "EMPLOYEE") {
-        try {
-          const me = await getCurrentEmployee();
-          setWorkspaceCompany(asWorkspaceCompany(me.companyCode));
-        } catch {
-          // Management-style accounts choose an entity after sign-in.
-        }
-      }
-
       navigate("/", { replace: true });
+      if (response.role === "EMPLOYEE") {
+        void getCurrentEmployee()
+          .then((me) => setWorkspaceCompany(asWorkspaceCompany(me.companyCode)))
+          .catch(() => {
+            // The employee can still open a workspace if this lookup is slow.
+          });
+      }
     } catch (err) {
       console.error(err);
 
@@ -637,16 +642,44 @@ function Login() {
 ============================================================ */
 
 
+function formatClock(value?: string) {
+  if (!value) {
+    return "—";
+  }
+  const match = String(value).match(/(\d{2}):(\d{2})/);
+  return match ? `${match[1]}:${match[2]}` : value;
+}
+
 function EmployeeDashboard() {
+  const navigate = useNavigate();
   const [employee, setEmployee] =
     useState<EmployeeResponse | null>(null);
+  const [attendance, setAttendance] = useState<AttendanceRecord | null>(null);
+  const [leaveCount, setLeaveCount] = useState(0);
+  const [latestPay, setLatestPay] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     getCurrentEmployee()
-      .then(setEmployee)
+      .then(async (me) => {
+        setEmployee(me);
+        const [records, leaves, payroll] = await Promise.all([
+          getEmployeeAttendance(me.id).catch(() => []),
+          getLeaves().catch(() => []),
+          getEmployeePayroll(me.id).catch(() => []),
+        ]);
+        const latest = [...records].sort((a, b) =>
+          b.attendanceDate.localeCompare(a.attendanceDate),
+        )[0];
+        setAttendance(latest ?? null);
+        setLeaveCount(leaves.length);
+        const pay = [...payroll].sort((a, b) =>
+          b.payMonth.localeCompare(a.payMonth),
+        )[0];
+        setLatestPay(pay ? pay.payMonth : "No payslip yet");
+      })
       .catch((err) => {
         console.error(err);
 
@@ -806,6 +839,45 @@ function EmployeeDashboard() {
 
       </div>
 
+      <div className="employee-action-grid">
+        <article className="panel employee-action-card">
+          <p className="eyebrow">ATTENDANCE</p>
+          <h3>Today's punches</h3>
+          <p>
+            {attendance
+              ? `${attendance.attendanceDate} · In ${formatClock(attendance.checkInTime)} · Out ${formatClock(attendance.checkOutTime)} · ${Math.floor((attendance.closedWorkMinutes ?? attendance.workMinutes ?? 0) / 60)}h ${(attendance.closedWorkMinutes ?? attendance.workMinutes ?? 0) % 60}m`
+              : "No attendance recorded yet."}
+          </p>
+          <button className="primary-button" type="button" onClick={() => navigate("/attendance")}>
+            Check in or check out
+          </button>
+        </article>
+        <article className="panel employee-action-card">
+          <p className="eyebrow">LEAVE</p>
+          <h3>My requests</h3>
+          <p>{leaveCount} leave request{leaveCount === 1 ? "" : "s"} on file.</p>
+          <button className="primary-button" type="button" onClick={() => navigate("/leave")}>
+            Submit or view leave
+          </button>
+        </article>
+        <article className="panel employee-action-card">
+          <p className="eyebrow">PAYROLL</p>
+          <h3>Payslip</h3>
+          <p>{latestPay}</p>
+          <button className="primary-button" type="button" onClick={() => navigate("/payroll")}>
+            View payslip
+          </button>
+        </article>
+        <article className="panel employee-action-card">
+          <p className="eyebrow">ALERTS</p>
+          <h3>Notifications</h3>
+          <p>Missing check-in or check-out is marked inactive and sent here.</p>
+          <button className="primary-button" type="button" onClick={() => navigate("/notifications")}>
+            Open notifications
+          </button>
+        </article>
+      </div>
+
       <section className="panel">
         <div className="panel-header">
           <div>
@@ -874,6 +946,7 @@ function Dashboard() {
 
   const [data, setData] =
     useState<DashboardSummary | null>(null);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
 
   const [loading, setLoading] =
     useState(true);
@@ -894,6 +967,10 @@ function Dashboard() {
         );
       })
       .finally(() => setLoading(false));
+
+    getLeaves()
+      .then((rows) => setLeaveRequests(rows.slice(0, 8)))
+      .catch(() => setLeaveRequests([]));
   }, []);
 
   if (loading) {
@@ -1124,6 +1201,45 @@ function Dashboard() {
         </article>
 
       </div>
+
+      <section className="panel hr-leave-panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">LEAVE REQUESTS</p>
+            <h3>Submitted by employees</h3>
+            <p>View only. Employees submit these requests. HR does not create them here.</p>
+          </div>
+          <button className="panel-link" type="button" onClick={() => navigate("/leave")}>
+            Review leave
+          </button>
+        </div>
+        {leaveRequests.length === 0 ? (
+          <p className="hr-leave-empty">No leave requests yet.</p>
+        ) : (
+          <div className="employees-table-wrap">
+            <table className="employees-table">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Dates</th>
+                  <th>Reason</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leaveRequests.map((leave) => (
+                  <tr key={`${leave.id ?? leave.startDate}-${leave.employee?.employeeCode ?? ""}`}>
+                    <td>{leave.employee?.fullName || "Employee"}</td>
+                    <td>{leave.startDate} to {leave.endDate}</td>
+                    <td>{leave.reason}</td>
+                    <td>{leave.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
 
       <div className="dashboard-grid">

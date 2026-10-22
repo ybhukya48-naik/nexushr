@@ -19,6 +19,7 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +31,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.zidio.nexushr.domain.PayrollStatus;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -526,6 +528,9 @@ public class AttendanceService {
                                 : calculateWorkMinutes(checkIn, checkOut);
 
                         record.setWorkMinutes(workMinutes);
+                        record.setClosedWorkMinutes(workMinutes);
+                        record.setBreakMinutes(0);
+                        record.setAttendanceStatus(checkOut == null ? "OPEN" : "CLOSED");
                         record.setLateArrivalMinutes(calculateLateArrivalMinutes(checkIn));
                         record.setOvertimeMinutes(calculateOvertimeMinutes(workMinutes));
 
@@ -641,6 +646,9 @@ public class AttendanceService {
                 record.setCheckOutTime(parsed.checkOut());
                 int workMinutes = calculateWorkMinutes(parsed.checkIn(), parsed.checkOut());
                 record.setWorkMinutes(workMinutes);
+                record.setClosedWorkMinutes(workMinutes);
+                record.setBreakMinutes(0);
+                record.setAttendanceStatus("CLOSED");
                 record.setLateArrivalMinutes(calculateLateArrivalMinutes(parsed.checkIn()));
                 record.setOvertimeMinutes(calculateOvertimeMinutes(workMinutes));
                 attendanceRepository.save(record);
@@ -789,23 +797,27 @@ public class AttendanceService {
                     : BigDecimal.valueOf(30000);
 
             BigDecimal expectedMinutesVal = BigDecimal.valueOf(Math.max(1, expectedWorkMinutes));
+            int payableMinutes = Math.max(0, expectedWorkMinutes - shortfallMinutes);
+            BigDecimal earnedSalary = expectedWorkMinutes <= 0
+                    ? baseSalary
+                    : baseSalary
+                    .multiply(BigDecimal.valueOf(payableMinutes))
+                    .divide(expectedMinutesVal, 2, RoundingMode.HALF_UP);
             BigDecimal perMinuteRate = baseSalary.divide(expectedMinutesVal, 8, RoundingMode.HALF_UP);
 
-            BigDecimal leaveDeduction = perMinuteRate
-                    .multiply(BigDecimal.valueOf(shortfallMinutes))
-                    .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal leaveDeduction = baseSalary.subtract(earnedSalary).max(BigDecimal.ZERO);
 
             BigDecimal overtimeAmount = perMinuteRate
                     .multiply(BigDecimal.valueOf(overtimeMinutes))
                     .setScale(2, RoundingMode.HALF_UP);
 
-            BigDecimal basicSalary = baseSalary.multiply(BigDecimal.valueOf(0.60)).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal hra = baseSalary.multiply(BigDecimal.valueOf(0.40)).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal grossSalary = baseSalary.add(overtimeAmount);
+            BigDecimal basicSalary = earnedSalary.multiply(BigDecimal.valueOf(0.60)).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal hra = earnedSalary.multiply(BigDecimal.valueOf(0.40)).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal grossSalary = earnedSalary.add(overtimeAmount);
 
             BigDecimal pf = basicSalary.multiply(BigDecimal.valueOf(0.12)).setScale(2, RoundingMode.HALF_UP);
             BigDecimal taxAmount = grossSalary.multiply(BigDecimal.valueOf(0.10)).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal deductions = pf.add(leaveDeduction).add(taxAmount);
+            BigDecimal deductions = pf.add(taxAmount);
             BigDecimal netSalary = grossSalary.subtract(deductions).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
 
             PayrollRecord payroll = existingPayrollMap.get(employee.getId());
@@ -851,6 +863,72 @@ public class AttendanceService {
             payrollToSave.clear();
         }
         log.info("[AttendanceService] Calculated and saved payroll for employees for payMonth={}", payMonth);
+    }
+
+    public byte[] sampleAttendanceWorkbook() {
+        List<Employee> people = employeeRepository
+                .findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus.ACTIVE)
+                .stream()
+                .limit(6)
+                .toList();
+
+        LocalDate day = LocalDate.now(COMPANY_ZONE).withDayOfMonth(1);
+        while (day.getDayOfWeek() == DayOfWeek.SUNDAY) {
+            day = day.plusDays(1);
+        }
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Attendance");
+            Row header = sheet.createRow(0);
+            String[] titles = {"Employee Code", "Date", "Check In", "Check Out", "Monthly CTC"};
+            for (int i = 0; i < titles.length; i++) {
+                header.createCell(i).setCellValue(titles[i]);
+            }
+
+            int rowIndex = 1;
+            if (people.isEmpty()) {
+                rowIndex = writeSampleRow(sheet, rowIndex, "CY-EMP-001", day, "09:00", "18:00", "720000");
+                rowIndex = writeSampleRow(sheet, rowIndex, "CY-EMP-002", day.plusDays(1), "09:30", "18:30", "600000");
+                writeSampleRow(sheet, rowIndex, "CY-EMP-003", day.plusDays(2), "10:00", "18:00", "540000");
+            } else {
+                for (Employee employee : people) {
+                    BigDecimal annual = employee.getBaseSalary() == null
+                            ? BigDecimal.valueOf(360000)
+                            : employee.getBaseSalary().multiply(BigDecimal.valueOf(12));
+                    String code = employee.getEmployeeCode() == null ? "CY-EMP-001" : employee.getEmployeeCode();
+                    String annualText = annual.setScale(0, RoundingMode.HALF_UP).toPlainString();
+                    rowIndex = writeSampleRow(sheet, rowIndex, code, day, "09:00", "18:00", annualText);
+                    rowIndex = writeSampleRow(sheet, rowIndex, code, day.plusDays(1), "09:00", "17:00", annualText);
+                    rowIndex = writeSampleRow(sheet, rowIndex, code, day.plusDays(2), "09:00", "19:00", annualText);
+                }
+            }
+
+            for (int i = 0; i < titles.length; i++) {
+                sheet.setColumnWidth(i, 18 * 256);
+            }
+            workbook.write(out);
+            return out.toByteArray();
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not build the sample workbook");
+        }
+    }
+
+    private static int writeSampleRow(
+            Sheet sheet,
+            int rowIndex,
+            String code,
+            LocalDate date,
+            String checkIn,
+            String checkOut,
+            String ctc) {
+        Row row = sheet.createRow(rowIndex);
+        row.createCell(0).setCellValue(code);
+        row.createCell(1).setCellValue(date.toString());
+        row.createCell(2).setCellValue(checkIn);
+        row.createCell(3).setCellValue(checkOut);
+        row.createCell(4).setCellValue(ctc);
+        return rowIndex + 1;
     }
 
     /**

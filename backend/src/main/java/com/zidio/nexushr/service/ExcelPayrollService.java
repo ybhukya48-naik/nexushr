@@ -139,6 +139,8 @@ public class ExcelPayrollService {
             throw new IllegalArgumentException("payMonth is required.");
         }
 
+        lastEmailReport = SalaryEmailReport.empty();
+
         try {
             SalarySource salarySource = readSalarySource(sheets);
 
@@ -247,14 +249,7 @@ public class ExcelPayrollService {
                 created = payrollRepository.saveAll(created);
             }
 
-            // Dispatch salary notifications asynchronously so SMTP latency never blocks the HTTP response
-            if (!notificationTasks.isEmpty()) {
-                java.util.concurrent.CompletableFuture.runAsync(() -> {
-                    for (SalaryNotificationTask task : notificationTasks) {
-                        sendSalaryNotification(task.employee(), task.payroll(), task.payMonth());
-                    }
-                });
-            }
+            lastEmailReport = dispatchSalaryEmails(notificationTasks);
 
             return created;
 
@@ -313,33 +308,78 @@ public class ExcelPayrollService {
         }
     }
 
-    private void sendSalaryNotification(Employee employee, PayrollRecord payroll, String payMonth) {
+    public record SalaryEmailReport(int sent, int failed, List<String> errors) {
+        public static SalaryEmailReport empty() {
+            return new SalaryEmailReport(0, 0, List.of());
+        }
+    }
+
+    private volatile SalaryEmailReport lastEmailReport = SalaryEmailReport.empty();
+
+    public SalaryEmailReport lastEmailReport() {
+        return lastEmailReport;
+    }
+
+    private SalaryEmailReport dispatchSalaryEmails(List<SalaryNotificationTask> tasks) {
+        int sent = 0;
+        int failed = 0;
+        List<String> errors = new ArrayList<>();
+        for (SalaryNotificationTask task : tasks) {
+            String error = sendSalaryNotification(task.employee(), task.payroll(), task.payMonth());
+            if (error == null) {
+                sent++;
+            } else {
+                failed++;
+                if (errors.size() < 8) {
+                    errors.add(error);
+                }
+            }
+        }
+        return new SalaryEmailReport(sent, failed, errors);
+    }
+
+    private String sendSalaryNotification(Employee employee, PayrollRecord payroll, String payMonth) {
         if (employee.getEmail() == null || employee.getEmail().isBlank()) {
-            return;
+            return (employee.getEmployeeCode() == null ? "Employee" : employee.getEmployeeCode())
+                    + " has no email address";
         }
 
-        try {
-            String subject = "Salary Processed - " + payMonth;
-            String message = "Dear " + employee.getFullName() + ",\n\n"
-                    + "Your salary for " + payMonth + " has been calculated and processed.\n"
-                    + "Worked Hours: " + (payroll.getActualHours() != null ? payroll.getActualHours() : 0) + " hrs\n"
-                    + "Earned Gross: â‚¹" + payroll.getEarnedGross() + "\n"
-                    + "Deductions: â‚¹" + payroll.getDeductions() + "\n"
-                    + "Net Salary: â‚¹" + payroll.getNetSalary() + "\n\n"
-                    + "Your payslip is available on the Cyond HR platform.\n\n"
-                    + "Best regards,\nCyond HR Team";
+        String subject = "Salary Processed - " + payMonth;
+        String message = "Dear " + employee.getFullName() + ",\n\n"
+                + "Your salary for " + payMonth + " has been calculated from your working hours.\n"
+                + "A full day is 9 hours. Break time is not paid.\n"
+                + "Worked Hours: " + (payroll.getActualHours() != null ? payroll.getActualHours() : 0) + " hrs\n"
+                + "Net Salary: Rs " + payroll.getNetSalary() + "\n\n"
+                + "Your payslip is on the Cyond HR platform.\n\n"
+                + "Best regards,\nCyond HR Team";
 
+        try {
             notificationService.sendNotification(
                     employee.getId(),
                     subject,
                     message,
                     NotificationType.GENERAL,
-                    NotificationChannel.BOTH,
+                    NotificationChannel.EMAIL,
                     employee.getEmail(),
-                    employee.getPhone()
+                    null
             );
+            return null;
         } catch (Exception ex) {
             log.warn("Failed to send salary notification email to {}: {}", employee.getEmail(), ex.getMessage());
+            try {
+                notificationService.sendNotification(
+                        employee.getId(),
+                        subject,
+                        message,
+                        NotificationType.GENERAL,
+                        NotificationChannel.IN_APP,
+                        null,
+                        null
+                );
+            } catch (Exception ignored) {
+                log.warn("In-app salary notice also failed for {}", employee.getEmployeeCode());
+            }
+            return employee.getEmployeeCode() + ": " + ex.getMessage();
         }
     }
 

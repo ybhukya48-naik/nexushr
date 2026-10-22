@@ -916,6 +916,68 @@ tbody tr:hover td {
   align-items: end;
   gap: 12px;
   margin-bottom: 14px;
+  font-size: 14px;
+}
+
+.payroll-attendance-import span,
+.payroll-salary-import span {
+  display: block;
+  margin-top: 4px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.payroll-import-result {
+  grid-column: 1 / -1;
+}
+
+.payroll-import-result table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.payroll-import-result th,
+.payroll-import-result td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.employee-action-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.employee-action-card h3 {
+  margin: 4px 0 8px;
+  font-size: 16px;
+}
+
+.employee-action-card p {
+  min-height: 44px;
+  margin: 0 0 12px;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.hr-leave-panel {
+  margin-bottom: 18px;
+}
+
+.hr-leave-empty {
+  margin: 0;
+  color: #475569;
+  font-size: 14px;
+}
+
+.hr-leave-panel .employees-table {
+  font-size: 14px;
 }
 
 .payroll-attendance-summary {
@@ -6515,14 +6577,17 @@ textarea {
 
 @media (max-width: 1100px) {
   .employee-dashboard .dashboard-kpi-grid,
-  .employee-dashboard .detail-grid {
+  .employee-dashboard .detail-grid,
+  .employee-action-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 700px) {
   .employee-dashboard .dashboard-kpi-grid,
-  .employee-dashboard .detail-grid {
+  .employee-dashboard .detail-grid,
+  .employee-action-grid,
+  .payroll-attendance-import {
     grid-template-columns: 1fr;
   }
 }

@@ -121,6 +121,11 @@ public class NotificationService {
             notification.setRecipientEmail(null);
         }
 
+        if (notification.getChannel() == NotificationChannel.BOTH
+                && (employee.getPhone() == null || employee.getPhone().isBlank())) {
+            notification.setChannel(NotificationChannel.EMAIL);
+        }
+
         if (notification.getChannel() == NotificationChannel.SMS ||
                 notification.getChannel() == NotificationChannel.BOTH) {
 

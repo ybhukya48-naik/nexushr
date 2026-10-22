@@ -84,6 +84,7 @@ export default function Notifications() {
   const [sending, setSending] = useState(false);
   const [success, setSuccess] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+  const [employeeSearch, setEmployeeSearch] = useState("");
   const [selectedCompany, setSelectedCompany] = useState(
     () => getWorkspaceCompany() ?? "CYOND",
   );
@@ -97,8 +98,23 @@ export default function Notifications() {
   const canCreate = ["ADMIN", "HR", "MANAGER"].includes(role);
 
   const activeEmployees = useMemo(
-    () => employees.filter((item) => item.active !== false && isCompanyMatch(item.companyCode, selectedCompany)),
-    [employees, selectedCompany],
+    () => {
+      const query = employeeSearch.trim().toLowerCase();
+      return employees.filter((item) => {
+        if (item.active === false || !isCompanyMatch(item.companyCode, selectedCompany)) {
+          return false;
+        }
+        if (!query) {
+          return true;
+        }
+        return (
+          item.fullName.toLowerCase().includes(query) ||
+          item.employeeCode.toLowerCase().includes(query) ||
+          (item.email || "").toLowerCase().includes(query)
+        );
+      });
+    },
+    [employees, selectedCompany, employeeSearch],
   );
 
   const loadEmployeeNotifications = useCallback(
@@ -199,6 +215,12 @@ export default function Notifications() {
     setError("");
     setSuccess("");
 
+    if (value === "ALL") {
+      setEmployee(null);
+      setNotifications([]);
+      return;
+    }
+
     if (!value) {
       setNotifications([]);
       return;
@@ -235,16 +257,18 @@ export default function Notifications() {
   ) {
     event.preventDefault();
 
-    const selected = employees.find(
-      (item) => item.id === Number(selectedEmployeeId),
-    );
+    const recipients = selectedEmployeeId === "ALL"
+      ? activeEmployees
+      : employees.filter((item) => item.id === Number(selectedEmployeeId));
 
-    if (!selected) {
-      setError("Please select an employee.");
+    if (recipients.length === 0) {
+      setError("Please select an employee or choose Select all.");
       return;
     }
 
-    if (selected.active === false) {
+    const selected = recipients[0];
+
+    if (recipients.some((item) => item.active === false)) {
       setError("Notifications can only be sent to active employees.");
       return;
     }
@@ -259,22 +283,24 @@ export default function Notifications() {
       setError("");
       setSuccess("");
 
-      await sendNotification({
-        employeeId: selected.id,
-        title: title.trim(),
-        message: message.trim(),
-        notificationType,
-        channel,
-        recipientEmail:
-          channel === "EMAIL" || channel === "BOTH"
-            ? selected.email
-            : undefined,
-        recipientPhone:
-          channel === "SMS" || channel === "BOTH"
-            ? selected.phone
-            : undefined,
-        scheduledAt: scheduledAt || undefined,
-      });
+      for (const recipient of recipients) {
+        await sendNotification({
+          employeeId: recipient.id,
+          title: title.trim(),
+          message: message.trim(),
+          notificationType,
+          channel,
+          recipientEmail:
+            channel === "EMAIL" || channel === "BOTH"
+              ? recipient.email
+              : undefined,
+          recipientPhone:
+            channel === "SMS" || channel === "BOTH"
+              ? recipient.phone
+              : undefined,
+          scheduledAt: scheduledAt || undefined,
+        });
+      }
 
       // Immediately reload the selected employee's notifications so
       // the new notification appears without a manual page refresh.
@@ -282,9 +308,11 @@ export default function Notifications() {
       await loadEmployeeNotifications(selected.id);
 
       setSuccess(
-        isScheduled
-          ? `Notification scheduled successfully for ${selected.fullName}.`
-          : `Notification sent successfully to ${selected.fullName}.`,
+        recipients.length > 1
+          ? `Notification sent to ${recipients.length} employees.`
+          : isScheduled
+            ? `Notification scheduled successfully for ${selected.fullName}.`
+            : `Notification sent successfully to ${selected.fullName}.`,
       );
 
       setShowCreate(false);
@@ -441,6 +469,15 @@ export default function Notifications() {
             )}
 
             <label>
+              Search employee
+              <input
+                value={employeeSearch}
+                onChange={(event) => setEmployeeSearch(event.target.value)}
+                placeholder="Name, code, or email"
+              />
+            </label>
+
+            <label>
               Employee
               <select
                 value={selectedEmployeeId}
@@ -449,6 +486,7 @@ export default function Notifications() {
                 }
               >
                 <option value="">Select active employee</option>
+                <option value="ALL">Select all</option>
                 {activeEmployees.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.fullName} - {item.employeeCode}

@@ -266,6 +266,17 @@ public class PayrollController {
      * <p>POST /api/v1/payroll/import-excel
      * <p>Required role: HR, ADMIN, or MANAGER
      */
+    @GetMapping(value = "/sample-attendance", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER')")
+    public ResponseEntity<byte[]> sampleAttendance() {
+        byte[] workbook = attendanceService.sampleAttendanceWorkbook();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"nexushr-sample-attendance.xlsx\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(workbook);
+    }
+
     @PostMapping(value = "/import-excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER')")
     public ResponseEntity<Map<String, Object>> importExcel(
@@ -303,6 +314,7 @@ public class PayrollController {
             }
 
             List<PayrollRecord> imported = excelPayrollService.importPayroll(tempPath, payMonth);
+            ExcelPayrollService.SalaryEmailReport emails = excelPayrollService.lastEmailReport();
             List<Map<String, Object>> employees = new ArrayList<>();
             for (PayrollRecord record : imported) {
                 Employee employee = record.getEmployee();
@@ -318,7 +330,14 @@ public class PayrollController {
             body.put("payMonth", payMonth);
             body.put("imported", imported.size());
             body.put("employees", employees);
-            body.put("message", "Salary data imported and email notifications dispatched for " + imported.size() + " employee(s).");
+            body.put("emailsSent", emails.sent());
+            body.put("emailsFailed", emails.failed());
+            body.put("emailErrors", emails.errors());
+            String emailNote = emails.failed() == 0
+                    ? "Email sent to " + emails.sent() + " employee(s)."
+                    : "Email sent to " + emails.sent() + " and failed for " + emails.failed()
+                    + ". " + String.join("; ", emails.errors());
+            body.put("message", "Salary imported for " + imported.size() + " employee(s). " + emailNote);
             return ResponseEntity.ok(body);
         } catch (IllegalStateException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());

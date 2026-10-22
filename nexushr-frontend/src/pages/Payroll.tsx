@@ -14,6 +14,7 @@ import {
   importPayrollExcel,
   getPayslip,
   downloadPayslipPdf,
+  downloadSampleAttendance,
   emailPayslip,
   markPayrollPaid,
   type AttendanceImportResponse,
@@ -526,6 +527,35 @@ export default function Payroll() {
           </div>
         </div>
 
+          <div className="payroll-attendance-import">
+            <div>
+              <strong>Sample employee sheet</strong>
+              <span>
+                Download fake attendance rows. A full day is 9:00 to 18:00. Importing it splits each employee's monthly salary by the hours in the sheet.
+              </span>
+            </div>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => {
+                void downloadSampleAttendance().then((file) => {
+                  const url = window.URL.createObjectURL(file);
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.download = "nexushr-sample-attendance.xlsx";
+                  document.body.appendChild(link);
+                  link.click();
+                  link.remove();
+                  window.URL.revokeObjectURL(url);
+                }).catch((err) => {
+                  setError(err instanceof Error ? err.message : "Unable to download the sample sheet.");
+                });
+              }}
+            >
+              Download sample Excel
+            </button>
+          </div>
+
           <form
             className="payroll-attendance-import"
             onSubmit={handleAttendanceImport}
@@ -570,20 +600,17 @@ export default function Payroll() {
 
           {/* ── Salary Excel Import ── */}
           <form
-            className="payroll-attendance-import"
-            style={{ marginTop: "1rem", borderTop: "1px solid var(--border-color, #e2e8f0)", paddingTop: "1.25rem" }}
+            className="payroll-attendance-import payroll-salary-import"
             onSubmit={handleSalaryExcelImport}
           >
-            <label style={{ fontWeight: 600, color: "var(--accent, #6366f1)" }}>
-              📊 Import Salary Excel (multi-sheet workbook)
-              <span style={{ display: "block", fontSize: "0.78rem", fontWeight: 400, color: "#64748b", marginTop: "0.2rem" }}>
-                Upload the provided salary Excel (e.g. GGEA-CYOND-SALARIES-2026.xlsx).<br />
-                Backend auto-calculates earned salary from working hours, syncs attendance, and emails employees.
+            <label>
+              Import salary Excel
+              <span>
+                Upload the salary workbook. Pay follows working hours, then the email button sends each employee their salary notice.
               </span>
               <input
                 type="file"
                 accept=".xlsx,.xls"
-                style={{ marginTop: "0.5rem" }}
                 onChange={(event) =>
                   setSalaryFile(event.target.files?.[0] ?? null)
                 }
@@ -594,19 +621,19 @@ export default function Payroll() {
               type="submit"
               className="primary-button"
               disabled={importingSalary}
-              style={{ marginTop: "0.75rem" }}
             >
               {importingSalary
-                ? "Importing & Emailing..."
-                : "📥 Import Salary & Send Email Notifications"}
+                ? "Importing and emailing..."
+                : "Import salary and send email"}
             </button>
 
             {salaryImportResult && (
-              <div className="payroll-attendance-summary" style={{ marginTop: "0.75rem" }}>
-                <strong>Salary Import Result ({salaryImportResult.payMonth})</strong>
-                <span>✅ {salaryImportResult.imported} employee salary record(s) created/updated.</span>
-                <span style={{ fontSize: "0.82rem", color: "#475569" }}>
-                  Email notifications dispatched. Attendance worked-hours updated.
+              <div className="payroll-attendance-summary payroll-import-result">
+                <strong>Salary import ({salaryImportResult.payMonth})</strong>
+                <span>{salaryImportResult.imported} salary record(s) saved.</span>
+                <span>
+                  {salaryImportResult.message
+                    || `Email sent: ${salaryImportResult.emailsSent ?? 0}. Failed: ${salaryImportResult.emailsFailed ?? 0}.`}
                 </span>
                 {salaryImportResult.employees && salaryImportResult.employees.length > 0 && (
                   <table>
@@ -1022,14 +1049,16 @@ export default function Payroll() {
                 Download PDF
               </button>
 
-              <button
-                type="button"
-                className="table-action"
-                onClick={() => void handleEmailPayslip()}
-                disabled={emailingPayslip}
-              >
-                {emailingPayslip ? "Emailing..." : "Email Payslip"}
-              </button>
+              {isManagementRole && (
+                <button
+                  type="button"
+                  className="table-action"
+                  onClick={() => void handleEmailPayslip()}
+                  disabled={emailingPayslip}
+                >
+                  {emailingPayslip ? "Emailing..." : "Email Payslip"}
+                </button>
+              )}
 
               <button
                 type="button"

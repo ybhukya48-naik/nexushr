@@ -203,7 +203,9 @@ export default function Leave() {
           <p className="eyebrow">WORKFORCE OPERATIONS - F03</p>
           <h2>Leave Management</h2>
           <p>
-            Request time off, track your balance and manage approvals.
+            {isEmployee
+              ? "Submit a leave request and follow its status."
+              : "Employee leave requests appear here. HR can review them and does not submit leave."}
           </p>
         </div>
 
@@ -233,7 +235,7 @@ export default function Leave() {
         )}
       </div>
 
-      <section className="panel leave-request-panel">
+      {isEmployee && <section className="panel leave-request-panel">
         <div className="panel-header">
           <div>
             <p className="eyebrow">TIME OFF</p>

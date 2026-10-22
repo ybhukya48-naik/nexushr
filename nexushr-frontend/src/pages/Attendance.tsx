@@ -292,6 +292,7 @@ export default function Attendance() {
   // Management users must explicitly select an employee before using
   // Check In / Check Out. "All employees" remains a view-only filter.
   const isManagementRole = ["ADMIN", "HR", "MANAGER"].includes(currentRole);
+  const canPunch = currentRole === "EMPLOYEE";
 
   const companyEmployees = employees.filter(
     (employee) =>
@@ -693,12 +694,13 @@ export default function Attendance() {
           <p className="eyebrow">WORKFORCE OPERATIONS</p>
           <h2>Attendance</h2>
           <p>
-            Monitor daily attendance, working hours, late arrivals and
-            overtime across your workforce.
+            {canPunch
+              ? "Check in and check out for today. A full day is 9 hours. If you take a break, check out and check in again. Work time continues from the earlier session, and the gap is break time."
+              : "View only. Date, check-in, check-out and working hours. Employees submit their own punches. A full day is 9 hours."}
           </p>
         </div>
 
-        <div className="attendance-actions">
+        {canPunch && <div className="attendance-actions">
           <button
             className="secondary-button"
             onClick={() =>
