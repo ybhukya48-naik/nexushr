@@ -700,7 +700,8 @@ export default function Attendance() {
           </p>
         </div>
 
-        {canPunch && <div className="attendance-actions">
+        {canPunch && (
+        <div className="attendance-actions">
           <button
             className="secondary-button"
             onClick={() =>
@@ -769,6 +770,7 @@ export default function Attendance() {
                   : "Check Out"}
           </button>
         </div>
+        )}
       </div>
 
       <section className="panel attendance-toolbar-panel">

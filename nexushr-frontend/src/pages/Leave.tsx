@@ -235,7 +235,8 @@ export default function Leave() {
         )}
       </div>
 
-      {isEmployee && <section className="panel leave-request-panel">
+      {isEmployee && (
+      <section className="panel leave-request-panel">
         <div className="panel-header">
           <div>
             <p className="eyebrow">TIME OFF</p>
@@ -337,6 +338,7 @@ export default function Leave() {
           </div>
         </form>
       </section>
+      )}
 
       {balance && (
         <section className="panel">
