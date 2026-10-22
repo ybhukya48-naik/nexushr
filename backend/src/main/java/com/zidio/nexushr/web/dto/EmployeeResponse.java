@@ -22,7 +22,9 @@ public record EmployeeResponse(
         boolean active,
         EmployeeLifecycleStatus lifecycleStatus,
         String companyCode,
-        String companyName
+        String companyName,
+        boolean siteVisitor,
+        Long reportingManagerId
 ) {
 
     public static EmployeeResponse from(Employee employee) {
@@ -41,7 +43,9 @@ public record EmployeeResponse(
                 employee.isActive(),
                 employee.getLifecycleStatus(),
                 employee.getCompany() == null ? null : employee.getCompany().getCode(),
-                employee.getCompany() == null ? null : employee.getCompany().getName()
+                employee.getCompany() == null ? null : employee.getCompany().getName(),
+                employee.isSiteVisitor(),
+                employee.getReportingManagerId()
         );
     }
 }

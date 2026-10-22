@@ -78,6 +78,7 @@ public class AuthorizationService {
                 .stream()
                 .anyMatch(authority ->
                         authority.getAuthority().equals("ROLE_ADMIN")
+                        || authority.getAuthority().equals("ROLE_SUPER_ADMIN")
                         || authority.getAuthority().equals("ROLE_HR")
                         || authority.getAuthority().equals("ROLE_MANAGER"));
     }

@@ -27,12 +27,13 @@ class HoursPayPolicyTest {
     }
 
     @Test
-    void oneCasualLeaveIsNotDeducted() {
-        int expected = 10 * HoursPayPolicy.DAY_MINUTES;
-        int worked = expected - HoursPayPolicy.DAY_MINUTES;
+    void casualAndPaidLeaveAreNotDeducted() {
+        int day = HoursPayPolicy.PAID_WORK_MINUTES;
+        int expected = 10 * day;
+        int worked = expected - 2 * day;
         assertEquals(0, HoursPayPolicy.deductibleShortfall(expected, worked));
         assertEquals(
-                2 * HoursPayPolicy.DAY_MINUTES,
-                HoursPayPolicy.deductibleShortfall(expected, expected - 3 * HoursPayPolicy.DAY_MINUTES));
+                day,
+                HoursPayPolicy.deductibleShortfall(expected, expected - 3 * day));
     }
 }

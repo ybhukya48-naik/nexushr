@@ -21,6 +21,13 @@ export interface AttendanceRecord {
   closedWorkMinutes?: number;
   breakMinutes?: number;
   attendanceStatus?: string | null;
+  lateWarning?: boolean;
+  yellowFlag?: boolean;
+  redFlag?: boolean;
+  blueFlag?: boolean;
+  deductedMinutes?: number;
+  penaltyNote?: string | null;
+  selfieCaptured?: boolean;
 }
 
 export interface AttendanceMetrics {
@@ -129,6 +136,61 @@ export async function checkOut(employeeId?: number) {
   return attendanceRequest<AttendanceRecord>(endpoint, {
     method: "POST",
   });
+}
+
+async function postSiteSelfie(path: string, selfie: File, failure: string) {
+  const token = localStorage.getItem("nexushr_token");
+  const body = new FormData();
+  body.append("selfie", selfie);
+  const headers = new Headers();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers,
+    body,
+  });
+  if (!response.ok) {
+    let message = failure;
+    try {
+      const errorBody = await response.json();
+      message = errorBody?.message || errorBody?.detail || message;
+    } catch {
+      message = `${failure}: ${response.status}`;
+    }
+    throw new Error(message);
+  }
+  return response.json() as Promise<AttendanceRecord>;
+}
+
+export async function siteCheckIn(selfie: File) {
+  return postSiteSelfie("/attendance/site-check-in", selfie, "Site check-in failed");
+}
+
+export async function siteCheckOut(selfie: File) {
+  return postSiteSelfie("/attendance/site-check-out", selfie, "Site check-out failed");
+}
+
+export async function sendAttendanceHeartbeat() {
+  return attendanceRequest<{ status: string }>("/attendance/heartbeat", {
+    method: "POST",
+  });
+}
+
+export interface AttendanceAuditEntry {
+  id: number;
+  employeeId: number;
+  actorName: string;
+  action: string;
+  detail: string;
+  attendanceDate?: string;
+  createdAt: string;
+}
+
+export async function getAttendanceAudit(employeeId?: number) {
+  const query = employeeId == null ? "" : `?employeeId=${encodeURIComponent(String(employeeId))}`;
+  return attendanceRequest<AttendanceAuditEntry[]>(`/attendance/audit${query}`);
 }
 
 export async function biometricCheckIn() {
@@ -262,6 +324,9 @@ export default function Attendance() {
   const [loading, setLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const [attendanceLoaded, setAttendanceLoaded] = useState(false);
+  const [selfie, setSelfie] = useState<File | null>(null);
+  const [history, setHistory] = useState<AttendanceRecord[]>([]);
+  const [audit, setAudit] = useState<AttendanceAuditEntry[]>([]);
   const currentUsername = (
     localStorage.getItem("nexushr_user") ?? ""
   ).trim().toLowerCase();
@@ -291,8 +356,21 @@ export default function Attendance() {
 
   // Management users must explicitly select an employee before using
   // Check In / Check Out. "All employees" remains a view-only filter.
-  const isManagementRole = ["ADMIN", "HR", "MANAGER"].includes(currentRole);
+  const isManagementRole = ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"].includes(currentRole);
   const canPunch = currentRole === "EMPLOYEE";
+  const siteVisitor = Boolean(currentEmployee?.siteVisitor);
+  const historyEmployeeId = selectedEmployee || (currentEmployee ? String(currentEmployee.id) : "");
+
+  useEffect(() => {
+    if (!historyEmployeeId) {
+      setHistory([]);
+      setAudit([]);
+      return;
+    }
+    const id = Number(historyEmployeeId);
+    void getEmployeeAttendance(id).then(setHistory).catch(() => setHistory([]));
+    void getAttendanceAudit(id).then(setAudit).catch(() => setAudit([]));
+  }, [historyEmployeeId, message]);
 
   const companyEmployees = employees.filter(
     (employee) =>
@@ -568,6 +646,7 @@ export default function Attendance() {
         return [saved, ...rest];
       });
       setMessage(`${success.replace(/\.$/, "")} at ${exactTime}.`);
+      setSelfie(null);
       await load({ keepMessage: true });
     } catch (err) {
       console.error(err);
@@ -695,20 +774,33 @@ export default function Attendance() {
           <h2>Attendance</h2>
           <p>
             {canPunch
-              ? "Check in and check out for today. A full day is 9 hours. If you take a break, check out and check in again. Work time continues from the earlier session, and the gap is break time."
-              : "View only. Date, check-in, check-out and working hours. Employees submit their own punches. A full day is 9 hours."}
+              ? "Check in once. A second check-in is blocked until you check out. Lunch is 1:00–1:45: check out, then check in again and work hours resume. A day is 8 working hours. Signing out of NexusHR does not delete attendance. If you are still checked in at 11:00 PM, logout happens automatically and the record is kept. Site staff use the phone app at /site."
+              : "View only. Date, check-in, check-out, flags, and working hours. Employees submit their own punches. A day is 8 working hours plus lunch from 1:00 to 1:45."}
           </p>
         </div>
 
         {canPunch && (
         <div className="attendance-actions">
+          {siteVisitor && (
+            <label className="secondary-button">
+              Site selfie
+              <input
+                type="file"
+                accept="image/*"
+                capture="user"
+                style={{ display: "block", marginTop: 8 }}
+                onChange={(event) => setSelfie(event.target.files?.[0] ?? null)}
+              />
+            </label>
+          )}
           <button
             className="secondary-button"
             onClick={() =>
               void runAction(
-                () => checkIn(actionEmployee?.id),
+                () => siteVisitor
+                  ? siteCheckIn(selfie as File)
+                  : checkIn(actionEmployee?.id),
                 "Check-in completed successfully.",
-
               )
             }
             disabled={
@@ -716,15 +808,16 @@ export default function Attendance() {
               !attendanceLoaded ||
               !isToday ||
               !actionEmployee ||
-              sessionOpen
+              sessionOpen ||
+              (siteVisitor && !selfie)
             }
             title={
-              !isToday
-                ? "Check-in is available only for today."
-                : sessionOpen
-                  ? "Check out before starting again. The gap is break time."
+              sessionOpen
+                ? "Already checked in. Check out before checking in again."
+                : siteVisitor && !selfie
+                  ? "Site visitors add a selfie, then check in."
                   : canResume
-                    ? "Check in again. Work time resumes and the gap counts as break."
+                    ? "Check in again. Work time resumes and the lunch gap is break time."
                     : undefined
             }
           >
@@ -741,7 +834,9 @@ export default function Attendance() {
             className="primary-button"
             onClick={() =>
               void runAction(
-                () => checkOut(actionEmployee?.id),
+                () => siteVisitor
+                  ? siteCheckOut(selfie as File)
+                  : checkOut(actionEmployee?.id),
                 "Check-out completed successfully.",
 
               )
@@ -751,14 +846,17 @@ export default function Attendance() {
               !attendanceLoaded ||
               !isToday ||
               !actionEmployee ||
-              !sessionOpen
+              !sessionOpen ||
+              (siteVisitor && !selfie)
             }
             title={
               !isToday
                 ? "Check-out is available only for today."
                 : !sessionOpen
                   ? "Check in before checking out."
-                  : undefined
+                  : siteVisitor && !selfie
+                    ? "Site visitors take a selfie, then check out."
+                    : undefined
             }
           >
             {loading
@@ -940,6 +1038,11 @@ export default function Attendance() {
           {record?.attendanceStatus === "INACTIVE" && (
             <span className="attendance-inactive">Inactive</span>
           )}
+          {record?.lateWarning && <span className="attendance-inactive">Late</span>}
+          {record?.yellowFlag && <span className="attendance-inactive">Yellow</span>}
+          {record?.redFlag && <span className="attendance-inactive">Red</span>}
+          {record?.blueFlag && <span className="attendance-inactive">Blue</span>}
+          {record?.selfieCaptured && <span className="attendance-inactive">Selfie</span>}
         </div>
       </td>
 
@@ -1033,6 +1136,93 @@ export default function Attendance() {
           </table>
         </div>
       </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">HISTORY</p>
+            <h3>Employee attendance history</h3>
+            <p>Past punches stay after logout. Work hours resume after lunch check-out and check-in.</p>
+          </div>
+        </div>
+        <div className="employees-table-wrap">
+          <table className="employees-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Check in</th>
+                <th>Check out</th>
+                <th>Work minutes</th>
+                <th>Flags</th>
+                <th>Deduction</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((row) => (
+                <tr key={row.id}>
+                  <td>{formatDate(row.attendanceDate)}</td>
+                  <td>{formatTime(row.checkInTime)}</td>
+                  <td>{formatTime(row.checkOutTime)}</td>
+                  <td>{row.workMinutes}</td>
+                  <td>
+                    {[
+                      row.lateWarning ? "Late" : "",
+                      row.yellowFlag ? "Yellow" : "",
+                      row.redFlag ? "Red" : "",
+                      row.blueFlag ? "Blue" : "",
+                    ].filter(Boolean).join(", ") || "-"}
+                  </td>
+                  <td>{row.deductedMinutes ? `${row.deductedMinutes} min` : "-"}</td>
+                </tr>
+              ))}
+              {history.length === 0 && (
+                <tr>
+                  <td colSpan={6}>No attendance history for this employee yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {isManagementRole && (
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">HR AUDIT</p>
+              <h3>Who changed attendance</h3>
+              <p>Check-in, check-out, and flags are recorded with the person who made the change.</p>
+            </div>
+          </div>
+          <div className="employees-table-wrap">
+            <table className="employees-table">
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Who</th>
+                  <th>Action</th>
+                  <th>Detail</th>
+                </tr>
+              </thead>
+              <tbody>
+                {audit.map((entry) => (
+                  <tr key={entry.id}>
+                    <td>{formatTime(entry.createdAt)}</td>
+                    <td>{entry.actorName}</td>
+                    <td>{entry.action}</td>
+                    <td>{entry.detail}</td>
+                  </tr>
+                ))}
+                {audit.length === 0 && (
+                  <tr>
+                    <td colSpan={4}>No attendance changes recorded yet.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </>
   );
 }

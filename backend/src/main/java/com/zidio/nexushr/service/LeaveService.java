@@ -276,10 +276,16 @@ public class LeaveService {
                         + request.getEndDate()
                         + " is pending approval.";
 
-        List<Employee> managers =
-                employeeRepository.findByRoleTypeAndActiveTrue(
-                        RoleType.MANAGER
-                );
+        List<Employee> managers = new java.util.ArrayList<>();
+        Long managerId = request.getEmployee().getReportingManagerId();
+        if (managerId != null) {
+            employeeRepository.findById(managerId)
+                    .filter(Employee::isActive)
+                    .ifPresent(managers::add);
+        }
+        if (managers.isEmpty()) {
+            managers.addAll(employeeRepository.findByRoleTypeAndActiveTrue(RoleType.MANAGER));
+        }
 
         for (Employee manager : managers) {
             notificationService.sendNotification(

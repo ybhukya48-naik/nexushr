@@ -7,13 +7,16 @@ import com.zidio.nexushr.domain.PayrollRecord;
 import com.zidio.nexushr.domain.PayrollStatus;
 import com.zidio.nexushr.domain.NotificationChannel;
 import com.zidio.nexushr.domain.NotificationType;
+import com.zidio.nexushr.domain.CompanyHoliday;
 import com.zidio.nexushr.repository.AttendanceRepository;
+import com.zidio.nexushr.repository.CompanyHolidayRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.service.NotificationService;
 import com.zidio.nexushr.repository.PayrollRepository;
 import com.zidio.nexushr.web.dto.PayrollAutoComponentsResponse;
 import com.zidio.nexushr.web.dto.PayrollRequest;
 import com.zidio.nexushr.web.dto.PayslipResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -27,6 +30,8 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -38,6 +43,9 @@ public class PayrollService {
     private final EmployeeRepository employeeRepository;
         private final AttendanceRepository attendanceRepository;
     private final NotificationService notificationService;
+
+    @Autowired(required = false)
+    private CompanyHolidayRepository companyHolidayRepository;
 
     @Value("${app.payroll.tax-rate:0.10}")
     private BigDecimal taxRate;
@@ -444,8 +452,17 @@ public class PayrollService {
 
         boolean gorle = HoursPayPolicy.gorle(
                 employee.getCompany() == null ? null : employee.getCompany().getCode());
-        int businessDays = HoursPayPolicy.expectedMinutes(effectiveStart, endDate, gorle) / HoursPayPolicy.DAY_MINUTES;
-        int expectedWorkMinutes = businessDays * HoursPayPolicy.DAY_MINUTES;
+        String companyCode = employee.getCompany() == null ? "" : employee.getCompany().getCode();
+        int businessDays = HoursPayPolicy.expectedMinutes(
+                effectiveStart,
+                endDate,
+                gorle,
+                holidayDates(effectiveStart, endDate, companyCode)) / HoursPayPolicy.DAY_MINUTES;
+        int expectedWorkMinutes = HoursPayPolicy.expectedPaidMinutes(
+                effectiveStart,
+                endDate,
+                gorle,
+                holidayDates(effectiveStart, endDate, companyCode));
 
         List<AttendanceRecord> records = attendanceRepository
                 .findByEmployee_IdAndAttendanceDateBetween(
@@ -459,6 +476,12 @@ public class PayrollService {
                 .filter(java.util.Objects::nonNull)
                 .mapToInt(Integer::intValue)
                 .sum();
+        int deductedMinutes = records.stream()
+                .map(AttendanceRecord::getDeductedMinutes)
+                .filter(java.util.Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
+        workedMinutes = Math.max(0, workedMinutes - deductedMinutes);
 
         int overtimeMinutes = records.stream()
                 .map(AttendanceRecord::getOvertimeMinutes)
@@ -530,6 +553,21 @@ public class PayrollService {
         }
 
         return businessDays;
+    }
+
+    private Set<LocalDate> holidayDates(LocalDate start, LocalDate end, String companyCode) {
+        if (companyHolidayRepository == null) {
+            return Set.of();
+        }
+        return companyHolidayRepository.findByHolidayDateBetween(start, end).stream()
+                .filter(holiday -> appliesToCompany(holiday, companyCode))
+                .map(CompanyHoliday::getHolidayDate)
+                .collect(Collectors.toSet());
+    }
+
+    private static boolean appliesToCompany(CompanyHoliday holiday, String companyCode) {
+        String code = holiday.getCompanyCode();
+        return code == null || code.isBlank() || code.equalsIgnoreCase(companyCode);
     }
 }
 

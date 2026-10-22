@@ -1,0 +1,108 @@
+.site-app {
+  min-height: 100vh;
+  background: #0f2744;
+  color: #f4f7fb;
+  display: flex;
+  justify-content: center;
+  padding: 24px 16px 40px;
+}
+
+.site-card {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.site-card h1 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.site-card p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.site-card form,
+.site-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.site-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #f4f7fb;
+  font-size: 0.92rem;
+}
+
+.site-card input[type="text"],
+.site-card input[type="password"] {
+  min-height: 48px;
+  border-radius: 12px;
+  border: 0;
+  padding: 0 14px;
+  font-size: 1rem;
+}
+
+.site-photo {
+  min-height: 52px;
+  border-radius: 12px;
+  background: #17375f;
+  color: #f4f7fb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  text-align: center;
+}
+
+.site-card button {
+  min-height: 56px;
+  border: 0;
+  border-radius: 14px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.site-card button:disabled {
+  opacity: 0.55;
+}
+
+.site-primary {
+  background: #f2b544;
+  color: #1b2430;
+}
+
+.site-secondary {
+  background: #e8eef6;
+  color: #10233d;
+}
+
+.site-quiet {
+  background: transparent;
+  color: #d5e2f2;
+  min-height: 44px;
+}
+
+.site-preview {
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: 16px;
+}
+
+.site-error {
+  background: #7a2430;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.site-ok {
+  background: #1d6b45;
+  border-radius: 12px;
+  padding: 12px;
+}

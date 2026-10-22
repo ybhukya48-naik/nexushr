@@ -22,6 +22,7 @@ import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
@@ -39,7 +40,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Duration;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -80,8 +80,14 @@ public class AttendanceService {
     @Value("${app.attendance.standard-daily-minutes:540}")
     private int standardDailyMinutes = 540;
 
-    @Value("${app.attendance.workday-start:09:00}")
-    private String workdayStart = "09:00";
+    @Value("${app.attendance.workday-start:09:30}")
+    private String workdayStart = "09:30";
+
+    @Autowired(required = false)
+    private AttendancePolicyService attendancePolicyService;
+
+    @Autowired(required = false)
+    private CompanyHolidayCalendar companyHolidayCalendar;
 
     public AttendanceService(
             AttendanceRepository attendanceRepository,
@@ -146,7 +152,7 @@ public class AttendanceService {
 
             validateCheckTimes(checkIn, checkOut);
 
-            int workMinutes = calculateWorkMinutes(checkIn, checkOut);
+            int workMinutes = AttendanceRules.workedMinutes(checkIn, checkOut);
 
             attendanceRecord.setWorkMinutes(workMinutes);
             attendanceRecord.setOvertimeMinutes(
@@ -157,14 +163,18 @@ public class AttendanceService {
             attendanceRecord.setOvertimeMinutes(0);
         }
 
-        attendanceRecord.setLateArrivalMinutes(
-                calculateLateArrivalMinutes(checkIn)
-        );
+        int lateMinutes = calculateLateArrivalMinutes(checkIn);
+        attendanceRecord.setLateArrivalMinutes(lateMinutes);
+        attendanceRecord.setLateWarning(lateMinutes > 0);
 
         return attendanceRepository.save(attendanceRecord);
     }
 
     public AttendanceRecord checkIn(Long employeeId) {
+        return checkIn(employeeId, employeeId, false);
+    }
+
+    public AttendanceRecord checkIn(Long employeeId, Long actorId, boolean selfieAttached) {
 
         Employee employee = getActiveEmployee(employeeId);
 
@@ -175,30 +185,52 @@ public class AttendanceService {
                 .findByEmployee_IdAndAttendanceDate(employeeId, today)
                 .orElseGet(AttendanceRecord::new);
 
+        if (selfieAttached && !employee.isSiteVisitor()) {
+            throw badRequest("Selfie check-in is only for site staff");
+        }
+        if (employee.isSiteVisitor() && !selfieAttached) {
+            throw badRequest("Site visitors must check in with a selfie photo");
+        }
+
         AttendanceDay day = dayFrom(record);
         try {
             day.checkIn(now);
         } catch (IllegalStateException ex) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Employee is already checked in"
+                    "Already checked in. Check out before checking in again."
             );
         }
 
         record.setEmployee(employee);
         record.setAttendanceDate(today);
         applyDay(record, day);
-        if (record.getLateArrivalMinutes() == null || record.getLateArrivalMinutes() == 0) {
-            record.setLateArrivalMinutes(calculateLateArrivalMinutes(record.getCheckInTime()));
-        }
+        record.setLateArrivalMinutes(calculateLateArrivalMinutes(record.getCheckInTime()));
         record.setOvertimeMinutes(calculateOvertimeMinutes(day.closedWorkMinutes()));
+        if (selfieAttached) {
+            record.setSelfieCaptured(true);
+        }
+        if (attendancePolicyService != null) {
+            attendancePolicyService.onCheckIn(record, actor(actorId, employee), selfieAttached);
+        }
 
         return attendanceRepository.save(record);
     }
 
     public AttendanceRecord checkOut(Long employeeId) {
+        return checkOut(employeeId, employeeId);
+    }
 
-        getActiveEmployee(employeeId);
+    public AttendanceRecord checkOut(Long employeeId, Long actorId) {
+        return checkOut(employeeId, actorId, false);
+    }
+
+    public AttendanceRecord checkOut(Long employeeId, Long actorId, boolean selfieAttached) {
+
+        Employee employee = getActiveEmployee(employeeId);
+        if (employee.isSiteVisitor() && !selfieAttached) {
+            throw badRequest("Site visitors must check out with a selfie photo");
+        }
 
         LocalDate today = LocalDate.now(COMPANY_ZONE);
 
@@ -225,7 +257,11 @@ public class AttendanceService {
         }
 
         applyDay(record, day);
-        record.setOvertimeMinutes(calculateOvertimeMinutes(day.closedWorkMinutes()));
+        if (attendancePolicyService != null) {
+            attendancePolicyService.onCheckOut(record, actor(actorId, employee));
+        }
+        record.setOvertimeMinutes(calculateOvertimeMinutes(
+                record.getClosedWorkMinutes() == null ? 0 : record.getClosedWorkMinutes()));
 
         if (record.getLateArrivalMinutes() == null) {
             record.setLateArrivalMinutes(
@@ -234,6 +270,13 @@ public class AttendanceService {
         }
 
         return attendanceRepository.save(record);
+    }
+
+    private Employee actor(Long actorId, Employee fallback) {
+        if (actorId == null || fallback.getId() != null && actorId.equals(fallback.getId())) {
+            return fallback;
+        }
+        return employeeRepository.findById(actorId).orElse(fallback);
     }
 
     public java.util.Map<String, Object> myStatus(Long employeeId) {
@@ -259,7 +302,56 @@ public class AttendanceService {
         body.put("checkedIn", record != null && record.getCheckInTime() != null);
         body.put("checkedOut", record != null && record.getCheckOutTime() != null);
         body.put("message", message);
+        body.put("blueFlag", record != null && Boolean.TRUE.equals(record.getBlueFlag()));
+        body.put("yellowFlag", record != null && Boolean.TRUE.equals(record.getYellowFlag()));
+        body.put("redFlag", record != null && Boolean.TRUE.equals(record.getRedFlag()));
+        body.put("lateWarning", record != null && Boolean.TRUE.equals(record.getLateWarning()));
         return body;
+    }
+
+    public AttendanceRecord heartbeat(Long employeeId) {
+        if (attendancePolicyService == null) {
+            return null;
+        }
+        return attendancePolicyService.heartbeat(employeeId);
+    }
+
+    @Transactional
+    public AttendanceRecord siteCheckIn(Long employeeId, String contentType, byte[] bytes) {
+        AttendanceRecord record = checkIn(employeeId, employeeId, true);
+        saveSelfie(employeeId, LocalDate.now(COMPANY_ZONE), contentType, bytes, "CHECK_IN");
+        record.setSelfieCaptured(true);
+        return attendanceRepository.save(record);
+    }
+
+    @Transactional
+    public AttendanceRecord siteCheckOut(Long employeeId, String contentType, byte[] bytes) {
+        AttendanceRecord record = checkOut(employeeId, employeeId, true);
+        saveSelfie(employeeId, LocalDate.now(COMPANY_ZONE), contentType, bytes, "CHECK_OUT");
+        record.setSelfieCaptured(true);
+        return attendanceRepository.save(record);
+    }
+
+    public void saveSelfie(Long employeeId, LocalDate date, String contentType, byte[] bytes) {
+        saveSelfie(employeeId, date, contentType, bytes, "CHECK_IN");
+    }
+
+    public void saveSelfie(Long employeeId, LocalDate date, String contentType, byte[] bytes, String punchType) {
+        if (attendancePolicyService == null) {
+            return;
+        }
+        AttendanceRecord saved = attendancePolicyService.saveSelfie(employeeId, date, contentType, bytes, punchType);
+        if (saved != null) {
+            saved.setSelfieCaptured(true);
+            attendanceRepository.save(saved);
+        }
+    }
+
+    public java.util.List<com.zidio.nexushr.domain.AttendanceAuditLog> auditTrail(Long employeeId) {
+        if (attendancePolicyService == null) {
+            return java.util.List.of();
+        }
+        return attendancePolicyService.auditTrail(employeeId);
     }
 
     private AttendanceDay dayFrom(AttendanceRecord record) {
@@ -525,13 +617,15 @@ public class AttendanceService {
 
                         int workMinutes = checkOut == null
                                 ? 0
-                                : calculateWorkMinutes(checkIn, checkOut);
+                                : AttendanceRules.workedMinutes(checkIn, checkOut);
 
                         record.setWorkMinutes(workMinutes);
                         record.setClosedWorkMinutes(workMinutes);
-                        record.setBreakMinutes(0);
+                        record.setBreakMinutes(AttendanceRules.lunchOverlapMinutes(checkIn, checkOut));
                         record.setAttendanceStatus(checkOut == null ? "OPEN" : "CLOSED");
-                        record.setLateArrivalMinutes(calculateLateArrivalMinutes(checkIn));
+                        int lateMinutes = calculateLateArrivalMinutes(checkIn);
+                        record.setLateArrivalMinutes(lateMinutes);
+                        record.setLateWarning(lateMinutes > 0);
                         record.setOvertimeMinutes(calculateOvertimeMinutes(workMinutes));
 
                         recordsToSave.add(record);
@@ -644,12 +738,14 @@ public class AttendanceService {
                 record.setAttendanceDate(parsed.date());
                 record.setCheckInTime(parsed.checkIn());
                 record.setCheckOutTime(parsed.checkOut());
-                int workMinutes = calculateWorkMinutes(parsed.checkIn(), parsed.checkOut());
+                int workMinutes = AttendanceRules.workedMinutes(parsed.checkIn(), parsed.checkOut());
                 record.setWorkMinutes(workMinutes);
                 record.setClosedWorkMinutes(workMinutes);
-                record.setBreakMinutes(0);
+                record.setBreakMinutes(AttendanceRules.lunchOverlapMinutes(parsed.checkIn(), parsed.checkOut()));
+                int lateMinutes = calculateLateArrivalMinutes(parsed.checkIn());
+                record.setLateArrivalMinutes(lateMinutes);
+                record.setLateWarning(lateMinutes > 0);
                 record.setAttendanceStatus("CLOSED");
-                record.setLateArrivalMinutes(calculateLateArrivalMinutes(parsed.checkIn()));
                 record.setOvertimeMinutes(calculateOvertimeMinutes(workMinutes));
                 attendanceRepository.save(record);
                 affected.add(employee);
@@ -751,6 +847,9 @@ public class AttendanceService {
         LocalDate startDate = month.atDay(1);
         LocalDate endDate = month.atEndOfMonth();
 
+        List<com.zidio.nexushr.domain.CompanyHoliday> holidayRows = companyHolidayCalendar == null
+                ? List.of()
+                : companyHolidayCalendar.between(startDate, endDate);
         List<AttendanceRecord> allMonthAttendance = attendanceRepository.findByAttendanceDateBetween(startDate, endDate);
         Map<Long, List<AttendanceRecord>> attendanceByEmployee = allMonthAttendance.stream()
                 .filter(r -> r.getEmployee() != null && r.getEmployee().getId() != null)
@@ -772,9 +871,13 @@ public class AttendanceService {
                     ? employee.getJoiningDate()
                     : startDate;
 
-            boolean gorle = HoursPayPolicy.gorle(
-                    employee.getCompany() == null ? null : employee.getCompany().getCode());
-            int expectedWorkMinutes = HoursPayPolicy.expectedMinutes(effectiveStart, endDate, gorle);
+            String companyCode = employee.getCompany() == null ? null : employee.getCompany().getCode();
+            boolean gorle = HoursPayPolicy.gorle(companyCode);
+            Set<LocalDate> holidays = companyHolidayCalendar == null
+                    ? Set.of()
+                    : companyHolidayCalendar.forCompany(holidayRows, companyCode);
+            int expectedWorkMinutes = HoursPayPolicy.expectedPaidMinutes(
+                    effectiveStart, endDate, gorle, holidays);
 
             List<AttendanceRecord> records = attendanceByEmployee.getOrDefault(employee.getId(), List.of());
 
@@ -783,6 +886,12 @@ public class AttendanceService {
                     .filter(Objects::nonNull)
                     .mapToInt(Integer::intValue)
                     .sum();
+            int deductedMinutes = records.stream()
+                    .map(AttendanceRecord::getDeductedMinutes)
+                    .filter(Objects::nonNull)
+                    .mapToInt(Integer::intValue)
+                    .sum();
+            workedMinutes = Math.max(0, workedMinutes - deductedMinutes);
 
             int overtimeMinutes = records.stream()
                     .map(AttendanceRecord::getOvertimeMinutes)
@@ -845,7 +954,7 @@ public class AttendanceService {
             payroll.setWorkingDays((int) records.stream().filter(r -> r.getCheckInTime() != null).count());
             payroll.setActualHours(BigDecimal.valueOf(workedMinutes).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP));
             payroll.setCasualLeave(BigDecimal.ONE);
-            payroll.setRequiredHours(BigDecimal.valueOf(9));
+            payroll.setRequiredHours(BigDecimal.valueOf(8));
             payroll.setExpectedWorkMinutes(expectedWorkMinutes);
             payroll.setWorkedMinutes(workedMinutes);
             payroll.setShortfallMinutes(shortfallMinutes);
@@ -1014,19 +1123,27 @@ public class AttendanceService {
         YearMonth month = parsePayMonth(payMonth);
         LocalDate start = month.atDay(1);
         LocalDate end = month.atEndOfMonth();
-        int businessDays = businessDaysBetween(start, end);
+        int businessDays = HoursPayPolicy.expectedMinutes(start, end, false) / HoursPayPolicy.DAY_MINUTES;
 
         List<Employee> employees = employeeRepository
             .findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus.ACTIVE);
 
         // ── Bulk-load all month attendance & payroll in exactly 2 queries ─────────
+        List<com.zidio.nexushr.domain.CompanyHoliday> holidayRows = companyHolidayCalendar == null
+                ? List.of()
+                : companyHolidayCalendar.between(start, end);
         List<AttendanceRecord> allMonthAttendance =
                 attendanceRepository.findByAttendanceDateBetween(start, end);
         Map<Long, Integer> workedMinutesByEmployee = new HashMap<>();
+        Map<Long, Integer> deductedMinutesByEmployee = new HashMap<>();
         for (AttendanceRecord r : allMonthAttendance) {
             if (r.getEmployee() != null && r.getEmployee().getId() != null
                     && r.getWorkMinutes() != null) {
                 workedMinutesByEmployee.merge(r.getEmployee().getId(), r.getWorkMinutes(), Integer::sum);
+                deductedMinutesByEmployee.merge(
+                        r.getEmployee().getId(),
+                        r.getDeductedMinutes() == null ? 0 : r.getDeductedMinutes(),
+                        Integer::sum);
             }
         }
 
@@ -1053,10 +1170,17 @@ public class AttendanceService {
                 ? employee.getJoiningDate()
                 : start;
 
-            int employeeBusinessDays = businessDaysBetween(effectiveStart, end);
-            int expectedMinutes = employeeBusinessDays * standardDailyMinutes;
+            String companyCode = employee.getCompany() == null ? null : employee.getCompany().getCode();
+            boolean gorle = HoursPayPolicy.gorle(companyCode);
+            Set<LocalDate> holidays = companyHolidayCalendar == null
+                    ? Set.of()
+                    : companyHolidayCalendar.forCompany(holidayRows, companyCode);
+            int expectedMinutes = HoursPayPolicy.expectedPaidMinutes(effectiveStart, end, gorle, holidays);
 
-            int workedMinutes = workedMinutesByEmployee.getOrDefault(employee.getId(), 0);
+            int workedMinutes = Math.max(
+                    0,
+                    workedMinutesByEmployee.getOrDefault(employee.getId(), 0)
+                            - deductedMinutesByEmployee.getOrDefault(employee.getId(), 0));
 
             // ── Fallback: if no daily attendance punches, use payroll record ──
             if (workedMinutes == 0) {
@@ -1067,7 +1191,7 @@ public class AttendanceService {
                 }
             }
 
-            int shortfallMinutes = Math.max(0, expectedMinutes - workedMinutes);
+            int shortfallMinutes = HoursPayPolicy.deductibleShortfall(expectedMinutes, workedMinutes);
 
             totalWorkedMinutes += workedMinutes;
             totalExpectedMinutes += expectedMinutes;
@@ -1091,7 +1215,7 @@ public class AttendanceService {
 
         return new AttendanceMonthlySummaryResponse(
             payMonth,
-            standardDailyMinutes,
+            AttendanceRules.WORK_MINUTES,
             businessDays,
             employees.size(),
             totalWorkedMinutes,
@@ -1152,28 +1276,17 @@ public class AttendanceService {
     }
 
     private int calculateLateArrivalMinutes(LocalDateTime checkIn) {
-
-        LocalTime start = parseWorkdayStart();
-
-        if (!checkIn.toLocalTime().isAfter(start)) {
+        if (checkIn == null) {
             return 0;
         }
-
-        long minutes = Duration.between(
-                start,
-                checkIn.toLocalTime()
-        ).toMinutes();
-
-        return safeInteger(minutes);
+        return AttendanceRules.lateArrivalMinutes(checkIn.toLocalTime());
     }
 
     private int calculateOvertimeMinutes(int workMinutes) {
-
-        if (workMinutes <= standardDailyMinutes) {
+        if (workMinutes <= AttendanceRules.WORK_MINUTES) {
             return 0;
         }
-
-        return workMinutes - standardDailyMinutes;
+        return workMinutes - AttendanceRules.WORK_MINUTES;
     }
 
     private LocalTime parseWorkdayStart() {
@@ -1187,26 +1300,6 @@ public class AttendanceService {
                     ex
             );
         }
-    }
-
-    private int calculateWorkMinutes(
-            LocalDateTime checkIn,
-            LocalDateTime checkOut) {
-
-        long minutes = Duration
-                .between(checkIn, checkOut)
-                .toMinutes();
-
-        return safeInteger(minutes);
-    }
-
-    private int safeInteger(long value) {
-
-        if (value < 0 || value > Integer.MAX_VALUE) {
-            throw badRequest("Work duration is invalid");
-        }
-
-        return (int) value;
     }
 
     private void validateCheckTimes(

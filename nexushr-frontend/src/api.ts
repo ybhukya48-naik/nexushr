@@ -19,6 +19,7 @@ export interface DashboardSummary {
 }
 
 export type EmployeeRole =
+  | "SUPER_ADMIN"
   | "ADMIN"
   | "HR"
   | "MANAGER"
@@ -48,6 +49,8 @@ export interface EmployeeResponse {
   lifecycleStatus: EmployeeLifecycleStatus;
   companyCode: string;
   companyName: string;
+  siteVisitor?: boolean;
+  reportingManagerId?: number | null;
 }
 
 export interface EmployeeRequest {
@@ -301,6 +304,10 @@ export type AdminEmployeeRow = {
   attendanceStatus: string;
   checkInTime?: string | null;
   checkOutTime?: string | null;
+  siteVisitor?: boolean;
+  blueFlag?: boolean;
+  yellowFlag?: boolean;
+  reportingManagerId?: number | null;
 };
 
 export type AdminOverview = {
@@ -324,6 +331,55 @@ export function setEmployeeActive(id: number, active: boolean) {
       body: JSON.stringify({ active }),
     },
   );
+}
+
+export function setSiteVisitor(id: number, siteVisitor: boolean) {
+  return request<{ id: number; siteVisitor: boolean }>(
+    `/admin/employees/${id}/site-visitor`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ siteVisitor }),
+    },
+  );
+}
+
+export function setEmployeeRole(id: number, role: string) {
+  return request<{ id: number; role: string }>(`/admin/employees/${id}/role`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export function setReportingManager(id: number, managerId: number | null) {
+  return request<{ id: number; reportingManagerId: number | string }>(
+    `/admin/employees/${id}/reporting-manager`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ managerId }),
+    },
+  );
+}
+
+export type CompanyHoliday = {
+  id: number;
+  holidayDate: string;
+  name: string;
+  companyCode?: string | null;
+};
+
+export function getHolidays() {
+  return request<CompanyHoliday[]>("/admin/holidays");
+}
+
+export function addHoliday(date: string, name: string, companyCode?: string) {
+  return request<CompanyHoliday>("/admin/holidays", {
+    method: "POST",
+    body: JSON.stringify({ date, name, companyCode: companyCode || null }),
+  });
+}
+
+export function deleteHoliday(id: number) {
+  return request<void>(`/admin/holidays/${id}`, { method: "DELETE" });
 }
 
 export function getCurrentEmployee() {

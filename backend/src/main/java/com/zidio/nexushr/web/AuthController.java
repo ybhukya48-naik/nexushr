@@ -314,4 +314,11 @@ public class AuthController {
                             "Could not save the new password. Use the email and password already saved on the employee, or ask HR."));
         }
     }
+
+    @PostMapping("/logout")
+    public Map<String, String> logout() {
+        return Map.of(
+                "status", "ok",
+                "attendance", "kept");
+    }
 }

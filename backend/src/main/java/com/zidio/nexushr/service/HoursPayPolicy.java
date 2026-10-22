@@ -2,14 +2,18 @@ package com.zidio.nexushr.service;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.util.Set;
 
 /**
- * A paid day is 9 hours. One casual leave each month is not deducted.
+ * A paid day is 8 working hours. Lunch from 1:00 to 1:45 is not work.
+ * One casual leave and one paid leave each month are not deducted.
+ * Sundays and listed public holidays are not working days.
  * Gorle Group also does not deduct the second Saturday.
  */
 public final class HoursPayPolicy {
 
     public static final int DAY_MINUTES = 9 * 60;
+    public static final int PAID_WORK_MINUTES = AttendanceRules.WORK_MINUTES;
 
     private HoursPayPolicy() {
     }
@@ -29,12 +33,23 @@ public final class HoursPayPolicy {
     }
 
     public static int expectedMinutes(LocalDate start, LocalDate end, boolean gorle) {
+        return expectedMinutes(start, end, gorle, Set.of());
+    }
+
+    public static int expectedMinutes(
+            LocalDate start,
+            LocalDate end,
+            boolean gorle,
+            Set<LocalDate> extraHolidays) {
         if (start == null || end == null || start.isAfter(end)) {
             return 0;
         }
         int days = 0;
         for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
-            if (date.getDayOfWeek() == DayOfWeek.SUNDAY) {
+            if (date.getDayOfWeek() == DayOfWeek.SUNDAY || AttendanceRules.isPublicHoliday(date)) {
+                continue;
+            }
+            if (extraHolidays != null && extraHolidays.contains(date)) {
                 continue;
             }
             if (gorle && isSecondSaturday(date)) {
@@ -45,8 +60,25 @@ public final class HoursPayPolicy {
         return days * DAY_MINUTES;
     }
 
+    public static int expectedPaidMinutes(
+            LocalDate start,
+            LocalDate end,
+            boolean gorle,
+            Set<LocalDate> extraHolidays) {
+        int presence = expectedMinutes(start, end, gorle, extraHolidays);
+        if (presence <= 0) {
+            return 0;
+        }
+        return (presence / DAY_MINUTES) * PAID_WORK_MINUTES;
+    }
+
+    public static int expectedPaidMinutes(LocalDate start, LocalDate end, boolean gorle) {
+        return expectedPaidMinutes(start, end, gorle, Set.of());
+    }
+
     public static int deductibleShortfall(int expectedMinutes, int workedMinutes) {
         int shortfall = Math.max(0, expectedMinutes - Math.max(0, workedMinutes));
-        return Math.max(0, shortfall - DAY_MINUTES);
+        int forgiven = 2 * AttendanceRules.WORK_MINUTES;
+        return Math.max(0, shortfall - forgiven);
     }
 }

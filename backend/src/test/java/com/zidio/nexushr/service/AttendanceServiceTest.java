@@ -83,7 +83,7 @@ class AttendanceServiceTest {
                 .isSameAs(record);
 
         assertThat(result.getWorkMinutes())
-                .isEqualTo(480);
+                .isEqualTo(435);
 
         verify(employeeRepository)
                 .findById(100L);
@@ -104,10 +104,10 @@ class AttendanceServiceTest {
                 .thenReturn(Optional.of(employee));
 
         when(attendanceRepository
-                .existsByEmployee_IdAndAttendanceDate(
+                .findByEmployee_IdAndAttendanceDate(
                         eq(100L),
                         any(LocalDate.class)))
-                .thenReturn(false);
+                .thenReturn(Optional.empty());
 
         AttendanceRecord savedRecord =
                 new AttendanceRecord();
@@ -143,7 +143,7 @@ class AttendanceServiceTest {
                 .findById(100L);
 
         verify(attendanceRepository)
-                .existsByEmployee_IdAndAttendanceDate(
+                .findByEmployee_IdAndAttendanceDate(
                         eq(100L),
                         eq(LocalDate.now(AttendanceService.COMPANY_ZONE)));
 

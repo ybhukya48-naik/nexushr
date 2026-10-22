@@ -8,9 +8,10 @@ import com.zidio.nexushr.web.dto.AttendanceMonthlySummaryResponse;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -41,7 +42,8 @@ public class AttendanceController {
                 ? employeeId
                 : attendanceService.findEmployeeIdByUsername(authentication.getName());
 
-        return attendanceService.checkIn(targetEmployeeId);
+        Long actorId = attendanceService.findEmployeeIdByUsername(authentication.getName());
+        return attendanceService.checkIn(targetEmployeeId, actorId, false);
     }
 
     @PostMapping("/check-out")
@@ -54,7 +56,8 @@ public class AttendanceController {
                 ? employeeId
                 : attendanceService.findEmployeeIdByUsername(authentication.getName());
 
-        return attendanceService.checkOut(targetEmployeeId);
+        Long actorId = attendanceService.findEmployeeIdByUsername(authentication.getName());
+        return attendanceService.checkOut(targetEmployeeId, actorId);
     }
 
     @PostMapping("/biometric/check-in")
@@ -81,6 +84,53 @@ public class AttendanceController {
                 : attendanceService.findEmployeeIdByUsername(authentication.getName());
 
         return attendanceService.biometricCheckOut(targetEmployeeId);
+    }
+
+    @PostMapping(value = "/site-check-in", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public AttendanceRecord siteCheckIn(
+            @RequestParam("selfie") MultipartFile selfie,
+            Authentication authentication) throws IOException {
+        Long employeeId = attendanceService.findEmployeeIdByUsername(authentication.getName());
+        return attendanceService.siteCheckIn(
+                employeeId,
+                selfie.getContentType(),
+                selfie.getBytes());
+    }
+
+    @PostMapping(value = "/site-check-out", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public AttendanceRecord siteCheckOut(
+            @RequestParam("selfie") MultipartFile selfie,
+            Authentication authentication) throws IOException {
+        Long employeeId = attendanceService.findEmployeeIdByUsername(authentication.getName());
+        return attendanceService.siteCheckOut(
+                employeeId,
+                selfie.getContentType(),
+                selfie.getBytes());
+    }
+
+    @PostMapping("/heartbeat")
+    public java.util.Map<String, Object> heartbeat(Authentication authentication) {
+        Long employeeId = attendanceService.findEmployeeIdByUsername(authentication.getName());
+        attendanceService.heartbeat(employeeId);
+        return attendanceService.myStatus(employeeId);
+    }
+
+    @GetMapping("/audit")
+    public java.util.List<com.zidio.nexushr.domain.AttendanceAuditLog> audit(
+            @RequestParam(required = false) Long employeeId,
+            Authentication authentication) {
+        Long self = attendanceService.findEmployeeIdByUsername(authentication.getName());
+        boolean management = authentication.getAuthorities().stream().anyMatch(authority -> {
+            String role = authority.getAuthority();
+            return role.equals("ROLE_HR")
+                    || role.equals("ROLE_ADMIN")
+                    || role.equals("ROLE_SUPER_ADMIN")
+                    || role.equals("ROLE_MANAGER");
+        });
+        if (!management) {
+            employeeId = self;
+        }
+        return attendanceService.auditTrail(employeeId);
     }
 
     @GetMapping("/my-status")

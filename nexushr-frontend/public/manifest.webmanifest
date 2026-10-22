@@ -1,0 +1,9 @@
+{
+  "name": "NexusHR",
+  "short_name": "NexusHR",
+  "start_url": "/site",
+  "display": "standalone",
+  "background_color": "#0f2744",
+  "theme_color": "#0f2744",
+  "description": "Site staff login, selfie check-in, and selfie check-out."
+}

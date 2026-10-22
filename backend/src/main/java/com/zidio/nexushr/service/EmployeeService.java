@@ -3,6 +3,7 @@ package com.zidio.nexushr.service;
 import com.zidio.nexushr.domain.Employee;
 import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
 import com.zidio.nexushr.domain.Company;
+import com.zidio.nexushr.domain.RoleType;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.repository.CompanyRepository;
 import com.zidio.nexushr.web.dto.EmployeeRequest;
@@ -91,6 +92,9 @@ public class EmployeeService {
         employee.setLifecycleStatus(
                 EmployeeLifecycleStatus.ACTIVE
         );
+        if (request.getSiteVisitor() != null) {
+            employee.setSiteVisitor(request.getSiteVisitor());
+        }
 
         return employeeRepository.save(employee);
     }
@@ -181,6 +185,14 @@ public class EmployeeService {
             );
         }
 
+        if (request.getSiteVisitor() != null) {
+            employee.setSiteVisitor(request.getSiteVisitor());
+        }
+
+        if (request.getReportingManagerId() != null) {
+            employee.setReportingManagerId(request.getReportingManagerId());
+        }
+
         if (request.getPassword() != null
                 && !request.getPassword().isBlank()) {
             employee.setPassword(
@@ -198,6 +210,30 @@ public class EmployeeService {
             employee.setCompany(company);
         }
 
+        return employeeRepository.save(employee);
+    }
+
+    public Employee setSiteVisitor(Long id, boolean siteVisitor) {
+        Employee employee = findById(id);
+        employee.setSiteVisitor(siteVisitor);
+        return employeeRepository.save(employee);
+    }
+
+    public Employee setRole(Long id, RoleType role) {
+        Employee employee = findById(id);
+        employee.setRoleType(role);
+        return employeeRepository.save(employee);
+    }
+
+    public Employee setReportingManager(Long id, Long managerId) {
+        Employee employee = findById(id);
+        if (managerId != null) {
+            if (managerId.equals(id)) {
+                throw new IllegalArgumentException("An employee cannot report to themselves");
+            }
+            findById(managerId);
+        }
+        employee.setReportingManagerId(managerId);
         return employeeRepository.save(employee);
     }
 

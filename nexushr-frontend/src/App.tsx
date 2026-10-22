@@ -17,6 +17,7 @@ import {
   createPassword,
   login as apiLogin,
   getAiWorkforceDashboard,
+  API_BASE,
   type DashboardSummary,
   type AiWorkforceDashboardResponse,
   type EmployeeResponse,
@@ -24,6 +25,7 @@ import {
 import {
   getEmployeeAttendance,
   getLeaves,
+  sendAttendanceHeartbeat,
   type AttendanceRecord,
   type LeaveRequest,
 } from "./pages/Attendance";
@@ -45,19 +47,20 @@ const Payroll = lazy(() => import("./pages/Payroll"));
 const Performance = lazy(() => import("./pages/Performance"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Admin = lazy(() => import("./pages/Admin"));
+const SiteAttendance = lazy(() => import("./pages/SiteAttendance"));
 
 const navItems: ReadonlyArray<
   readonly [string, string, readonly string[]]
 > = [
-  ["Dashboard", "/", ["ADMIN", "HR", "MANAGER"]],
-  ["Employees", "/employees", ["ADMIN", "HR", "MANAGER"]],
-  ["Attendance", "/attendance", ["ADMIN", "HR", "MANAGER", "EMPLOYEE"]],
-  ["Leave", "/leave", ["ADMIN", "HR", "MANAGER", "EMPLOYEE"]],
-  ["Payroll", "/payroll", ["ADMIN", "HR", "MANAGER", "EMPLOYEE"]],
-  ["Performance", "/performance", ["ADMIN", "HR", "MANAGER", "EMPLOYEE"]],
-  ["AI Insights", "/ai", ["ADMIN", "HR", "MANAGER"]],
-  ["Notifications", "/notifications", ["ADMIN", "HR", "MANAGER", "EMPLOYEE"]],
-  ["Admin", "/admin", ["ADMIN"]],
+  ["Dashboard", "/", ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"]],
+  ["Employees", "/employees", ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"]],
+  ["Attendance", "/attendance", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
+  ["Leave", "/leave", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
+  ["Payroll", "/payroll", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
+  ["Performance", "/performance", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
+  ["AI Insights", "/ai", ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"]],
+  ["Notifications", "/notifications", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
+  ["Admin", "/admin", ["ADMIN", "SUPER_ADMIN"]],
 ] as const;
 
 function isAuthenticated() {
@@ -114,13 +117,22 @@ function AppRoutes() {
 
     loadStatus();
     const timer = window.setInterval(loadStatus, 60000);
+    const heartbeat = window.setInterval(() => {
+      if (document.visibilityState !== "visible" || !document.hasFocus()) {
+        return;
+      }
+      void sendAttendanceHeartbeat().catch(() => undefined);
+    }, 60000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      window.clearInterval(heartbeat);
     };
   }, [workspace]);
 
   function handleLogout() {
+    // Logging out only clears this browser session. It does not delete attendance.
+    void fetch(`${API_BASE}/auth/logout`, { method: "POST" }).catch(() => undefined);
     localStorage.removeItem("nexushr_token");
     localStorage.removeItem("nexushr_user");
     localStorage.removeItem("nexushr_role");
@@ -171,7 +183,7 @@ function AppRoutes() {
     );
   }
 
-  const canSwitchWorkspace = role === "ADMIN" || role === "HR" || role === "MANAGER";
+  const canSwitchWorkspace = role === "ADMIN" || role === "SUPER_ADMIN" || role === "HR" || role === "MANAGER";
 
   return (
     <div className="app-shell">
@@ -1738,6 +1750,15 @@ export default function App() {
         <Route
           path="/login"
           element={<Login />}
+        />
+
+        <Route
+          path="/site"
+          element={
+            <Suspense fallback={<div className="page-loading">Loading site attendance</div>}>
+              <SiteAttendance />
+            </Suspense>
+          }
         />
 
         <Route

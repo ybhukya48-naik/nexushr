@@ -21,6 +21,8 @@ public class EmployeeRequest {
     private Boolean active;
 
     private String companyCode;
+    private Boolean siteVisitor;
+    private Long reportingManagerId;
 
         public String getCompanyCode() {
         return companyCode;
@@ -124,5 +126,21 @@ public class EmployeeRequest {
 
     public void setActive(Boolean active) {
         this.active = active;
+    }
+
+    public Boolean getSiteVisitor() {
+        return siteVisitor;
+    }
+
+    public void setSiteVisitor(Boolean siteVisitor) {
+        this.siteVisitor = siteVisitor;
+    }
+
+    public Long getReportingManagerId() {
+        return reportingManagerId;
+    }
+
+    public void setReportingManagerId(Long reportingManagerId) {
+        this.reportingManagerId = reportingManagerId;
     }
 }

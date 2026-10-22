@@ -61,7 +61,7 @@ public final class AttendanceDay {
         if (now.isBefore(sessionStartedAt)) {
             throw new IllegalStateException("Check-out time cannot be before check-in time");
         }
-        closedWorkMinutes += minutesBetween(sessionStartedAt, now);
+        closedWorkMinutes += AttendanceRules.workedMinutes(sessionStartedAt, now);
         lastCheckOut = now;
         sessionStartedAt = null;
         status = "CLOSED";

@@ -65,6 +65,33 @@ public class AttendanceRecord {
     @Column(name = "attendance_status", length = 20)
     private String attendanceStatus;
 
+    @Column(name = "last_activity_at")
+    private LocalDateTime lastActivityAt;
+
+    @Column(name = "session_idle_minutes", nullable = false)
+    private Integer sessionIdleMinutes = 0;
+
+    @Column(name = "late_warning", nullable = false)
+    private Boolean lateWarning = false;
+
+    @Column(name = "yellow_flag", nullable = false)
+    private Boolean yellowFlag = false;
+
+    @Column(name = "red_flag", nullable = false)
+    private Boolean redFlag = false;
+
+    @Column(name = "blue_flag", nullable = false)
+    private Boolean blueFlag = false;
+
+    @Column(name = "deducted_minutes", nullable = false)
+    private Integer deductedMinutes = 0;
+
+    @Column(name = "penalty_note", length = 500)
+    private String penaltyNote;
+
+    @Column(name = "selfie_captured", nullable = false)
+    private Boolean selfieCaptured = false;
+
     public Long getId() {
         return id;
     }
@@ -159,5 +186,77 @@ public class AttendanceRecord {
 
     public void setAttendanceStatus(String attendanceStatus) {
         this.attendanceStatus = attendanceStatus;
+    }
+
+    public LocalDateTime getLastActivityAt() {
+        return lastActivityAt;
+    }
+
+    public void setLastActivityAt(LocalDateTime lastActivityAt) {
+        this.lastActivityAt = lastActivityAt;
+    }
+
+    public Integer getSessionIdleMinutes() {
+        return sessionIdleMinutes;
+    }
+
+    public void setSessionIdleMinutes(Integer sessionIdleMinutes) {
+        this.sessionIdleMinutes = sessionIdleMinutes;
+    }
+
+    public Boolean getLateWarning() {
+        return lateWarning;
+    }
+
+    public void setLateWarning(Boolean lateWarning) {
+        this.lateWarning = lateWarning;
+    }
+
+    public Boolean getYellowFlag() {
+        return yellowFlag;
+    }
+
+    public void setYellowFlag(Boolean yellowFlag) {
+        this.yellowFlag = yellowFlag;
+    }
+
+    public Boolean getRedFlag() {
+        return redFlag;
+    }
+
+    public void setRedFlag(Boolean redFlag) {
+        this.redFlag = redFlag;
+    }
+
+    public Boolean getBlueFlag() {
+        return blueFlag;
+    }
+
+    public void setBlueFlag(Boolean blueFlag) {
+        this.blueFlag = blueFlag;
+    }
+
+    public Integer getDeductedMinutes() {
+        return deductedMinutes;
+    }
+
+    public void setDeductedMinutes(Integer deductedMinutes) {
+        this.deductedMinutes = deductedMinutes;
+    }
+
+    public String getPenaltyNote() {
+        return penaltyNote;
+    }
+
+    public void setPenaltyNote(String penaltyNote) {
+        this.penaltyNote = penaltyNote;
+    }
+
+    public Boolean getSelfieCaptured() {
+        return selfieCaptured;
+    }
+
+    public void setSelfieCaptured(Boolean selfieCaptured) {
+        this.selfieCaptured = selfieCaptured;
     }
 }

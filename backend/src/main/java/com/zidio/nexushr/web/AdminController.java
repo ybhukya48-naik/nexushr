@@ -1,15 +1,20 @@
 package com.zidio.nexushr.web;
 
 import com.zidio.nexushr.domain.AttendanceRecord;
+import com.zidio.nexushr.domain.CompanyHoliday;
 import com.zidio.nexushr.domain.Employee;
+import com.zidio.nexushr.domain.RoleType;
+import com.zidio.nexushr.repository.CompanyHolidayRepository;
 import com.zidio.nexushr.service.AttendanceService;
 import com.zidio.nexushr.service.EmployeeService;
 import com.zidio.nexushr.security.AuthorizationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,14 +32,17 @@ public class AdminController {
     private final EmployeeService employeeService;
     private final AttendanceService attendanceService;
     private final AuthorizationService authorizationService;
+    private final CompanyHolidayRepository companyHolidayRepository;
 
     public AdminController(
             EmployeeService employeeService,
             AttendanceService attendanceService,
-            AuthorizationService authorizationService) {
+            AuthorizationService authorizationService,
+            CompanyHolidayRepository companyHolidayRepository) {
         this.employeeService = employeeService;
         this.attendanceService = attendanceService;
         this.authorizationService = authorizationService;
+        this.companyHolidayRepository = companyHolidayRepository;
     }
 
     @GetMapping("/overview")
@@ -77,6 +85,11 @@ public class AdminController {
             row.put("attendanceStatus", attendanceStatus);
             row.put("checkInTime", record == null ? null : record.getCheckInTime());
             row.put("checkOutTime", record == null ? null : record.getCheckOutTime());
+            row.put("siteVisitor", employee.isSiteVisitor());
+            row.put("blueFlag", record != null && Boolean.TRUE.equals(record.getBlueFlag()));
+            row.put("yellowFlag", record != null && Boolean.TRUE.equals(record.getYellowFlag()));
+            row.put("redFlag", record != null && Boolean.TRUE.equals(record.getRedFlag()));
+            row.put("reportingManagerId", employee.getReportingManagerId());
             rows.add(row);
         }
 
@@ -106,5 +119,97 @@ public class AdminController {
         return Map.of(
                 "id", updated.getId(),
                 "active", updated.isActive());
+    }
+
+    @PatchMapping("/employees/{id}/site-visitor")
+    public Map<String, Object> setSiteVisitor(
+            @PathVariable Long id,
+            @RequestBody Map<String, Boolean> body) {
+        if (body == null || !body.containsKey("siteVisitor")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "siteVisitor is required");
+        }
+        Employee updated = employeeService.setSiteVisitor(id, Boolean.TRUE.equals(body.get("siteVisitor")));
+        return Map.of(
+                "id", updated.getId(),
+                "siteVisitor", updated.isSiteVisitor());
+    }
+
+    @PatchMapping("/employees/{id}/role")
+    public Map<String, Object> setRole(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body,
+            Authentication authentication) {
+        if (body == null || body.get("role") == null || body.get("role").isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "role is required");
+        }
+        Long currentId = authorizationService.authenticatedEmployeeId(authentication);
+        if (currentId != null && currentId.equals(id)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot change your own role");
+        }
+        RoleType role;
+        try {
+            role = RoleType.valueOf(body.get("role").trim());
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown role");
+        }
+        Employee updated = employeeService.setRole(id, role);
+        return Map.of("id", updated.getId(), "role", updated.getRoleType().name());
+    }
+
+    @PatchMapping("/employees/{id}/reporting-manager")
+    public Map<String, Object> setReportingManager(
+            @PathVariable Long id,
+            @RequestBody Map<String, Long> body) {
+        if (body == null || !body.containsKey("managerId")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "managerId is required");
+        }
+        try {
+            Employee updated = employeeService.setReportingManager(id, body.get("managerId"));
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("id", updated.getId());
+            result.put("reportingManagerId", updated.getReportingManagerId());
+            return result;
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
+        }
+    }
+
+    @GetMapping("/holidays")
+    public List<CompanyHoliday> holidays() {
+        return companyHolidayRepository.findAll();
+    }
+
+    @PostMapping("/holidays")
+    public CompanyHoliday addHoliday(@RequestBody Map<String, String> body) {
+        if (body == null || body.get("date") == null || body.get("name") == null || body.get("name").isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Holiday date and name are required");
+        }
+        LocalDate date;
+        try {
+            date = LocalDate.parse(body.get("date"));
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Holiday date must be YYYY-MM-DD");
+        }
+        String companyCode = body.get("companyCode");
+        if (companyCode != null && companyCode.isBlank()) {
+            companyCode = null;
+        }
+        if (companyHolidayRepository.existsForDay(date, companyCode)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "That holiday is already saved");
+        }
+        CompanyHoliday holiday = new CompanyHoliday();
+        holiday.setHolidayDate(date);
+        holiday.setName(body.get("name").trim());
+        holiday.setCompanyCode(companyCode);
+        return companyHolidayRepository.save(holiday);
+    }
+
+    @DeleteMapping("/holidays/{id}")
+    public Map<String, Object> deleteHoliday(@PathVariable Long id) {
+        if (!companyHolidayRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Holiday not found");
+        }
+        companyHolidayRepository.deleteById(id);
+        return Map.of("deleted", true);
     }
 }

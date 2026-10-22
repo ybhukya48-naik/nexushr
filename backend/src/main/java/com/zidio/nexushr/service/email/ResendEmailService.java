@@ -1,5 +1,7 @@
 package com.zidio.nexushr.service.email;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -11,15 +13,17 @@ import java.util.Map;
 @Service
 public class ResendEmailService {
 
+    private static final Logger log = LoggerFactory.getLogger(ResendEmailService.class);
+
     private final RestClient restClient;
 
     public ResendEmailService() {
         String apiKey = System.getenv("RESEND_API_KEY");
 
         if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException(
-                    "RESEND_API_KEY environment variable is not configured"
-            );
+            log.warn("RESEND_API_KEY is not set. Email sending is skipped until it is configured.");
+            this.restClient = null;
+            return;
         }
 
         this.restClient = RestClient.builder()
@@ -54,6 +58,10 @@ public class ResendEmailService {
                 "subject", subject,
                 "text", message
         );
+
+        if (restClient == null) {
+            return "skipped";
+        }
 
         Map<?, ?> response = restClient.post()
                 .uri("/emails")
@@ -90,6 +98,10 @@ public class ResendEmailService {
                 "subject", subject,
                 "html", html
         );
+
+        if (restClient == null) {
+            return "skipped";
+        }
 
         Map<?, ?> response = restClient.post()
                 .uri("/emails")
@@ -137,6 +149,10 @@ public class ResendEmailService {
                 "html", html,
                 "attachments", List.of(attachment)
         );
+
+        if (restClient == null) {
+            return "skipped";
+        }
 
         Map<?, ?> response = restClient.post()
                 .uri("/emails")

@@ -6,6 +6,7 @@ import com.zidio.nexushr.domain.PerformanceReview;
 import com.zidio.nexushr.repository.AttendanceRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.repository.PerformanceReviewRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -18,6 +19,7 @@ import java.time.YearMonth;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class PerformanceService {
@@ -27,6 +29,9 @@ public class PerformanceService {
     private final PerformanceReviewRepository reviewRepository;
     private final EmployeeRepository employeeRepository;
     private final AttendanceRepository attendanceRepository;
+
+    @Autowired(required = false)
+    private CompanyHolidayCalendar companyHolidayCalendar;
 
     public PerformanceService(
             PerformanceReviewRepository reviewRepository,
@@ -152,12 +157,16 @@ public class PerformanceService {
         int expectedWorkMinutes = 0;
 
         if (!effectiveStart.isAfter(calculationEnd)) {
-            int businessDays = businessDaysBetween(
+            String companyCode = employee.getCompany() == null ? null : employee.getCompany().getCode();
+            boolean gorle = HoursPayPolicy.gorle(companyCode);
+            Set<LocalDate> holidays = companyHolidayCalendar == null
+                    ? Set.of()
+                    : companyHolidayCalendar.dates(effectiveStart, calculationEnd, companyCode);
+            expectedWorkMinutes = HoursPayPolicy.expectedPaidMinutes(
                     effectiveStart,
-                    calculationEnd);
-
-            expectedWorkMinutes =
-                    businessDays * STANDARD_DAILY_MINUTES;
+                    calculationEnd,
+                    gorle,
+                    holidays);
         }
 
         List<AttendanceRecord> attendanceRecords =
@@ -174,6 +183,12 @@ public class PerformanceService {
                 .filter(value -> value != null && value > 0)
                 .mapToInt(Integer::intValue)
                 .sum();
+        int deductedMinutes = attendanceRecords.stream()
+                .map(AttendanceRecord::getDeductedMinutes)
+                .filter(value -> value != null && value > 0)
+                .mapToInt(Integer::intValue)
+                .sum();
+        workedMinutes = Math.max(0, workedMinutes - deductedMinutes);
 
         int overtimeMinutes = attendanceRecords.stream()
                 .map(AttendanceRecord::getOvertimeMinutes)
@@ -181,9 +196,9 @@ public class PerformanceService {
                 .mapToInt(Integer::intValue)
                 .sum();
 
-        int shortfallMinutes = Math.max(
-                0,
-                expectedWorkMinutes - workedMinutes);
+        int shortfallMinutes = HoursPayPolicy.deductibleShortfall(
+                expectedWorkMinutes,
+                workedMinutes);
 
         double attendanceScore = 0.0;
 

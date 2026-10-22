@@ -241,7 +241,7 @@ export default function Leave() {
           <div>
             <p className="eyebrow">TIME OFF</p>
             <h3>New Leave Request</h3>
-            <p>Submit a request for approval.</p>
+            <p>One casual leave and one paid leave each month. Sundays and public holidays are not working days. The request goes to your reporting manager.</p>
           </div>
         </div>
 

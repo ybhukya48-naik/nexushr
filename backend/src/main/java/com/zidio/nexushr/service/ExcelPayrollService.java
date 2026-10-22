@@ -15,6 +15,7 @@ import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.repository.PayrollRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -39,13 +40,16 @@ public class ExcelPayrollService {
     public static final String UNSET_PASSWORD_HASH =
             "$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EH";
     private static final BigDecimal ZERO = BigDecimal.ZERO;
-    private static final BigDecimal NINE = BigDecimal.valueOf(9);
+    private static final BigDecimal EIGHT = BigDecimal.valueOf(8);
 
     private final PayrollRepository payrollRepository;
     private final EmployeeRepository employeeRepository;
     private final CompanyRepository companyRepository;
     private final AttendanceRepository attendanceRepository;
     private final NotificationService notificationService;
+
+    @Autowired(required = false)
+    private CompanyHolidayCalendar companyHolidayCalendar;
 
     public ExcelPayrollService(
             PayrollRepository payrollRepository,
@@ -569,7 +573,7 @@ public class ExcelPayrollService {
         BigDecimal pt = value(row, sheet.ptColumn());
 
         payroll.setWorkingDays(sheet.workingDays());
-        payroll.setRequiredHours(NINE);
+        payroll.setRequiredHours(EIGHT);
         payroll.setActualHours(actualWorkingHours);
         payroll.setCasualLeave(casualLeave);
         payroll.setOtherLeave(ZERO);
@@ -596,12 +600,26 @@ public class ExcelPayrollService {
         payroll.setShortHoursDeduction(ZERO);
         payroll.setOtherDeductions(ZERO);
 
-        int workedMinutes = hoursToMinutes(actualWorkingHours);
-        boolean gorle = HoursPayPolicy.gorle(
-                payroll.getEmployee() == null || payroll.getEmployee().getCompany() == null
-                        ? null
-                        : payroll.getEmployee().getCompany().getCode());
-        int expectedMinutes = Math.max(0, sheet.workingDays() - (gorle ? 1 : 0)) * HoursPayPolicy.DAY_MINUTES;
+        Employee employee = payroll.getEmployee();
+        String companyCode = employee == null || employee.getCompany() == null
+                ? null
+                : employee.getCompany().getCode();
+        boolean gorle = HoursPayPolicy.gorle(companyCode);
+        YearMonth payMonth = parsePayMonth(payroll.getPayMonth());
+        LocalDate periodStart = payMonth == null ? null : payMonth.atDay(1);
+        LocalDate periodEnd = payMonth == null ? null : payMonth.atEndOfMonth();
+        if (periodStart != null && employee != null && employee.getJoiningDate() != null
+                && employee.getJoiningDate().isAfter(periodStart)) {
+            periodStart = employee.getJoiningDate();
+        }
+        Set<LocalDate> holidays = periodStart == null || companyHolidayCalendar == null
+                ? Set.of()
+                : companyHolidayCalendar.dates(periodStart, periodEnd, companyCode);
+        int expectedMinutes = periodStart == null || periodStart.isAfter(periodEnd)
+                ? Math.max(0, sheet.workingDays()) * HoursPayPolicy.PAID_WORK_MINUTES
+                : HoursPayPolicy.expectedPaidMinutes(periodStart, periodEnd, gorle, holidays);
+        payroll.setWorkingDays(expectedMinutes / HoursPayPolicy.PAID_WORK_MINUTES);
+        int workedMinutes = Math.max(0, hoursToMinutes(actualWorkingHours) - deductedMinutes(employee, periodStart, periodEnd));
         int shortfallMinutes = HoursPayPolicy.deductibleShortfall(expectedMinutes, workedMinutes);
 
         BigDecimal payableBase = earnedGross.compareTo(ZERO) > 0 ? earnedGross : grossSalary;
@@ -612,7 +630,6 @@ public class ExcelPayrollService {
                 .multiply(BigDecimal.valueOf(shortfallMinutes))
                 .setScale(2, RoundingMode.HALF_UP);
 
-        payroll.setCasualLeave(BigDecimal.ONE);
         payroll.setLeaveDeduction(hoursDeduction);
         payroll.setShortHoursDeduction(hoursDeduction);
         BigDecimal totalDeductions = pf.add(esi).add(pt).add(hoursDeduction);
@@ -1047,6 +1064,30 @@ public class ExcelPayrollService {
         } catch (Exception ex) {
             return ZERO;
         }
+    }
+
+    private YearMonth parsePayMonth(String payMonth) {
+        if (payMonth == null || payMonth.isBlank()) {
+            return null;
+        }
+        try {
+            return YearMonth.parse(payMonth.trim());
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private int deductedMinutes(Employee employee, LocalDate start, LocalDate end) {
+        if (employee == null || employee.getId() == null || start == null || end == null || start.isAfter(end)) {
+            return 0;
+        }
+        return attendanceRepository
+                .findByEmployee_IdAndAttendanceDateBetween(employee.getId(), start, end)
+                .stream()
+                .map(AttendanceRecord::getDeductedMinutes)
+                .filter(minutes -> minutes != null && minutes > 0)
+                .mapToInt(Integer::intValue)
+                .sum();
     }
 
     private int hoursToMinutes(BigDecimal hours) {

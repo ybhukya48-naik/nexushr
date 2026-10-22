@@ -3,7 +3,7 @@ spring:
     name: nexushr-backend
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5433/nexushr}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/nexushr}
     username: ${DB_USER:nexushr}
     password: ${DB_PASSWORD:nexushr_local_password}
 

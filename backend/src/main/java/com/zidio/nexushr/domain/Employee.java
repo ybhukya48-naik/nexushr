@@ -69,6 +69,12 @@ public class Employee {
     @Column
     private String mfaSecret;
 
+    @Column(name = "site_visitor", nullable = false)
+    private boolean siteVisitor = false;
+
+    @Column(name = "reporting_manager_id")
+    private Long reportingManagerId;
+
     // =========================
     // Getters and Setters
     // =========================
@@ -214,6 +220,22 @@ public class Employee {
 
     public void setLifecycleStatus(EmployeeLifecycleStatus lifecycleStatus) {
         this.lifecycleStatus = lifecycleStatus;
+    }
+
+    public boolean isSiteVisitor() {
+        return siteVisitor;
+    }
+
+    public void setSiteVisitor(boolean siteVisitor) {
+        this.siteVisitor = siteVisitor;
+    }
+
+    public Long getReportingManagerId() {
+        return reportingManagerId;
+    }
+
+    public void setReportingManagerId(Long reportingManagerId) {
+        this.reportingManagerId = reportingManagerId;
     }
 
     @JsonIgnore
