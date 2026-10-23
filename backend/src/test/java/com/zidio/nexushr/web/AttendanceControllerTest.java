@@ -56,7 +56,7 @@ class AttendanceControllerTest {
                 "employee@example.com"))
                 .thenReturn(100L);
 
-        when(attendanceService.checkIn(100L))
+        when(attendanceService.checkIn(100L, 100L, false))
                 .thenReturn(record);
 
         mockMvc.perform(
@@ -79,7 +79,7 @@ class AttendanceControllerTest {
                 "employee@example.com"))
                 .thenReturn(100L);
 
-        when(attendanceService.checkOut(100L))
+        when(attendanceService.checkOut(100L, 100L))
                 .thenReturn(record);
 
         mockMvc.perform(

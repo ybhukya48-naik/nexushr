@@ -2,18 +2,21 @@ package com.zidio.nexushr.service;
 
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class CachedXlsxTest {
 
     @Test
     void readsSalaryWorkbookWithoutLoadingEveryCell() throws Exception {
         Path workbook = Path.of("GGEA-CYOND-SALARIES-2026.xlsx");
+        assumeTrue(Files.exists(workbook), "Local salary workbook is not part of the repository");
         List<String> names = CachedXlsx.sheetNames(workbook);
         assertTrue(names.contains("CONSTRUCTIONS DEPARTMENT"));
         assertTrue(names.contains("Employs Salaris"));
