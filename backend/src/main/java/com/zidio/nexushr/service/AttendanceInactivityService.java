@@ -170,7 +170,7 @@ public class AttendanceInactivityService {
                 employee,
                 "Check-in missing",
                 marker + ". You did not check in, so this day is marked inactive.");
-        notifyManagers(employee, marker, "did not check in");
+        notifyReportingManager(employee, marker, "did not check in");
     }
 
     private void markMissingCheckOut(Employee employee, LocalDate today) {
@@ -187,7 +187,7 @@ public class AttendanceInactivityService {
                 employee,
                 "Automatic logout",
                 marker + ". You were logged out at 11:00 PM. The attendance record is kept and marked with a blue flag.");
-        notifyManagers(employee, marker, "was logged out automatically at 11:00 PM");
+        notifyReportingManager(employee, marker, "was logged out automatically at 11:00 PM");
     }
 
     private boolean missedLunchReturn(AttendanceRecord record) {
@@ -210,18 +210,19 @@ public class AttendanceInactivityService {
                 && record.getSessionStartedAt() == null;
     }
 
-    private void notifyManagers(Employee employee, String marker, String reason) {
-        for (Employee manager : employeeRepository.findAll()) {
+    private void notifyReportingManager(Employee employee, String marker, String reason) {
+        Long managerId = employee.getReportingManagerId();
+        if (managerId == null || managerId.equals(employee.getId())) {
+            return;
+        }
+        employeeRepository.findById(managerId).ifPresent(manager -> {
             if (manager.getId() == null || !manager.isActive()) {
-                continue;
+                return;
             }
-            if (manager.getRoleType() != RoleType.HR
-                    && manager.getRoleType() != RoleType.ADMIN
-                    && manager.getRoleType() != RoleType.SUPER_ADMIN) {
-                continue;
-            }
-            if (manager.getId().equals(employee.getId())) {
-                continue;
+            if (manager.getRoleType() == RoleType.HR
+                    || manager.getRoleType() == RoleType.ADMIN
+                    || manager.getRoleType() == RoleType.SUPER_ADMIN) {
+                return;
             }
             notify(
                     manager,
@@ -234,7 +235,7 @@ public class AttendanceInactivityService {
                             + ". "
                             + marker
                             + ".");
-        }
+        });
     }
 
     private void notify(Employee employee, String title, String message) {

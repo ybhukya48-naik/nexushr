@@ -1,5 +1,5 @@
 ﻿import { isCompanyMatch } from "../utils/company";
-import { getWorkspaceCompany, setWorkspaceCompany } from "../utils/workspace";
+import { getWorkspaceCompany } from "../utils/workspace";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import "./Notifications.css";
 import {
@@ -448,26 +448,6 @@ export default function Notifications() {
               marginBottom: showCreate ? 18 : 0,
             }}
           >
-            {canCreate && (
-              <label>
-                Company
-                <select
-                  value={selectedCompany}
-                  onChange={(event) => {
-                    const next = event.target.value === "GORLE" ? "GORLE" : "CYOND";
-                    setSelectedCompany(next);
-                    setWorkspaceCompany(next);
-                    setSelectedEmployeeId("");
-                    setEmployee(null);
-                    setNotifications([]);
-                  }}
-                >
-                  <option value="CYOND">CYOND</option>
-                  <option value="GORLE">GORLE GROUP</option>
-                </select>
-              </label>
-            )}
-
             <label>
               Search employee
               <input

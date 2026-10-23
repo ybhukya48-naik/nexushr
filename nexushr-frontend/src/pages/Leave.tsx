@@ -1,5 +1,5 @@
 ﻿import { isCompanyMatch } from "../utils/company";
-import { asWorkspaceCompany, getWorkspaceCompany, setWorkspaceCompany } from "../utils/workspace";
+import { asWorkspaceCompany, getWorkspaceCompany } from "../utils/workspace";
 import { useEffect, useMemo, useState } from "react";
 import {
   getCurrentEmployee,
@@ -247,25 +247,6 @@ export default function Leave() {
 
         <form onSubmit={submit}>
           <div className="employee-filters">
-            {!isEmployee && (
-              <label>
-                Company
-                <select
-                  value={selectedCompany}
-                  onChange={(event) => {
-                    const next = event.target.value === "GORLE" ? "GORLE" : "CYOND";
-                    setSelectedCompany(next);
-                    setWorkspaceCompany(next);
-                    setSelectedEmployee("");
-                    setBalance(null);
-                  }}
-                >
-                  <option value="CYOND">CYOND</option>
-                  <option value="GORLE">GORLE GROUP</option>
-                </select>
-              </label>
-            )}
-
             <label>
               Employee
               {isEmployee ? (

@@ -1,5 +1,5 @@
 ﻿import { isCompanyMatch } from "../utils/company";
-import { getWorkspaceCompany, setWorkspaceCompany } from "../utils/workspace";
+import { getWorkspaceCompany } from "../utils/workspace";
 import { API_BASE } from "../api";
 import { useEffect, useState } from "react";
 import {
@@ -876,7 +876,7 @@ export default function Attendance() {
           <div>
             <p className="eyebrow">DAILY VIEW</p>
             <h3>Attendance filters</h3>
-            <p>Select a date and employee to review attendance activity.</p>
+            <p>Choose a date and employee.</p>
           </div>
 
           <button
@@ -896,25 +896,6 @@ export default function Attendance() {
               value={date}
               onChange={(event) => setDate(event.target.value)}
             />
-          </label>
-
-          <label>
-            <span>Company</span>
-            <select
-              value={selectedCompany}
-              onChange={(event) => {
-                if (isManagementRole) {
-                  const next = event.target.value === "GORLE" ? "GORLE" : "CYOND";
-                  setSelectedCompany(next);
-                  setWorkspaceCompany(next);
-                  setSelectedEmployee("");
-                }
-              }}
-              disabled={!isManagementRole}
-            >
-              <option value="CYOND">CYOND</option>
-              <option value="GORLE">GORLE GROUP</option>
-            </select>
           </label>
 
           <label>
