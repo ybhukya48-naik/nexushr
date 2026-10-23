@@ -85,9 +85,7 @@ export default function Notifications() {
   const [success, setSuccess] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [employeeSearch, setEmployeeSearch] = useState("");
-  const [selectedCompany, setSelectedCompany] = useState(
-    () => getWorkspaceCompany() ?? "CYOND",
-  );
+  const selectedCompany = getWorkspaceCompany() ?? "CYOND";
   const [notificationType, setNotificationType] = useState<NotificationResponse["notificationType"]>("GENERAL");
   const [channel, setChannel] = useState("BOTH");
   const [title, setTitle] = useState("");
