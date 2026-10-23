@@ -14,7 +14,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Layer 1 — Integration tests: Employee API with a real PostgreSQL database.
- * Seed data from V2__seed_data.sql is present on startup (3 employees).
+ * Demo seed employees are removed by a later migration, so these tests
+ * create the rows they need.
  */
 class EmployeeApiIT extends AbstractIntegrationTest {
 
@@ -36,7 +37,7 @@ class EmployeeApiIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void listEmployees_returnsSeedData() {
+    void listEmployees_returnsOk() {
         HttpEntity<Void> request = new HttpEntity<>(authHeaders);
         ResponseEntity<Object[]> response = restTemplate.exchange(
                 baseUrl() + "/api/v1/employees",
@@ -46,8 +47,7 @@ class EmployeeApiIT extends AbstractIntegrationTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        // V2 seed inserts 3 employees
-        assertThat(response.getBody()).hasSizeGreaterThanOrEqualTo(3);
+        assertThat(response.getBody()).isNotNull();
     }
 
     @Test
@@ -62,6 +62,7 @@ class EmployeeApiIT extends AbstractIntegrationTest {
                   "designation": "Test Engineer",
                   "joiningDate": "2026-07-04",
                   "baseSalary": 75000.00,
+                  "password": "Integration1",
                   "active": true
                 }
                 """;
