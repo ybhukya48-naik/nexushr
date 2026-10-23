@@ -21,8 +21,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     @Query(value = """
             SELECT email, password, employee_code, role_type, active, lifecycle_status, full_name
             FROM employees
-            WHERE lower(employee_code) = lower(:login)
-               OR lower(email) = lower(:login)
+            WHERE lower(trim(employee_code)) = lower(trim(:login))
+               OR lower(trim(email)) = lower(trim(:login))
             """, nativeQuery = true)
     List<Object[]> findLoginMatches(@Param("login") String login);
 
@@ -31,16 +31,16 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     @Query(value = """
             UPDATE employees
             SET password = :password
-            WHERE lower(email) = lower(:email)
+            WHERE lower(trim(email)) = lower(trim(:email))
               AND COALESCE(active, true) = true
-              AND (role_type IS NULL OR role_type NOT IN ('ADMIN', 'HR', 'MANAGER'))
+              AND (role_type IS NULL OR role_type NOT IN ('ADMIN', 'HR', 'SUPER_ADMIN'))
             """, nativeQuery = true)
     int updateEmployeePassword(@Param("email") String email, @Param("password") String password);
 
     @Query(value = """
             SELECT role_type
             FROM employees
-            WHERE lower(email) = lower(:email)
+            WHERE lower(trim(email)) = lower(trim(:email))
             """, nativeQuery = true)
     List<String> findRoleTypesByEmail(@Param("email") String email);
 

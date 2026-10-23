@@ -8,6 +8,7 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useSearchParams,
 } from "react-router-dom";
 import {
   getDashboardSummary,
@@ -318,11 +319,14 @@ function AppRoutes() {
 }
 function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [mode, setMode] = useState<"signin" | "create">("signin");
+  const [mode, setMode] = useState<"signin" | "create">(
+    searchParams.get("create") === "1" ? "create" : "signin",
+  );
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
@@ -456,8 +460,8 @@ function Login() {
 
               <p>
                 {mode === "create"
-                  ? "Employees use their email to create a password, then sign in."
-                  : "Sign in with your email and password."}
+                  ? "Use the email already saved for you in CYOND or Gorle. Choose a password, then sign in. HR does not see this password."
+                  : "Sign in with your email and the password you created."}
               </p>
 
             </div>

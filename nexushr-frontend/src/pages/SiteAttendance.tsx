@@ -157,6 +157,7 @@ export default function SiteAttendance() {
             <button className="site-primary" type="submit" disabled={loading}>
               {loading ? "Signing in..." : "Login"}
             </button>
+            <Link to="/login?create=1">Create your password with your email</Link>
           </form>
         )}
 

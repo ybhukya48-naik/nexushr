@@ -133,29 +133,41 @@ class EmployeeServiceTest {
     }
 
     @Test
-    void create_throwsException_whenPasswordMissing() {
+    void create_withoutPassword_letsTheEmployeeChooseOneLater() {
 
         request.setPassword(null);
 
-        assertThatThrownBy(() -> employeeService.create(request))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Employee password is required");
+        when(employeeRepository.existsByEmployeeCode("EMP001"))
+                .thenReturn(false);
+        when(employeeRepository.existsByEmail("alice@example.com"))
+                .thenReturn(false);
+        when(employeeRepository.save(any(Employee.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
-        verify(employeeRepository, never())
-                .save(any(Employee.class));
+        Employee result = employeeService.create(request);
+
+        assertThat(result.getPassword())
+                .isEqualTo(ExcelPayrollService.UNSET_PASSWORD_HASH);
+        verify(passwordEncoder, never()).encode(any());
     }
 
     @Test
-    void create_throwsException_whenPasswordBlank() {
+    void create_blankPassword_letsTheEmployeeChooseOneLater() {
 
         request.setPassword("   ");
 
-        assertThatThrownBy(() -> employeeService.create(request))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Employee password is required");
+        when(employeeRepository.existsByEmployeeCode("EMP001"))
+                .thenReturn(false);
+        when(employeeRepository.existsByEmail("alice@example.com"))
+                .thenReturn(false);
+        when(employeeRepository.save(any(Employee.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
-        verify(employeeRepository, never())
-                .save(any(Employee.class));
+        Employee result = employeeService.create(request);
+
+        assertThat(result.getPassword())
+                .isEqualTo(ExcelPayrollService.UNSET_PASSWORD_HASH);
+        verify(passwordEncoder, never()).encode(any());
     }
 
     @Test

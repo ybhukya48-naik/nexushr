@@ -379,20 +379,9 @@ export default function EmployeeProfile() {
               />
             </label>
 
-            <label>
-              New Password
-              <input
-                type="password"
-                placeholder="Enter password if changing it"
-                value={form.password}
-                onChange={(event) =>
-                  updateForm(
-                    "password",
-                    event.target.value,
-                  )
-                }
-              />
-            </label>
+            <p className="employee-password-note">
+              Password is not shown here. The employee creates it on the sign-in page with this email.
+            </p>
 
             <label>
               Role

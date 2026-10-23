@@ -552,17 +552,9 @@ export default function Employees() {
               />
             </label>
 
-            <label>
-              Password
-              <input
-                required
-                type="password"
-                value={form.password}
-                onChange={(event) =>
-                  updateForm("password", event.target.value)
-                }
-              />
-            </label>
+            <p className="employee-password-note">
+              No password is saved here. The employee uses this email on the sign-in page, creates a password, then logs in. This works for both CYOND and Gorle.
+            </p>
 
             <label>
               Role

@@ -310,7 +310,7 @@ public class AuthController {
 
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("message",
-                            "This account cannot create a password here. Sign in with the password already on the employee."));
+                            "This email belongs to an HR or admin account. Employees create a password with their own email."));
         } catch (Exception ex) {
             log.error("CREATE_PASSWORD_FAILED", ex);
             return ResponseEntity.status(HttpStatus.CONFLICT)

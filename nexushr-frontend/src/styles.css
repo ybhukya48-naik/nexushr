@@ -4897,6 +4897,14 @@ tbody tr:hover td {
   box-shadow: 0 0 0 4px rgba(105, 65, 198, 0.11);
 }
 
+.employee-password-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #475467;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 /* Selected employee summary */
 
 .payroll-employee-summary {
