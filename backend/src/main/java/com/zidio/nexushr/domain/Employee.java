@@ -2,6 +2,8 @@ package com.zidio.nexushr.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -245,5 +247,35 @@ public class Employee {
 
     public void setMfaSecret(String mfaSecret) {
         this.mfaSecret = mfaSecret;
+    }
+
+    @JsonIgnore
+    @Basic(fetch = FetchType.LAZY)
+    @JdbcTypeCode(SqlTypes.BINARY)
+    @Column(name = "profile_photo")
+    private byte[] profilePhoto;
+
+    @Column(name = "profile_photo_type", length = 80)
+    private String profilePhotoType;
+
+    @JsonIgnore
+    public byte[] getProfilePhoto() {
+        return profilePhoto;
+    }
+
+    public void setProfilePhoto(byte[] profilePhoto) {
+        this.profilePhoto = profilePhoto;
+    }
+
+    public String getProfilePhotoType() {
+        return profilePhotoType;
+    }
+
+    public void setProfilePhotoType(String profilePhotoType) {
+        this.profilePhotoType = profilePhotoType;
+    }
+
+    public boolean hasProfilePhoto() {
+        return profilePhotoType != null && !profilePhotoType.isBlank();
     }
 }

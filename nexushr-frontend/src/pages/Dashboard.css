@@ -1,0 +1,223 @@
+.hr-home {
+  display: grid;
+  gap: 18px;
+}
+
+.hr-home-head,
+.hr-card-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.hr-home-head p,
+.hr-card-title button,
+.hr-people em,
+.hr-leaves em,
+.hr-empty {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+.hr-home-head h2,
+.hr-card h3 {
+  margin: 4px 0 0;
+}
+
+.hr-home-head time {
+  color: #344054;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.hr-holidays li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hr-kpis,
+.hr-home-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.hr-kpis {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.hr-home-grid {
+  grid-template-columns: 1.3fr 1fr 0.7fr;
+}
+
+.hr-home-lower {
+  grid-template-columns: 1.4fr 0.9fr;
+}
+
+.hr-kpis button,
+.hr-card {
+  border: 1px solid #ece7fb;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.04);
+}
+
+.hr-kpis button,
+.hr-actions button,
+.hr-card-title button,
+.hr-alerts button,
+.hr-people button,
+.hr-leaves button {
+  text-align: left;
+  cursor: pointer;
+}
+
+.hr-kpis button {
+  padding: 16px 18px;
+}
+
+.hr-kpis span,
+.hr-actions button {
+  color: #667085;
+  font-size: 13px;
+}
+
+.hr-kpis strong {
+  display: block;
+  margin-top: 8px;
+  color: #1d1633;
+  font-size: 32px;
+}
+
+.hr-card {
+  padding: 16px 18px;
+}
+
+.hr-card-title button,
+.hr-alerts button {
+  border: 0;
+  background: transparent;
+  color: #6941c6;
+  font-weight: 700;
+}
+
+.hr-bars {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  align-items: end;
+  height: 140px;
+  margin: 18px 0;
+}
+
+.hr-bars button {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  gap: 6px;
+}
+
+.hr-bars span {
+  display: block;
+  width: 100%;
+  max-width: 28px;
+  border-radius: 8px 8px 4px 4px;
+  background: #8b6cf6;
+}
+
+.hr-alerts,
+.hr-actions,
+.hr-people,
+.hr-leaves,
+.hr-holidays {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hr-alerts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.hr-alerts button,
+.hr-actions button,
+.hr-people button,
+.hr-leaves button {
+  width: 100%;
+  border: 1px solid #f0ecfa;
+  border-radius: 12px;
+  background: #faf8ff;
+  padding: 10px 12px;
+}
+
+.hr-people button,
+.hr-leaves button {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.hr-leaves button {
+  grid-template-columns: 1fr auto auto;
+}
+
+.hr-people button > span {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #efe8ff;
+  color: #6941c6;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.hr-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-top: 14px;
+  text-align: center;
+  font-size: 12px;
+  color: #475467;
+}
+
+.hr-cal-label {
+  color: #98a2b3;
+  font-weight: 700;
+}
+
+.hr-cal-today,
+.hr-cal-holiday {
+  border-radius: 8px;
+  font-weight: 800;
+}
+
+.hr-cal-today {
+  background: #6941c6;
+  color: #fff;
+}
+
+.hr-cal-holiday {
+  background: #efe8ff;
+  color: #6941c6;
+}
+
+@media (max-width: 1000px) {
+  .hr-kpis,
+  .hr-home-grid,
+  .hr-home-lower,
+  .hr-alerts {
+    grid-template-columns: 1fr;
+  }
+}

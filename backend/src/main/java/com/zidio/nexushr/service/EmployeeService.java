@@ -243,6 +243,26 @@ public class EmployeeService {
         return employeeRepository.save(employee);
     }
 
+    public Employee saveProfilePhoto(Long id, byte[] bytes, String contentType) {
+        if (bytes == null || bytes.length == 0) {
+            throw new IllegalArgumentException("Choose a profile picture");
+        }
+        if (bytes.length > 2 * 1024 * 1024) {
+            throw new IllegalArgumentException("Profile picture must be 2 MB or smaller");
+        }
+        String type = contentType == null ? "" : contentType.toLowerCase();
+        if (!type.equals("image/jpeg")
+                && !type.equals("image/png")
+                && !type.equals("image/webp")
+                && !type.equals("image/gif")) {
+            throw new IllegalArgumentException("Profile picture must be a JPEG, PNG, WEBP, or GIF");
+        }
+        Employee employee = findById(id);
+        employee.setProfilePhoto(bytes);
+        employee.setProfilePhotoType(type);
+        return employeeRepository.save(employee);
+    }
+
     public void delete(Long id) {
         Employee employee = findById(id);
         employee.setActive(false);
