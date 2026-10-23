@@ -51,6 +51,7 @@ export interface EmployeeResponse {
   companyName: string;
   siteVisitor?: boolean;
   reportingManagerId?: number | null;
+  hasProfilePhoto?: boolean;
 }
 
 export interface EmployeeRequest {
@@ -384,6 +385,42 @@ export function deleteHoliday(id: number) {
 
 export function getCurrentEmployee() {
   return request<EmployeeResponse>("/employees/me");
+}
+
+export async function fetchEmployeePhoto(id: number): Promise<string | null> {
+  const token = localStorage.getItem("nexushr_token");
+  const response = await fetch(`${API_BASE}/employees/${id}/photo`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    return null;
+  }
+  return URL.createObjectURL(await response.blob());
+}
+
+export async function uploadEmployeePhoto(id: number | "me", file: File) {
+  const token = localStorage.getItem("nexushr_token");
+  const body = new FormData();
+  body.append("file", file);
+  const path = id === "me" ? "/employees/me/photo" : `/employees/${id}/photo`;
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body,
+  });
+  if (!response.ok) {
+    let message = "Could not save the profile picture";
+    try {
+      const errorBody = await response.json();
+      if (typeof errorBody?.message === "string" && errorBody.message.trim()) {
+        message = errorBody.message;
+      }
+    } catch {
+      // Keep the fallback message.
+    }
+    throw new Error(message);
+  }
+  return response.json() as Promise<EmployeeResponse>;
 }
 
 export function getEmployee(id: number) {

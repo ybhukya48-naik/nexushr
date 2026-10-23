@@ -24,7 +24,8 @@ public record EmployeeResponse(
         String companyCode,
         String companyName,
         boolean siteVisitor,
-        Long reportingManagerId
+        Long reportingManagerId,
+        boolean hasProfilePhoto
 ) {
 
     public static EmployeeResponse from(Employee employee) {
@@ -45,7 +46,8 @@ public record EmployeeResponse(
                 employee.getCompany() == null ? null : employee.getCompany().getCode(),
                 employee.getCompany() == null ? null : employee.getCompany().getName(),
                 employee.isSiteVisitor(),
-                employee.getReportingManagerId()
+                employee.getReportingManagerId(),
+                employee.hasProfilePhoto()
         );
     }
 }

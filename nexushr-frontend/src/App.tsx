@@ -11,15 +11,14 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import {
-  getDashboardSummary,
   getCurrentEmployee,
   getEmployeePayroll,
   getMyAttendanceStatus,
   createPassword,
   login as apiLogin,
   getAiWorkforceDashboard,
+  fetchEmployeePhoto,
   API_BASE,
-  type DashboardSummary,
   type AiWorkforceDashboardResponse,
   type EmployeeResponse,
 } from "./api";
@@ -28,7 +27,6 @@ import {
   getLeaves,
   sendAttendanceHeartbeat,
   type AttendanceRecord,
-  type LeaveRequest,
 } from "./pages/Attendance";
 import {
   asWorkspaceCompany,
@@ -40,6 +38,7 @@ import {
   workspaceTagline,
   type WorkspaceCompany,
 } from "./utils/workspace";
+const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Employees = lazy(() => import("./pages/Employees"));
 const EmployeeProfile = lazy(() => import("./pages/EmployeeProfile"));
 const Attendance = lazy(() => import("./pages/Attendance"));
@@ -91,6 +90,49 @@ function AppRoutes() {
     getWorkspaceCompany(),
   );
   const [attendanceAlert, setAttendanceAlert] = useState("");
+  const [me, setMe] = useState<EmployeeResponse | null>(null);
+  const [myPhoto, setMyPhoto] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    getCurrentEmployee()
+      .then((employee) => {
+        if (!cancelled) {
+          setMe(employee);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMe(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspace]);
+
+  useEffect(() => {
+    if (!me?.hasProfilePhoto) {
+      setMyPhoto("");
+      return;
+    }
+    let cancelled = false;
+    let objectUrl = "";
+    fetchEmployeePhoto(me.id)
+      .then((url) => {
+        if (!cancelled && url) {
+          objectUrl = url;
+          setMyPhoto(url);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [me]);
 
   useEffect(() => {
     const sync = () => setWorkspace(getWorkspaceCompany());
@@ -258,14 +300,23 @@ function AppRoutes() {
               <span aria-hidden="true">🔔</span>
             </button>
 
-            <div className="avatar">
-              {role === "ADMIN" ? "AD" : role === "MANAGER" ? "MG" : role === "EMPLOYEE" ? "EM" : "HR"}
-            </div>
-
-            <div>
-              <strong>{username}</strong>
-              <span>{role}</span>
-            </div>
+            <button
+              type="button"
+              className="user-profile-link"
+              onClick={() => navigate("/profile")}
+            >
+              <div className="avatar">
+                {myPhoto ? (
+                  <img src={myPhoto} alt="" />
+                ) : (
+                  (me?.fullName || username).slice(0, 2).toUpperCase()
+                )}
+              </div>
+              <div>
+                <strong>{me?.fullName || username}</strong>
+                <span>{me?.designation || role}</span>
+              </div>
+            </button>
 
             <button
               className="primary-button"
@@ -297,6 +348,7 @@ function AppRoutes() {
                   )
                 }
               />
+              <Route path="/profile" element={<EmployeeProfile />} />
               <Route path="/employees" element={<Employees />} />
               <Route path="/employees/:id" element={<EmployeeProfile />} />
               <Route path="/attendance" element={<Attendance />} />
@@ -763,96 +815,10 @@ function EmployeeDashboard() {
           </h2>
 
           <p>
-            View your employee information and access your
-            attendance, leave, payroll and performance details
-            from Cyond.
+            Open attendance, leave, payroll, or your profile.
           </p>
 
         </div>
-      </div>
-
-      <div className="dashboard-kpi-grid">
-
-        <article className="dashboard-kpi">
-          <div className="dashboard-kpi-top">
-            <span className="dashboard-kpi-icon">
-              ID
-            </span>
-
-            <span className="dashboard-kpi-label">
-              Employee Code
-            </span>
-          </div>
-
-          <strong>
-            {employee.employeeCode}
-          </strong>
-
-          <p>
-            Your employee identification
-          </p>
-        </article>
-
-        <article className="dashboard-kpi">
-          <div className="dashboard-kpi-top">
-            <span className="dashboard-kpi-icon">
-              D
-            </span>
-
-            <span className="dashboard-kpi-label">
-              Department
-            </span>
-          </div>
-
-          <strong>
-            {employee.department || "—"}
-          </strong>
-
-          <p>
-            Current department
-          </p>
-        </article>
-
-        <article className="dashboard-kpi">
-          <div className="dashboard-kpi-top">
-            <span className="dashboard-kpi-icon">
-              R
-            </span>
-
-            <span className="dashboard-kpi-label">
-              Designation
-            </span>
-          </div>
-
-          <strong>
-            {employee.designation || "—"}
-          </strong>
-
-          <p>
-            Current designation
-          </p>
-        </article>
-
-        <article className="dashboard-kpi">
-          <div className="dashboard-kpi-top">
-            <span className="dashboard-kpi-icon">
-              S
-            </span>
-
-            <span className="dashboard-kpi-label">
-              Status
-            </span>
-          </div>
-
-          <strong>
-            {employee.lifecycleStatus}
-          </strong>
-
-          <p>
-            Employment status
-          </p>
-        </article>
-
       </div>
 
       <div className="employee-action-grid">
@@ -897,594 +863,19 @@ function EmployeeDashboard() {
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">
-              EMPLOYEE INFORMATION
-            </p>
-
-            <h3>
-              My Profile
-            </h3>
+            <p className="eyebrow">PROFILE</p>
+            <h3>{employee.designation || "Employee"}</h3>
+            <p>Your details, designation, and profile picture are on your profile.</p>
           </div>
-        </div>
-
-        <div className="detail-grid">
-
-          <div>
-            <span>Full Name</span>
-            <strong>
-              {employee.fullName}
-            </strong>
-          </div>
-
-          <div>
-            <span>Email</span>
-            <strong>
-              {employee.email || "—"}
-            </strong>
-          </div>
-
-          <div>
-            <span>Employee Code</span>
-            <strong>
-              {employee.employeeCode}
-            </strong>
-          </div>
-
-          <div>
-            <span>Department</span>
-            <strong>
-              {employee.department || "—"}
-            </strong>
-          </div>
-
-          <div>
-            <span>Designation</span>
-            <strong>
-              {employee.designation || "—"}
-            </strong>
-          </div>
-
-          <div>
-            <span>Joining Date</span>
-            <strong>
-              {employee.joiningDate || "—"}
-            </strong>
-          </div>
-
+          <button className="primary-button" type="button" onClick={() => navigate("/profile")}>
+            Open profile
+          </button>
         </div>
       </section>
 
     </div>
   );
 }
-function Dashboard() {
-  const navigate = useNavigate();
-
-  const [data, setData] =
-    useState<DashboardSummary | null>(null);
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState("");
-
-  useEffect(() => {
-    getDashboardSummary()
-      .then(setData)
-      .catch((err) => {
-        console.error(err);
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load dashboard data from the backend.",
-        );
-      })
-      .finally(() => setLoading(false));
-
-    getLeaves()
-      .then((rows) => setLeaveRequests(rows.slice(0, 8)))
-      .catch(() => setLeaveRequests([]));
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="page-loading">
-
-        <div className="loading-spinner"></div>
-
-        <strong>
-          Loading workforce dashboard
-        </strong>
-
-        <span>
-          Connecting to Cyond services...
-        </span>
-
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="page-heading">
-
-        <div>
-
-          <p className="eyebrow">
-            OVERVIEW
-          </p>
-
-          <h2>
-            Workforce Dashboard
-          </h2>
-
-          <p>
-            {error}
-          </p>
-
-        </div>
-
-      </div>
-    );
-  }
-
-  if (!data) {
-    return null;
-  }
-
-  const workforceRate =
-    data.totalEmployees > 0
-      ? Math.round(
-          (data.activeEmployees /
-            data.totalEmployees) *
-            100,
-        )
-      : 0;
-
-  return (
-    <div className="dashboard-page">
-
-      <div className="dashboard-hero">
-
-        <div className="dashboard-hero-copy">
-
-          <p className="eyebrow">
-            WORKFORCE OVERVIEW
-          </p>
-
-          <h2>
-            Good to see you.
-          </h2>
-
-          <p>
-            Monitor workforce activity, employee lifecycle
-            operations, leave and payroll readiness from one place.
-          </p>
-
-        </div>
-
-        <div className="dashboard-actions">
-
-          <button
-            className="secondary-button"
-            onClick={() =>
-              navigate("/employees")
-            }
-          >
-            View Employees
-          </button>
-
-          <button
-            className="primary-button"
-            onClick={() =>
-              navigate("/employees")
-            }
-          >
-            + Add Employee
-          </button>
-
-        </div>
-
-      </div>
-
-      <div className="dashboard-kpi-grid">
-
-        <article className="dashboard-kpi">
-
-          <div className="dashboard-kpi-top">
-
-            <span className="dashboard-kpi-icon">
-              W
-            </span>
-
-            <span className="dashboard-kpi-label">
-              Workforce
-            </span>
-
-          </div>
-
-          <strong>
-            {data.totalEmployees.toLocaleString()}
-          </strong>
-
-          <p>
-            Total employees
-          </p>
-
-          <span className="dashboard-kpi-meta">
-            {data.activeEmployees.toLocaleString()}
-            {" "}currently active
-          </span>
-
-        </article>
-
-
-        <article className="dashboard-kpi">
-
-          <div className="dashboard-kpi-top">
-
-            <span className="dashboard-kpi-icon">
-              A
-            </span>
-
-            <span className="dashboard-kpi-label">
-              Active Rate
-            </span>
-
-          </div>
-
-          <strong>
-            {workforceRate}%
-          </strong>
-
-          <p>
-            Workforce availability
-          </p>
-
-          <span className="dashboard-kpi-meta">
-            {data.activeEmployees.toLocaleString()}
-            {" "}active employees
-          </span>
-
-        </article>
-
-
-        <article className="dashboard-kpi">
-
-          <div className="dashboard-kpi-top">
-
-            <span className="dashboard-kpi-icon">
-              L
-            </span>
-
-            <span className="dashboard-kpi-label">
-              Leave Requests
-            </span>
-
-          </div>
-
-          <strong>
-            {data.pendingLeaveRequests.toLocaleString()}
-          </strong>
-
-          <p>
-            Awaiting action
-          </p>
-
-          <span className="dashboard-kpi-meta">
-            {data.leaveRequests.toLocaleString()}
-            {" "}total requests
-          </span>
-
-        </article>
-
-
-        <article className="dashboard-kpi">
-
-          <div className="dashboard-kpi-top">
-
-            <span className="dashboard-kpi-icon">
-              P
-            </span>
-
-            <span className="dashboard-kpi-label">
-              Payroll
-            </span>
-
-          </div>
-
-          <strong>
-            {data.paidPayrollRecords ===
-            data.payrollRecords
-              ? "Ready"
-              : "Processing"}
-          </strong>
-
-          <p>
-            Payroll processing status
-          </p>
-
-          <span className="dashboard-kpi-meta">
-            {data.paidPayrollRecords.toLocaleString()}
-            {" "}of{" "}
-            {data.payrollRecords.toLocaleString()}
-            {" "}records paid
-          </span>
-
-        </article>
-
-      </div>
-
-      <section className="panel hr-leave-panel">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">LEAVE REQUESTS</p>
-            <h3>Submitted by employees</h3>
-            <p>View only. Employees submit these requests. HR does not create them here.</p>
-          </div>
-          <button className="panel-link" type="button" onClick={() => navigate("/leave")}>
-            Review leave
-          </button>
-        </div>
-        {leaveRequests.length === 0 ? (
-          <p className="hr-leave-empty">No leave requests yet.</p>
-        ) : (
-          <div className="employees-table-wrap">
-            <table className="employees-table">
-              <thead>
-                <tr>
-                  <th>Employee</th>
-                  <th>Dates</th>
-                  <th>Reason</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaveRequests.map((leave) => (
-                  <tr key={`${leave.id ?? leave.startDate}-${leave.employee?.employeeCode ?? ""}`}>
-                    <td>{leave.employee?.fullName || "Employee"}</td>
-                    <td>{leave.startDate} to {leave.endDate}</td>
-                    <td>{leave.reason}</td>
-                    <td>{leave.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-
-      <div className="dashboard-grid">
-
-        <section className="panel dashboard-workforce-panel">
-
-          <div className="panel-header">
-
-            <div>
-
-              <p className="eyebrow">
-                WORKFORCE HEALTH
-              </p>
-
-              <h3>
-                People Operations
-              </h3>
-
-              <p>
-                Current workforce lifecycle and attendance activity.
-              </p>
-
-            </div>
-
-            <button
-              className="panel-link"
-              onClick={() =>
-                navigate("/employees")
-              }
-            >
-              Manage employees
-            </button>
-
-          </div>
-
-
-          <div className="department-list">
-
-            <Department
-              name="Active Employees"
-              count={data.activeEmployees.toLocaleString()}
-              percent={`${workforceRate}%`}
-            />
-
-            <Department
-              name="Pending Onboarding"
-              count={data.pendingOnboarding.toLocaleString()}
-              percent={
-                data.totalEmployees > 0
-                  ? `${Math.min(
-                      100,
-                      Math.round(
-                        (data.pendingOnboarding /
-                          data.totalEmployees) *
-                          100,
-                      ),
-                    )}%`
-                  : "0%"
-              }
-            />
-
-            <Department
-              name="Pending Offboarding"
-              count={data.pendingOffboarding.toLocaleString()}
-              percent={
-                data.totalEmployees > 0
-                  ? `${Math.min(
-                      100,
-                      Math.round(
-                        (data.pendingOffboarding /
-                          data.totalEmployees) *
-                          100,
-                      ),
-                    )}%`
-                  : "0%"
-              }
-            />
-
-            <Department
-              name="Attendance Events"
-              count={data.attendanceEvents.toLocaleString()}
-              percent={
-                data.totalEmployees > 0
-                  ? `${Math.min(
-                      100,
-                      Math.round(
-                        (data.attendanceEvents /
-                          Math.max(
-                            data.totalEmployees,
-                            1,
-                          )) *
-                          100,
-                      ),
-                    )}%`
-                  : "0%"
-              }
-            />
-
-          </div>
-
-        </section>
-
-
-        <section className="panel ai-panel">
-
-          <div className="panel-header">
-
-            <div>
-
-              <p className="eyebrow">
-                AI WORKFORCE INTELLIGENCE
-              </p>
-
-              <h3>
-                AI Insights
-              </h3>
-
-              <p>
-                Analyze attrition risk, engagement, skill gaps
-                and workforce trends.
-              </p>
-
-            </div>
-
-          </div>
-
-
-          <div className="ai-highlight">
-
-            <strong>
-              {data.totalEmployees.toLocaleString()}
-            </strong>
-
-            <span>
-              Employees in workforce
-            </span>
-
-          </div>
-
-
-          <NavLink
-            className="primary-button"
-            to="/ai"
-          >
-            Open AI Insights
-          </NavLink>
-
-        </section>
-
-      </div>
-
-
-      <section className="panel activity-panel">
-
-        <div className="panel-header">
-
-          <div>
-
-            <h3>
-              HR Platform Status
-            </h3>
-
-            <p>
-              Live backend service metrics
-            </p>
-
-          </div>
-
-        </div>
-
-
-        <div className="activity-list">
-
-          <div className="activity-item">
-
-            <strong>
-              Attendance
-            </strong>
-
-            <span>
-              {data.attendanceEvents.toLocaleString()}
-              {" "}events recorded
-            </span>
-
-          </div>
-
-
-          <div className="activity-item">
-
-            <strong>
-              Leave Management
-            </strong>
-
-            <span>
-              {data.pendingLeaveRequests.toLocaleString()}
-              {" "}requests pending
-            </span>
-
-          </div>
-
-
-          <div className="activity-item">
-
-            <strong>
-              Payroll
-            </strong>
-
-            <span>
-              {data.paidPayrollRecords.toLocaleString()}
-              {" "}of{" "}
-              {data.payrollRecords.toLocaleString()}
-              {" "}records paid
-            </span>
-
-          </div>
-
-        </div>
-
-      </section>
-
-    </div>
-  );
-}
-
-
-/* ============================================================
-   STAT
-============================================================ */
-
 function Stat({
   title,
   value,
@@ -1498,78 +889,13 @@ function Stat({
 }) {
   return (
     <div className="stat-card">
-
-      <div className="stat-icon">
-        {icon}
-      </div>
-
-      <p>
-        {title}
-      </p>
-
-      <h3>
-        {value}
-      </h3>
-
-      <span>
-        {change}
-      </span>
-
+      <div className="stat-icon">{icon}</div>
+      <p>{title}</p>
+      <h3>{value}</h3>
+      <span>{change}</span>
     </div>
   );
 }
-
-
-/* ============================================================
-   DEPARTMENT
-============================================================ */
-
-function Department({
-  name,
-  count,
-  percent,
-}: {
-  name: string;
-  count: string;
-  percent: string;
-}) {
-  return (
-    <div className="department-row">
-
-      <div className="department-info">
-
-        <strong>
-          {name}
-        </strong>
-
-        <span>
-          {count} employees
-        </span>
-
-      </div>
-
-      <div className="bar">
-
-        <div
-          style={{
-            width: percent,
-          }}
-        ></div>
-
-      </div>
-
-      <strong>
-        {percent}
-      </strong>
-
-    </div>
-  );
-}
-
-
-/* ============================================================
-   AI INSIGHTS
-============================================================ */
 
 function AIInsights() {
   const [data, setData] =

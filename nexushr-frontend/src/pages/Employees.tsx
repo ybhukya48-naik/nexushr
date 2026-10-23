@@ -750,7 +750,11 @@ export default function Employees() {
                   {filteredEmployees.map((employee) => (
                     <tr key={employee.id}>
                       <td>
-                        <div className="employee-name-cell">
+                        <button
+                          type="button"
+                          className="employee-name-cell employee-profile-link"
+                          onClick={() => navigate(`/employees/${employee.id}`)}
+                        >
                           <div className="employee-avatar">
                             {initials(employee.fullName)}
                           </div>
@@ -759,7 +763,7 @@ export default function Employees() {
                             <strong>{employee.fullName}</strong>
                             <span>{employee.employeeCode}</span>
                           </div>
-                        </div>
+                        </button>
                       </td>
 
                       <td><strong>{employee.companyName}</strong></td>

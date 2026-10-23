@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./EmployeeProfile.css";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
+  fetchEmployeePhoto,
+  getCurrentEmployee,
   getEmployee,
   updateEmployee,
+  uploadEmployeePhoto,
   type EmployeeRequest,
   type EmployeeResponse,
   type EmployeeLifecycleStatus,
@@ -57,13 +60,22 @@ function roleLabel(role: EmployeeRole) {
   }
 }
 
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
+}
+
 export default function EmployeeProfile() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
-
+  const mine = location.pathname === "/profile";
   const employeeId = Number(id);
+  const pictureInput = useRef<HTMLInputElement>(null);
 
   const [employee, setEmployee] = useState<EmployeeResponse | null>(null);
+  const [photoUrl, setPhotoUrl] = useState("");
+  const [photoError, setPhotoError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false);
@@ -73,13 +85,15 @@ export default function EmployeeProfile() {
   const [form, setForm] = useState<EmployeeRequest | null>(null);
 
   useEffect(() => {
-    if (!Number.isInteger(employeeId) || employeeId <= 0) {
+    if (!mine && (!Number.isInteger(employeeId) || employeeId <= 0)) {
       return;
     }
 
     let cancelled = false;
 
-    getEmployee(employeeId)
+    const load = mine ? getCurrentEmployee() : getEmployee(employeeId);
+
+    load
       .then((data) => {
         if (cancelled) {
           return;
@@ -119,7 +133,50 @@ export default function EmployeeProfile() {
     return () => {
       cancelled = true;
     };
-  }, [employeeId]);
+  }, [employeeId, mine]);
+
+  useEffect(() => {
+    if (!employee?.hasProfilePhoto) {
+      setPhotoUrl("");
+      return;
+    }
+    let cancelled = false;
+    let objectUrl = "";
+    fetchEmployeePhoto(employee.id)
+      .then((url) => {
+        if (cancelled || !url) {
+          return;
+        }
+        objectUrl = url;
+        setPhotoUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPhotoUrl("");
+        }
+      });
+    return () => {
+      cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [employee]);
+
+  async function handlePicture(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !employee) {
+      return;
+    }
+    setPhotoError("");
+    try {
+      const updated = await uploadEmployeePhoto(mine ? "me" : employee.id, file);
+      setEmployee(updated);
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : "Could not save the profile picture.");
+    }
+  }
 
   function updateForm(
     field: keyof EmployeeRequest,
@@ -200,7 +257,7 @@ export default function EmployeeProfile() {
     }
   }
 
-  if (!Number.isInteger(employeeId) || employeeId <= 0) {
+  if (!mine && (!Number.isInteger(employeeId) || employeeId <= 0)) {
     return (
       <section className="panel empty-module">
         <div className="module-icon">!</div>
@@ -244,13 +301,35 @@ export default function EmployeeProfile() {
 
   return (
     <section className="employees-page">
-      <div className="employees-header">
-        <div>
-          <p className="page-eyebrow">Employee Lifecycle</p>
-          <h1>{employee.fullName}</h1>
-          <p>
-            Employee profile and employment information.
-          </p>
+      <div className="employees-header profile-hero">
+        <div className="profile-identity">
+          <button
+            type="button"
+            className="profile-picture"
+            onClick={() => pictureInput.current?.click()}
+          >
+            {photoUrl ? <img src={photoUrl} alt="" /> : <span>{initials(employee.fullName)}</span>}
+          </button>
+          <div>
+            <p className="page-eyebrow">{employee.employeeCode}</p>
+            <h1>{employee.fullName}</h1>
+            <p>{employee.designation || "No designation yet"}</p>
+            <button
+              type="button"
+              className="table-action"
+              onClick={() => pictureInput.current?.click()}
+            >
+              Add profile picture
+            </button>
+            {photoError && <span className="profile-picture-error">{photoError}</span>}
+            <input
+              ref={pictureInput}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              hidden
+              onChange={(event) => void handlePicture(event)}
+            />
+          </div>
         </div>
 
         <div>

@@ -199,6 +199,34 @@ public class SecurityConfig {
                     "EMPLOYEE"
                 )
 
+                .requestMatchers(
+                    HttpMethod.POST,
+                    "/api/v1/employees/me/photo"
+                )
+                .hasAnyRole(
+                    "HR",
+                    "ADMIN",
+                    "MANAGER",
+                    "EMPLOYEE"
+                )
+
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/api/v1/employees/*/photo"
+                )
+                .hasAnyRole(
+                    "HR",
+                    "ADMIN",
+                    "MANAGER",
+                    "EMPLOYEE"
+                )
+
+                .requestMatchers(
+                    HttpMethod.POST,
+                    "/api/v1/employees/*/photo"
+                )
+                .hasAnyRole("HR", "ADMIN", "MANAGER")
+
                 // Employee directory remains management-only.
                 .requestMatchers(
                     "/api/v1/employees/**"
