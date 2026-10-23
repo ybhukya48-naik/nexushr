@@ -749,7 +749,7 @@ export default function Payroll() {
             </div>
           )}
 
-        <form onSubmit={handleGenerate}>
+        <form className="payroll-salary-form" onSubmit={handleGenerate}>
           <div className="employee-filters">
             <label>
               Employee
@@ -817,37 +817,39 @@ export default function Payroll() {
                   }
                 />
                 <span>
-                  Use imported attendance to auto-calculate overtime and leave deduction
+                  Check-in and check-out fill Overtime and Leave Deduction below.
                 </span>
               </div>
             </label>
 
             {selectedEmployee && (
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() =>
-                  void loadAutoComponents(selectedEmployee, payMonth)
-                }
-                disabled={autoComponentsLoading}
-              >
-                {autoComponentsLoading
-                  ? "Calculating..."
-                  : "Refresh Attendance Calculation"}
-              </button>
-            )}
+              <div className="payroll-attendance-block">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() =>
+                    void loadAutoComponents(selectedEmployee, payMonth)
+                  }
+                  disabled={autoComponentsLoading}
+                >
+                  {autoComponentsLoading
+                    ? "Calculating..."
+                    : "Refresh Attendance Calculation"}
+                </button>
 
-            {autoComponents && (
-              <div className="payroll-attendance-summary">
-                <strong>
-                  Attendance calculation for {autoComponents.employeeCode}
-                </strong>
-                <span>
-                  Worked {(autoComponents.workedMinutes / 60).toFixed(1)}h of {(autoComponents.expectedWorkMinutes / 60).toFixed(1)}h, shortfall {(autoComponents.shortfallMinutes / 60).toFixed(1)}h.
-                </span>
-                <span>
-                  Auto leave deduction {money(autoComponents.leaveDeduction)} | Auto overtime {money(autoComponents.overtimeAmount)}
-                </span>
+                {autoComponents && (
+                  <div className="payroll-attendance-summary">
+                    <strong>
+                      Attendance calculation for {autoComponents.employeeCode}
+                    </strong>
+                    <span>
+                      Worked {(autoComponents.workedMinutes / 60).toFixed(1)}h of {(autoComponents.expectedWorkMinutes / 60).toFixed(1)}h, shortfall {(autoComponents.shortfallMinutes / 60).toFixed(1)}h.
+                    </span>
+                    <span>
+                      This amount goes into Leave Deduction {money(autoComponents.leaveDeduction)} and Overtime {money(autoComponents.overtimeAmount)}.
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
