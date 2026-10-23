@@ -999,8 +999,20 @@ tbody tr:hover td {
   font-size: 13px;
 }
 
-.payroll-auto-toggle {
+.payroll-auto-toggle,
+.payroll-attendance-block {
   grid-column: 1 / -1;
+}
+
+.payroll-attendance-block {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.payroll-attendance-block .payroll-attendance-summary {
+  width: 100%;
+  margin-bottom: 0;
 }
 
 .payroll-auto-toggle-row {
@@ -1010,10 +1022,32 @@ tbody tr:hover td {
   min-height: 42px;
 }
 
-.payroll-auto-toggle-row input[type="checkbox"] {
-  width: auto;
-  min-height: auto;
-  margin: 0;
+.employees-page .employees-panel form .employee-filters .payroll-auto-toggle {
+  padding-top: 0;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.employees-page .employees-panel form .employee-filters .payroll-auto-toggle-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  flex: 0 0 18px;
+  padding: 0;
+  accent-color: #6941c6;
+}
+
+.employees-page .payroll-salary-form .employee-filters label:last-child {
+  flex-direction: column;
+  align-items: stretch;
+  padding-top: 0;
+}
+
+.employees-page .payroll-salary-form .employee-filters label:last-child input {
+  width: 100%;
+  height: auto;
+  min-height: 44px;
 }
 
 .payroll-auto-toggle-row span {
