@@ -886,13 +886,20 @@ export async function downloadSampleAttendance(): Promise<Blob> {
 }
 
 /**
- * Upload a multi-sheet salary Excel workbook.
- * The backend will:
- *  1. Parse actual worked hours / days for each employee.
- *  2. Calculate earned salary = (workedDays / totalDays) × CTC.
- *  3. Sync AttendanceRecord rows so the monthly summary shows real hours.
- *  4. Send salary-notification emails to every employee.
+ * Builds the month's payroll from recorded check-in hours.
+ * A spreadsheet is not required.
  */
+export function generatePayrollFromAttendance(
+  payMonth: string,
+  companyCode: string,
+) {
+  const params = new URLSearchParams({ payMonth, companyCode });
+  return request<{ payMonth: string; employees: number; message: string }>(
+    `/payroll/generate-from-attendance?${params.toString()}`,
+    { method: "POST" },
+  );
+}
+
 export function importPayrollExcel(
   payMonth: string,
   file: File,

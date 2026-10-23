@@ -1,14 +1,11 @@
 package com.zidio.nexushr.service;
 
 import com.zidio.nexushr.domain.AttendanceRecord;
-import com.zidio.nexushr.domain.Company;
 import com.zidio.nexushr.domain.Employee;
-import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
 import com.zidio.nexushr.domain.NotificationChannel;
 import com.zidio.nexushr.domain.NotificationType;
 import com.zidio.nexushr.domain.PayrollRecord;
 import com.zidio.nexushr.domain.PayrollStatus;
-import com.zidio.nexushr.domain.RoleType;
 import com.zidio.nexushr.repository.AttendanceRepository;
 import com.zidio.nexushr.repository.CompanyRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
@@ -27,7 +24,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.*;
@@ -204,22 +200,17 @@ public class ExcelPayrollService {
                             salary = salarySource.find(employeeCode, employeeName);
                         }
 
-                        BigDecimal sheetCtc = payrollSheet.ctcColumn() != null
-                                ? value(row, payrollSheet.ctcColumn())
-                                : ZERO;
-                        BigDecimal sheetGross = payrollSheet.grossSalaryColumn() != null
-                                ? value(row, payrollSheet.grossSalaryColumn())
-                                : ZERO;
-
                         Employee employee = resolveEmployee(
                                 employeeCode,
                                 employeeName,
-                                sheet.getName(),
-                                salary,
-                                sheetCtc,
-                                sheetGross,
                                 allEmployees
                         );
+                        if (employee == null) {
+                            errors.add("Sheet [" + sheet.getName() + "], row [" + (rowIndex + 1)
+                                    + "]: " + employeeCode + " / " + employeeName
+                                    + " is not an employee. A spreadsheet cannot create an account.");
+                            continue;
+                        }
 
                         PayrollRecord payroll = existingMap.get(employee.getId());
                         if (payroll != null) {
@@ -264,54 +255,6 @@ public class ExcelPayrollService {
         }
     }
 
-    private void syncAttendance(Employee employee, YearMonth yearMonth, BigDecimal actualHours, int workingDays) {
-        if (employee == null || employee.getId() == null || yearMonth == null) {
-            return;
-        }
-
-        try {
-            int days = workingDays > 0 ? workingDays : 22;
-            int totalHours = actualHours != null && actualHours.compareTo(ZERO) > 0
-                    ? actualHours.intValue()
-                    : days * 9;
-            int dailyHours = Math.max(1, Math.min(12, totalHours / days));
-            int remainingHours = totalHours % days;
-
-            LocalDate cur = yearMonth.atDay(1);
-            LocalDate end = yearMonth.atEndOfMonth();
-            int dayCount = 0;
-
-            List<AttendanceRecord> recordsToSave = new ArrayList<>();
-
-            while (!cur.isAfter(end) && dayCount < days) {
-                if (cur.getDayOfWeek() != DayOfWeek.SUNDAY) {
-                    int hoursToday = dailyHours + (dayCount < remainingHours ? 1 : 0);
-                    AttendanceRecord record = attendanceRepository
-                            .findByEmployee_IdAndAttendanceDate(employee.getId(), cur)
-                            .orElseGet(AttendanceRecord::new);
-
-                    record.setEmployee(employee);
-                    record.setAttendanceDate(cur);
-                    record.setCheckInTime(cur.atTime(9, 0));
-                    record.setCheckOutTime(cur.atTime(9 + hoursToday, 0));
-                    record.setWorkMinutes(hoursToday * 60);
-                    record.setLateArrivalMinutes(0);
-                    record.setOvertimeMinutes(Math.max(0, (hoursToday - 9) * 60));
-
-                    recordsToSave.add(record);
-                    dayCount++;
-                }
-                cur = cur.plusDays(1);
-            }
-
-            if (!recordsToSave.isEmpty()) {
-                attendanceRepository.saveAll(recordsToSave);
-            }
-        } catch (Exception ex) {
-            log.warn("Failed to sync attendance for employee {}: {}", employee.getEmployeeCode(), ex.getMessage());
-        }
-    }
-
     public record SalaryEmailReport(int sent, int failed, List<String> errors) {
         public static SalaryEmailReport empty() {
             return new SalaryEmailReport(0, 0, List.of());
@@ -351,7 +294,7 @@ public class ExcelPayrollService {
         String subject = "Salary Processed - " + payMonth;
         String message = "Dear " + employee.getFullName() + ",\n\n"
                 + "Your salary for " + payMonth + " has been calculated from your working hours.\n"
-                + "A full day is 9 hours. Break time is not paid.\n"
+                + "A full day is 8 working hours. Lunch is not paid.\n"
                 + "Worked Hours: " + (payroll.getActualHours() != null ? payroll.getActualHours() : 0) + " hrs\n"
                 + "Net Salary: Rs " + payroll.getNetSalary() + "\n\n"
                 + "Your payslip is on the Cyond HR platform.\n\n"
@@ -390,10 +333,6 @@ public class ExcelPayrollService {
     private Employee resolveEmployee(
             String employeeCode,
             String employeeName,
-            String sheetName,
-            SalaryRow salary,
-            BigDecimal rowCtc,
-            BigDecimal rowGross,
             List<Employee> allEmployees) {
 
         String code = normalizeCode(employeeCode);
@@ -450,64 +389,7 @@ public class ExcelPayrollService {
             allEmployees.add(found.get());
             return found.get();
         }
-
-        // 4. If not found in DB, auto-create complete valid employee record
-        String companyCode = sheetName.toUpperCase(Locale.ROOT).contains("CYOND") ? "CYOND" : "GORLE";
-        Company company = companyRepository.findByCodeIgnoreCase(companyCode)
-                .orElseGet(() -> {
-                    Company c = new Company();
-                    c.setCode(companyCode);
-                    c.setName(companyCode.equalsIgnoreCase("CYOND") ? "CYOND" : "GORLE GROUP");
-                    c.setTagline(companyCode.equalsIgnoreCase("CYOND")
-                            ? "Waterproofing Diagnosis & Repair Experts"
-                            : "STRUCTURAL ENGINEERING");
-                    c.setLogoPath(companyCode.equalsIgnoreCase("CYOND")
-                            ? "/images/cyond-logo.jpeg"
-                            : "/images/gorle-group-logo.jpeg");
-                    c.setActive(true);
-                    return companyRepository.save(c);
-                });
-
-        Employee newEmp = new Employee();
-        String assignedCode = code.isBlank() ? ("EMP-" + System.currentTimeMillis()) : code;
-        if (employeeRepository.existsByEmployeeCode(assignedCode)) {
-            assignedCode = (companyCode.equals("CYOND") ? "CY-EMP-" : "GG-EMP-") + assignedCode;
-        }
-        newEmp.setEmployeeCode(assignedCode);
-        newEmp.setFullName(name.isBlank() ? assignedCode : name);
-        newEmp.setCompany(company);
-
-        String cleanCode = assignedCode.replaceAll("[^a-zA-Z0-9]", "").toLowerCase(Locale.ROOT);
-        String safeEmail = cleanCode + "@" + (companyCode.equals("CYOND") ? "cyond.com" : "gorlegroup.com");
-        if (employeeRepository.existsByEmail(safeEmail)) {
-            safeEmail = cleanCode + "." + System.currentTimeMillis() + "@" + (companyCode.equals("CYOND") ? "cyond.com" : "gorlegroup.com");
-        }
-        newEmp.setEmail(safeEmail);
-        newEmp.setPassword(UNSET_PASSWORD_HASH);
-        newEmp.setRoleType(RoleType.EMPLOYEE);
-        newEmp.setDepartment(sheetName);
-        newEmp.setDesignation("Staff");
-        newEmp.setJoiningDate(LocalDate.of(2026, 1, 1));
-
-        BigDecimal base = ZERO;
-        if (rowGross != null && rowGross.compareTo(ZERO) > 0) {
-            base = rowGross;
-        } else if (salary != null && salary.gross() != null && salary.gross().compareTo(ZERO) > 0) {
-            base = salary.gross();
-        } else if (salary != null && salary.ctc() != null && salary.ctc().compareTo(ZERO) > 0) {
-            base = salary.ctc().divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
-        } else if (rowCtc != null && rowCtc.compareTo(ZERO) > 0) {
-            base = rowCtc.divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
-        } else {
-            base = BigDecimal.valueOf(30000);
-        }
-        newEmp.setBaseSalary(base);
-        newEmp.setActive(true);
-        newEmp.setLifecycleStatus(EmployeeLifecycleStatus.ACTIVE);
-
-        Employee saved = employeeRepository.save(newEmp);
-        allEmployees.add(saved);
-        return saved;
+        return null;
     }
 
     private PayrollRecord buildPayrollRecord(
@@ -559,7 +441,6 @@ public class ExcelPayrollService {
         payroll.setCtc(ctc);
         payroll.setGrossSalary(grossSalary);
 
-        BigDecimal actualWorkingHours = value(row, sheet.actualWorkingHoursColumn());
         BigDecimal casualLeave = value(row, sheet.casualLeaveColumn());
         BigDecimal chargePerDay = value(row, sheet.chargePerDayColumn());
         BigDecimal earnedGross = value(row, sheet.earnedGrossColumn());
@@ -574,7 +455,7 @@ public class ExcelPayrollService {
 
         payroll.setWorkingDays(sheet.workingDays());
         payroll.setRequiredHours(EIGHT);
-        payroll.setActualHours(actualWorkingHours);
+        payroll.setActualHours(ZERO);
         payroll.setCasualLeave(casualLeave);
         payroll.setOtherLeave(ZERO);
         payroll.setChargePerDay(chargePerDay);
@@ -619,7 +500,10 @@ public class ExcelPayrollService {
                 ? Math.max(0, sheet.workingDays()) * HoursPayPolicy.PAID_WORK_MINUTES
                 : HoursPayPolicy.expectedPaidMinutes(periodStart, periodEnd, gorle, holidays);
         payroll.setWorkingDays(expectedMinutes / HoursPayPolicy.PAID_WORK_MINUTES);
-        int workedMinutes = Math.max(0, hoursToMinutes(actualWorkingHours) - deductedMinutes(employee, periodStart, periodEnd));
+        int recordedMinutes = attendanceWorkedMinutes(employee, periodStart, periodEnd);
+        payroll.setActualHours(BigDecimal.valueOf(recordedMinutes)
+                .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP));
+        int workedMinutes = Math.max(0, recordedMinutes - deductedMinutes(employee, periodStart, periodEnd));
         int shortfallMinutes = HoursPayPolicy.deductibleShortfall(expectedMinutes, workedMinutes);
 
         BigDecimal payableBase = earnedGross.compareTo(ZERO) > 0 ? earnedGross : grossSalary;
@@ -1090,11 +974,17 @@ public class ExcelPayrollService {
                 .sum();
     }
 
-    private int hoursToMinutes(BigDecimal hours) {
-        if (hours == null) {
+    private int attendanceWorkedMinutes(Employee employee, LocalDate start, LocalDate end) {
+        if (employee == null || employee.getId() == null || start == null || end == null || start.isAfter(end)) {
             return 0;
         }
-        return hours.multiply(BigDecimal.valueOf(60)).setScale(0, RoundingMode.HALF_UP).intValue();
+        return attendanceRepository
+                .findByEmployee_IdAndAttendanceDateBetween(employee.getId(), start, end)
+                .stream()
+                .map(AttendanceRecord::getWorkMinutes)
+                .filter(minutes -> minutes != null && minutes > 0)
+                .mapToInt(Integer::intValue)
+                .sum();
     }
 
     private record SalaryRow(

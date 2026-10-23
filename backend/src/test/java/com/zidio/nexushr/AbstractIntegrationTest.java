@@ -5,8 +5,6 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Base class for integration tests.
@@ -32,18 +30,22 @@ import org.testcontainers.junit.jupiter.Testcontainers;
                 "spring.jpa.hibernate.ddl-auto=validate"
         }
 )
-@Testcontainers(disabledWithoutDocker = true)
 public abstract class AbstractIntegrationTest {
 
     /**
-     * PostgreSQL database used by integration tests.
+     * One PostgreSQL database for every integration test class.
+     * Started here, not with {@code @Container}, so Testcontainers does not
+     * stop it when a test class finishes and leave Spring pointing at the old port.
      */
-    @Container
     static final PostgreSQLContainer<?> POSTGRES =
             new PostgreSQLContainer<>("postgres:16-alpine")
                     .withDatabaseName("nexushr_it")
                     .withUsername("nexushr")
                     .withPassword("nexushr");
+
+    static {
+        POSTGRES.start();
+    }
 
     /**
      * Random HTTP port assigned by Spring Boot.

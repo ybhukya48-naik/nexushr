@@ -89,7 +89,6 @@ public class SecurityConfig {
                 // =========================================================
 
                 .requestMatchers("/", "/error").permitAll()
-                .requestMatchers("/api/v1/s3-test").permitAll()
                 .requestMatchers("/test-public").access((authentication, context) -> new org.springframework.security.authorization.AuthorizationDecision(false))
 
 
@@ -413,6 +412,17 @@ public class SecurityConfig {
 
                 .requestMatchers(
                     "/api/v1/ai/**"
+                )
+                .hasAnyRole(
+                    "HR",
+                    "ADMIN",
+                    "MANAGER"
+                )
+
+                // Payroll writes, imports, and hour-based generation are management-only.
+                .requestMatchers(
+                    HttpMethod.POST,
+                    "/api/v1/payroll/**"
                 )
                 .hasAnyRole(
                     "HR",

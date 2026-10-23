@@ -11,9 +11,12 @@ import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.FileInputStream;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 @SpringBootTest
 class ExcelPayrollServiceTest {
@@ -31,6 +34,7 @@ class ExcelPayrollServiceTest {
     void importActualPayrollWorkbook() throws Exception {
 
         String filePath = "GGEA-CYOND-SALARIES-2026.xlsx";
+        assumeTrue(Files.exists(Path.of(filePath)), "Local salary workbook is not part of the repository");
 
         try (FileInputStream inputStream =
                      new FileInputStream(filePath)) {

@@ -1,5 +1,5 @@
 ﻿import { isCompanyMatch } from "../utils/company";
-import { getWorkspaceCompany, setWorkspaceCompany } from "../utils/workspace";
+import { getWorkspaceCompany } from "../utils/workspace";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { FormEvent } from "react";
@@ -101,9 +101,7 @@ export default function Employees() {
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("All Departments");
   const [status, setStatus] = useState("All Statuses");
-  const [company, setCompany] = useState<string>(
-    () => getWorkspaceCompany() ?? "CYOND",
-  );
+  const company = getWorkspaceCompany() ?? "CYOND";
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -337,6 +335,10 @@ export default function Employees() {
       accountNumber: form.accountNumber?.trim() || "",
       department: form.department.trim(),
       designation: form.designation.trim(),
+      companyCode:
+        editingEmployeeId !== null
+          ? form.companyCode
+          : (getWorkspaceCompany() ?? "CYOND"),
     };
 
     try {
@@ -563,19 +565,6 @@ export default function Employees() {
             </label>
 
             <label>
-              Company
-              <select
-                value={form.companyCode || "CYOND"}
-                onChange={(event) =>
-                  updateForm("companyCode", event.target.value)
-                }
-              >
-                <option value="CYOND">CYOND</option>
-                <option value="GORLE">GORLE GROUP</option>
-              </select>
-            </label>
-
-            <label>
               Role
               <select
                 value={form.roleType}
@@ -704,21 +693,6 @@ export default function Employees() {
               {departments.map((item) => (
                 <option key={item}>{item}</option>
               ))}
-            </select>
-          </label>
-
-          <label>
-            <span className="sr-only">Filter by company</span>
-            <select
-              value={company}
-              onChange={(event) => {
-                const next = event.target.value === "GORLE" ? "GORLE" : "CYOND";
-                setCompany(next);
-                setWorkspaceCompany(next);
-              }}
-            >
-              <option value="CYOND">CYOND</option>
-              <option value="GORLE">GORLE GROUP</option>
             </select>
           </label>
 

@@ -974,6 +974,26 @@ public class AttendanceService {
         log.info("[AttendanceService] Calculated and saved payroll for employees for payMonth={}", payMonth);
     }
 
+    @Transactional
+    public int generatePayrollFromAttendance(String payMonth, String companyCode) {
+        YearMonth month;
+        try {
+            month = YearMonth.parse(payMonth == null ? "" : payMonth.trim());
+        } catch (RuntimeException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "payMonth must use YYYY-MM format");
+        }
+        String company = companyCode == null ? "" : companyCode.trim();
+        List<Employee> people = employeeRepository
+                .findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus.ACTIVE)
+                .stream()
+                .filter(employee -> company.isEmpty()
+                        || (employee.getCompany() != null
+                        && company.equalsIgnoreCase(employee.getCompany().getCode())))
+                .toList();
+        calculateAndSavePayrollForAttendance(new HashSet<>(people), month, month.toString());
+        return people.size();
+    }
+
     public byte[] sampleAttendanceWorkbook() {
         List<Employee> people = employeeRepository
                 .findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus.ACTIVE)

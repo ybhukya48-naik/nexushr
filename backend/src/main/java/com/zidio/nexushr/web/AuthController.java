@@ -6,6 +6,7 @@ import com.zidio.nexushr.domain.GenderType;
 import com.zidio.nexushr.domain.RoleType;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.security.JwtTokenService;
+import com.zidio.nexushr.service.ExcelPayrollService;
 import com.zidio.nexushr.web.dto.AuthDtos;
 import com.zidio.nexushr.web.dto.RegisterRequest;
 import org.slf4j.Logger;
@@ -228,6 +229,9 @@ public class AuthController {
 
     private boolean passwordMatches(String rawPassword, String storedHash) {
         if (storedHash == null || storedHash.isBlank()) {
+            return false;
+        }
+        if (ExcelPayrollService.UNSET_PASSWORD_HASH.equals(storedHash)) {
             return false;
         }
         try {

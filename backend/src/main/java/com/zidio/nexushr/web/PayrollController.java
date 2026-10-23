@@ -277,6 +277,24 @@ public class PayrollController {
                 .body(workbook);
     }
 
+    @PostMapping("/generate-from-attendance")
+    @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER')")
+    public Map<String, Object> generateFromAttendance(
+            @RequestParam String payMonth,
+            @RequestParam(required = false) String companyCode) {
+
+        if (payMonth == null || payMonth.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "payMonth is required (YYYY-MM)");
+        }
+        int employees = attendanceService.generatePayrollFromAttendance(payMonth, companyCode);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("payMonth", payMonth);
+        body.put("employees", employees);
+        body.put("message", "Payroll generated from recorded working hours for "
+                + employees + " employee(s). No spreadsheet was used.");
+        return body;
+    }
+
     @PostMapping(value = "/import-excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER')")
     public ResponseEntity<Map<String, Object>> importExcel(

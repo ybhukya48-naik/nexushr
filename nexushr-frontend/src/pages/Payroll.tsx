@@ -1,5 +1,5 @@
 import { isCompanyMatch } from "../utils/company";
-import { getWorkspaceCompany, setWorkspaceCompany } from "../utils/workspace";
+import { getWorkspaceCompany } from "../utils/workspace";
 import { useEffect, useMemo, useState } from "react";
 import {
   createPayroll,
@@ -11,6 +11,7 @@ import {
   getPayrollRecords,
   importAttendanceExcel,
   importAttendancePaste,
+  generatePayrollFromAttendance,
   importPayrollExcel,
   getPayslip,
   downloadPayslipPdf,
@@ -79,6 +80,7 @@ export default function Payroll() {
   // Salary Excel import state
   const [salaryFile, setSalaryFile] = useState<File | null>(null);
   const [importingSalary, setImportingSalary] = useState(false);
+  const [generatingFromHours, setGeneratingFromHours] = useState(false);
   const [salaryImportResult, setSalaryImportResult] =
     useState<PayrollExcelImportResponse | null>(null);
 
@@ -271,13 +273,24 @@ export default function Payroll() {
     }
   }
 
+  async function handleGenerateFromHours() {
+    setGeneratingFromHours(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await generatePayrollFromAttendance(payMonth, selectedCompany);
+      setMessage(result.message);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to generate payroll from working hours.");
+    } finally {
+      setGeneratingFromHours(false);
+    }
+  }
+
   /**
-   * Upload the provided salary workbook (multi-sheet XLSX).
-   * Backend will:
-   *  1. Parse worked hours/days per employee from the Excel.
-   *  2. Calculate earned salary based on actual working days.
-   *  3. Sync AttendanceRecord rows so monthly summary shows real hours.
-   *  4. Send email notifications to every employee.
+   * Optional salary workbook for people who already exist.
+   * Hours come from attendance. The sheet cannot create employees.
    */
   async function handleSalaryExcelImport(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -529,9 +542,26 @@ export default function Payroll() {
 
           <div className="payroll-attendance-import">
             <div>
+              <strong>Generate from working hours</strong>
+              <span>
+                Uses each employee&apos;s check-in and check-out for {payMonth}. A spreadsheet is not required, and this does not add employees.
+              </span>
+            </div>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => void handleGenerateFromHours()}
+              disabled={generatingFromHours}
+            >
+              {generatingFromHours ? "Generating..." : "Generate payroll"}
+            </button>
+          </div>
+
+          <div className="payroll-attendance-import">
+            <div>
               <strong>Sample employee sheet</strong>
               <span>
-                Download fake attendance rows. A full day is 9:00 to 18:00. Importing it splits each employee's monthly salary by the hours in the sheet.
+                Optional. Download a blank attendance layout for people already in Employees. Importing it does not create accounts.
               </span>
             </div>
             <button
@@ -606,7 +636,7 @@ export default function Payroll() {
             <label>
               Import salary Excel
               <span>
-                Upload the salary workbook. Pay follows working hours, then the email button sends each employee their salary notice.
+                Optional. Matches people already in Employees and uses their recorded hours. Rows that are not real employees are skipped.
               </span>
               <input
                 type="file"
@@ -721,24 +751,6 @@ export default function Payroll() {
 
         <form onSubmit={handleGenerate}>
           <div className="employee-filters">
-            {isManagementRole && (
-              <label>
-                Company
-                <select
-                  value={selectedCompany}
-                  onChange={(event) => {
-                    const next = event.target.value === "GORLE" ? "GORLE" : "CYOND";
-                    setSelectedCompany(next);
-                    setWorkspaceCompany(next);
-                    setSelectedEmployee("");
-                  }}
-                >
-                  <option value="CYOND">CYOND</option>
-                  <option value="GORLE">GORLE GROUP</option>
-                </select>
-              </label>
-            )}
-
             <label>
               Employee
               <select
