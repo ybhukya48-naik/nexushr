@@ -74,7 +74,7 @@ class EmployeeApiIT extends AbstractIntegrationTest {
                 Map.class
         );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).containsEntry("fullName", "Integration Test User");
         assertThat(response.getBody()).containsEntry("email", "it.user@zidio.com");
         assertThat((Integer) response.getBody().get("id")).isPositive();

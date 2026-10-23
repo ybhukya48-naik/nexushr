@@ -26,16 +26,61 @@ class LeaveApiIT extends AbstractIntegrationTest {
 
     private HttpHeaders authHeaders;
 
+    private static final String ACTOR_CODE = "LVACTOR";
+
+    private static boolean actorReady;
+
     @BeforeEach
     void setUp() {
-        String token = jwtTokenService.generate(
-                "admin",
+        HttpHeaders bootstrap = new HttpHeaders();
+        bootstrap.setBearerAuth(jwtTokenService.generate(
+                "bootstrap",
                 Map.of("role", "ADMIN")
-        );
+        ));
+        bootstrap.setContentType(MediaType.APPLICATION_JSON);
+        ensureActor(bootstrap);
 
         authHeaders = new HttpHeaders();
-        authHeaders.setBearerAuth(token);
+        authHeaders.setBearerAuth(jwtTokenService.generate(
+                ACTOR_CODE,
+                Map.of("role", "ADMIN")
+        ));
         authHeaders.setContentType(MediaType.APPLICATION_JSON);
+    }
+
+    /**
+     * Leave creation looks up the signed-in user by employee code.
+     * The demo admin row is gone, so the token subject has to be a real employee.
+     */
+    private void ensureActor(HttpHeaders bootstrap) {
+        if (actorReady) {
+            return;
+        }
+
+        String body = """
+                {
+                  "employeeCode": "%s",
+                  "fullName": "Leave Actor",
+                  "email": "lvactor@zidio.com",
+                  "password": "LeaveTest1",
+                  "roleType": "ADMIN",
+                  "department": "QA",
+                  "designation": "Tester",
+                  "joiningDate": "2026-01-01",
+                  "baseSalary": 50000.00,
+                  "active": true
+                }
+                """.formatted(ACTOR_CODE);
+
+        ResponseEntity<Map> response = restTemplate.exchange(
+                baseUrl() + "/api/v1/employees",
+                HttpMethod.POST,
+                new HttpEntity<>(body, bootstrap),
+                Map.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        actorReady = true;
     }
 
     private static int nextEmployee = 1;
@@ -68,7 +113,7 @@ class LeaveApiIT extends AbstractIntegrationTest {
                 Map.class
         );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         return ((Number) response.getBody().get("id")).intValue();
     }
 

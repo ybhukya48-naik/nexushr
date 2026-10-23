@@ -89,7 +89,7 @@ class AiAttritionApiIT extends AbstractIntegrationTest {
                 new HttpEntity<>(body, authHeaders),
                 Map.class
         );
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         return ((Number) response.getBody().get("id")).intValue();
     }
 
