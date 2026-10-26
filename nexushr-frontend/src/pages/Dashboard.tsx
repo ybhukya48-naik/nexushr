@@ -10,8 +10,10 @@ import {
   type EmployeeResponse,
 } from "../api";
 import {
+  getAttendanceAudit,
   getAttendanceByDate,
   getLeaves,
+  type AttendanceAuditEntry,
   type AttendanceRecord,
   type LeaveRequest,
 } from "./Attendance";
@@ -36,11 +38,32 @@ function todayIso() {
 }
 
 function clock(value?: string) {
-  if (!value) {
-    return "—";
+  const match = String(value ?? "").match(/(\d{2}):(\d{2})/);
+  return match ? `${match[1]}:${match[2]}` : "—";
+}
+
+function punchPairs(entries: AttendanceAuditEntry[], employeeId: number, date: string, record?: AttendanceRecord) {
+  const pairs: Array<{ checkIn: string; checkOut?: string }> = [];
+  const relevant = entries
+    .filter((entry) => entry.employeeId === employeeId
+      && (entry.attendanceDate ?? "").slice(0, 10) === date
+      && (entry.action === "CHECK_IN" || entry.action === "CHECK_OUT"))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  for (const entry of relevant) {
+    const time = clock(entry.detail) === "—" ? clock(entry.createdAt) : clock(entry.detail);
+    if (entry.action === "CHECK_IN") {
+      pairs.push({ checkIn: time });
+    } else if (pairs.length > 0 && !pairs[pairs.length - 1].checkOut) {
+      pairs[pairs.length - 1].checkOut = time;
+    }
   }
-  const time = value.includes("T") ? value.split("T")[1] : value;
-  return time.slice(0, 5);
+  if (pairs.length === 0 && record?.checkInTime) {
+    pairs.push({
+      checkIn: clock(record.checkInTime),
+      checkOut: record.checkOutTime ? clock(record.checkOutTime) : undefined,
+    });
+  }
+  return pairs;
 }
 
 function initials(name: string) {
@@ -97,6 +120,8 @@ export default function Dashboard() {
   const [me, setMe] = useState<EmployeeResponse | null>(null);
   const [people, setPeople] = useState<EmployeeResponse[]>([]);
   const [todayRows, setTodayRows] = useState<AttendanceRecord[]>([]);
+  const [recentRows, setRecentRows] = useState<AttendanceRecord[]>([]);
+  const [audit, setAudit] = useState<AttendanceAuditEntry[]>([]);
   const [week, setWeek] = useState<Array<{ label: string; present: number }>>([]);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [holidays, setHolidays] = useState<HolidayMark[]>([]);
@@ -122,8 +147,9 @@ export default function Dashboard() {
       Promise.all(dates.map((date) => getAttendanceByDate(date).catch(() => [] as AttendanceRecord[]))),
       getLeaves().catch(() => [] as LeaveRequest[]),
       getHolidays().catch(() => [] as CompanyHoliday[]),
+      getAttendanceAudit().catch(() => [] as AttendanceAuditEntry[]),
     ])
-      .then(([dashboard, current, employees, attendance, history, leaveRows, extraHolidays]) => {
+      .then(([dashboard, current, employees, attendance, history, leaveRows, extraHolidays, punches]) => {
         if (cancelled) {
           return;
         }
@@ -131,6 +157,10 @@ export default function Dashboard() {
         setMe(current);
         setPeople(employees.filter((employee) => isCompanyMatch(employee.companyCode, company)));
         setTodayRows(attendance.filter((row) => isCompanyMatch(row.employee?.companyCode, company)));
+        setRecentRows(history.flat().filter((row) =>
+          isCompanyMatch(row.employee?.companyCode, company) && row.checkInTime,
+        ).sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate)));
+        setAudit(punches);
         setWeek(dates.map((date, index) => ({
           label: date.slice(8),
           present: history[index].filter((row) =>
@@ -245,6 +275,9 @@ export default function Dashboard() {
             <button type="button" onClick={() => navigate("/attendance")}>{late} late arrivals</button>
             <button type="button" onClick={() => navigate("/attendance")}>{missingCheckIn} did not check in</button>
             <button type="button" onClick={() => navigate("/attendance")}>{missingCheckOut} did not check out</button>
+            <button type="button" onClick={() => navigate("/attendance")}>
+              {todayRows.filter((row) => row.yellowFlag).length} inactive warnings
+            </button>
           </div>
         </article>
 
@@ -262,13 +295,19 @@ export default function Dashboard() {
                   <button type="button" onClick={() => navigate(`/employees/${row.employee.id}`)}>
                     <span>{initials(row.employee.fullName || "Employee")}</span>
                     <strong>{row.employee.fullName}</strong>
-                    <em>{row.checkOutTime ? "Checked out" : "Checked in"}</em>
-                    <time>{clock(row.checkInTime)}</time>
+                    <em>
+                      {punchPairs(audit, row.employee.id, today, row).map((pair) =>
+                        `${pair.checkIn}–${pair.checkOut ?? "in"}`).join(", ")}
+                      {" · "}
+                      {Math.floor((row.workMinutes ?? 0) / 60)}h {(row.workMinutes ?? 0) % 60}m
+                      {row.yellowFlag ? " · warning" : ""}
+                    </em>
                   </button>
                 </li>
               ))}
             </ul>
           )}
+          <p className="hr-empty">Salary uses these working hours. Inactive time from 1:00 to 2:00 is not a warning. Three warnings cut half a day.</p>
         </article>
 
         <article className="hr-card hr-actions">
@@ -276,8 +315,61 @@ export default function Dashboard() {
           <button type="button" onClick={() => navigate("/attendance")}>Attendance</button>
           <button type="button" onClick={() => navigate("/leave")}>Leave</button>
           <button type="button" onClick={() => navigate("/payroll")}>Payroll</button>
-          <button type="button" onClick={() => navigate("/employees")}>Employees</button>
+          <button type="button" onClick={() => navigate("/employees?status=Active")}>Active</button>
+          <button type="button" onClick={() => navigate("/employees?status=Onboarding")}>Onboarding</button>
+          <button type="button" onClick={() => navigate("/employees?status=Offboarding")}>Offboarding</button>
         </article>
+      </section>
+
+      {(missingCheckIn > 0 || missingCheckOut > 0) && (
+        <section className="hr-card">
+          <div className="hr-card-title">
+            <h3>Check-in and check-out missing</h3>
+            <button type="button" onClick={() => navigate("/attendance")}>Open attendance</button>
+          </div>
+          <ul className="hr-leaves">
+            {people.filter((employee) => employee.active && !todayRows.some((row) => row.employee?.id === employee.id && row.checkInTime)).slice(0, 6).map((employee) => (
+              <li key={employee.id}>
+                <button type="button" onClick={() => navigate(`/employees/${employee.id}`)}>
+                  <strong>{employee.fullName}</strong>
+                  <span>Check-in is missing</span>
+                </button>
+              </li>
+            ))}
+            {todayRows.filter((row) => row.checkInTime && !row.checkOutTime).slice(0, 6).map((row) => (
+              <li key={`out-${row.id}`}>
+                <button type="button" onClick={() => navigate(`/employees/${row.employee.id}`)}>
+                  <strong>{row.employee.fullName}</strong>
+                  <span>Checked in {clock(row.checkInTime)}. Check-out is missing.</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="hr-card">
+        <div className="hr-card-title">
+          <h3>Attendance history</h3>
+          <button type="button" onClick={() => navigate("/attendance")}>Open attendance</button>
+        </div>
+        {recentRows.length === 0 ? (
+          <p className="hr-empty">No attendance history yet.</p>
+        ) : (
+          <ul className="hr-leaves">
+            {recentRows.slice(0, 8).map((row) => (
+              <li key={row.id}>
+                <button type="button" onClick={() => navigate(`/employees/${row.employee.id}`)}>
+                  <strong>{row.employee.fullName}</strong>
+                  <span>
+                    {row.attendanceDate.slice(0, 10)} · {clock(row.checkInTime)}–{row.checkOutTime ? clock(row.checkOutTime) : "in"} · {Math.floor((row.workMinutes ?? 0) / 60)}h {(row.workMinutes ?? 0) % 60}m
+                    {row.yellowFlag ? " · warning" : ""}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="hr-home-grid hr-home-lower">

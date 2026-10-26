@@ -92,4 +92,32 @@ public final class AttendanceRules {
     public static boolean duringLunch(LocalTime time) {
         return time != null && !time.isBefore(LUNCH_START) && time.isBefore(LUNCH_END);
     }
+
+    /**
+     * Idle time from 13:00 to 14:00 is lunch. It is not an inactivity warning.
+     * Idle after 14:00 counts again once it passes 15 minutes.
+     */
+    public static int countableInactiveMinutes(LocalDateTime from, LocalDateTime to) {
+        if (from == null || to == null || !to.isAfter(from)) {
+            return 0;
+        }
+        if (!from.toLocalDate().equals(to.toLocalDate())) {
+            long raw = Duration.between(from, to).toMinutes();
+            return raw > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) raw;
+        }
+        long raw = Duration.between(from, to).toMinutes();
+        LocalDateTime graceStart = from.toLocalDate().atTime(LUNCH_START);
+        LocalDateTime graceEnd = from.toLocalDate().atTime(LUNCH_RETURN_DEADLINE);
+        LocalDateTime overlapFrom = from.isAfter(graceStart) ? from : graceStart;
+        LocalDateTime overlapTo = to.isBefore(graceEnd) ? to : graceEnd;
+        long overlap = overlapTo.isAfter(overlapFrom)
+                ? Duration.between(overlapFrom, overlapTo).toMinutes()
+                : 0;
+        long countable = Math.max(0, raw - overlap);
+        return countable > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) countable;
+    }
+
+    public static boolean duringInactivityGrace(LocalTime time) {
+        return time != null && !time.isBefore(LUNCH_START) && time.isBefore(LUNCH_RETURN_DEADLINE);
+    }
 }

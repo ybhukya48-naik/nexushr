@@ -17,7 +17,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -87,7 +86,7 @@ public class AttendanceInactivityService {
     @Transactional
     public void alertChromeInactive() {
         LocalDateTime now = LocalDateTime.now(AttendanceService.COMPANY_ZONE);
-        if (AttendanceRules.duringLunch(now.toLocalTime())) {
+        if (AttendanceRules.duringInactivityGrace(now.toLocalTime())) {
             return;
         }
         LocalDate today = now.toLocalDate();
@@ -101,7 +100,7 @@ public class AttendanceInactivityService {
             if (Boolean.TRUE.equals(record.getYellowFlag()) || record.getLastActivityAt() == null) {
                 continue;
             }
-            long gap = Duration.between(record.getLastActivityAt(), now).toMinutes();
+            int gap = AttendanceRules.countableInactiveMinutes(record.getLastActivityAt(), now);
             if (gap > AttendanceRules.INACTIVE_LIMIT_MINUTES) {
                 attendancePolicyService.markInactiveChrome(record, (int) gap);
                 attendanceRepository.save(record);
