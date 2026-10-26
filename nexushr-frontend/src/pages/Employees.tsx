@@ -1,7 +1,7 @@
 ﻿import { isCompanyMatch } from "../utils/company";
 import { getWorkspaceCompany } from "../utils/workspace";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { FormEvent } from "react";
 import {
   createEmployee,
@@ -94,13 +94,40 @@ function canManageEmployees(role: string) {
   return role === "ADMIN" || role === "HR" || role === "MANAGER";
 }
 
+function matchesLifecycle(status: string, lifecycle?: string) {
+  if (status === "All Statuses") {
+    return true;
+  }
+  if (status === "Onboarding") {
+    return lifecycle === "PENDING_ONBOARDING" || lifecycle === "PENDING_APPROVAL";
+  }
+  if (status === "Active") {
+    return lifecycle === "ACTIVE";
+  }
+  if (status === "Offboarding") {
+    return lifecycle === "OFFBOARDING";
+  }
+  if (status === "Offboarded") {
+    return lifecycle === "OFFBOARDED";
+  }
+  return lifecycle !== undefined && statusLabel(lifecycle as EmployeeLifecycleStatus) === status;
+}
+
 export default function Employees() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("All Departments");
-  const [status, setStatus] = useState("All Statuses");
+  const [status, setStatus] = useState(searchParams.get("status") || "All Statuses");
+
+  useEffect(() => {
+    const next = searchParams.get("status");
+    if (next) {
+      setStatus(next);
+    }
+  }, [searchParams]);
   const company = getWorkspaceCompany() ?? "CYOND";
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -211,9 +238,7 @@ export default function Employees() {
         department === "All Departments" ||
         employee.department === department;
 
-      const matchesStatus =
-        status === "All Statuses" ||
-        statusLabel(employee.lifecycleStatus) === status;
+      const matchesStatus = matchesLifecycle(status, employee.lifecycleStatus);
 
       const matchesCompany =
         isCompanyMatch(employee.companyCode, company);
@@ -425,25 +450,25 @@ export default function Employees() {
           <strong>{employees.length}</strong>
         </div>
 
-        <div className="employee-summary-card">
+        <button type="button" className="employee-summary-card" onClick={() => setStatus("Active")}>
           <span>Active</span>
           <strong>{activeCount}</strong>
-        </div>
+        </button>
 
-        <div className="employee-summary-card">
+        <button type="button" className="employee-summary-card" onClick={() => setStatus("Onboarding")}>
           <span>Onboarding</span>
           <strong>{onboardingCount}</strong>
-        </div>
+        </button>
 
-        <div className="employee-summary-card">
+        <button type="button" className="employee-summary-card" onClick={() => setStatus("Offboarding")}>
           <span>Offboarding</span>
           <strong>{offboardingCount}</strong>
-        </div>
+        </button>
 
-        <div className="employee-summary-card">
+        <button type="button" className="employee-summary-card" onClick={() => setStatus("Offboarded")}>
           <span>Offboarded</span>
           <strong>{offboardedCount}</strong>
-        </div>
+        </button>
       </div>
 
       {showCreateForm && (

@@ -144,7 +144,7 @@
 }
 
 .hr-alerts {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .hr-alerts button,
@@ -161,9 +161,13 @@
 .hr-people button,
 .hr-leaves button {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto 1fr;
   gap: 10px;
   align-items: center;
+}
+
+.hr-people em {
+  grid-column: 2;
 }
 
 .hr-leaves button {

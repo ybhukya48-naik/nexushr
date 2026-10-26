@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -92,9 +91,9 @@ public class AttendancePolicyService {
             record.setLastActivityAt(now);
             return attendanceRepository.save(record);
         }
-        int gap = gapMinutes(record.getLastActivityAt(), now);
+        int gap = AttendanceRules.countableInactiveMinutes(record.getLastActivityAt(), now);
         if (gap > AttendanceRules.INACTIVE_LIMIT_MINUTES
-                && !AttendanceRules.duringLunch(now.toLocalTime())) {
+                && !AttendanceRules.duringInactivityGrace(now.toLocalTime())) {
             record.setSessionIdleMinutes(zero(record.getSessionIdleMinutes()) + gap);
             if (!Boolean.TRUE.equals(record.getYellowFlag())) {
                 record.setYellowFlag(true);
@@ -274,19 +273,12 @@ public class AttendancePolicyService {
             return 0;
         }
         int stored = zero(record.getSessionIdleMinutes());
-        int trailing = gapMinutes(record.getLastActivityAt(), now);
-        if (trailing > AttendanceRules.INACTIVE_LIMIT_MINUTES) {
+        int trailing = AttendanceRules.countableInactiveMinutes(record.getLastActivityAt(), now);
+        if (trailing > AttendanceRules.INACTIVE_LIMIT_MINUTES
+                && (now == null || !AttendanceRules.duringInactivityGrace(now.toLocalTime()))) {
             stored += trailing;
         }
         return stored;
-    }
-
-    private static int gapMinutes(LocalDateTime from, LocalDateTime to) {
-        if (from == null || to == null || to.isBefore(from)) {
-            return 0;
-        }
-        long minutes = Duration.between(from, to).toMinutes();
-        return minutes > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) minutes;
     }
 
     private static int zero(Integer value) {

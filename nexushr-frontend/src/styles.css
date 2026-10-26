@@ -3493,6 +3493,38 @@ tbody tr:hover td {
   border-bottom: 0;
 }
 
+.dash-notices,
+.dash-punches {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-notices li {
+  border: 1px solid #fecdca;
+  background: #fff6f5;
+  color: #912018;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.dash-punches li {
+  border: 1px solid #ece7fb;
+  background: #faf8ff;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+button.employee-summary-card {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .employee-name-cell {
   display: flex;
   align-items: center;
