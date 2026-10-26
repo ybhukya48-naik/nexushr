@@ -378,6 +378,7 @@ function Login() {
   const [username, setUsername] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
+  const [employeeCode, setEmployeeCode] = useState("");
   const [companyCode, setCompanyCode] = useState<"CYOND" | "GORLE">("CYOND");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -456,8 +457,8 @@ function Login() {
       setError("Enter your name.");
       return;
     }
-    if (!email && !mobile) {
-      setError("Enter a phone number or an email address.");
+    if (!email) {
+      setError("Enter your email address.");
       return;
     }
     if (password.length < 8) {
@@ -473,16 +474,22 @@ function Login() {
     try {
       const response = await apiRegister({
         fullName: fullName.trim(),
-        email: email || undefined,
+        email,
         phone: mobile || undefined,
         password,
         companyCode,
+        employeeCode: employeeCode.trim() || undefined,
       });
-      setUsername(email || mobile);
+      setUsername(email);
       setPassword("");
       setConfirmPassword("");
+      setEmployeeCode("");
       setMode("signin");
-      setNotice(response.message || "Profile created. Sign in with your phone or email and password.");
+      setNotice(
+        response.employeeCode
+          ? `${response.message} Email: ${response.email}. Employee code: ${response.employeeCode}.`
+          : response.message,
+      );
     } catch (err) {
       setError(
         err instanceof Error
@@ -528,8 +535,8 @@ function Login() {
 
               <p>
                 {mode === "create"
-                  ? "Enter your name, a phone number or email, and a password. Choose CYOND or Gorle Group. You sign in with that phone or email."
-                  : "Sign in with your phone, email, or employee code and the password you created."}
+                  ? "Create your profile with your own email and password. If you already have an employee code, enter it. Then sign in with that email or employee code and the same password."
+                  : "Sign in with your email or employee code and the password you created."}
               </p>
 
             </div>
@@ -601,7 +608,7 @@ function Login() {
               <label>
 
                 <span>
-                  {mode === "create" ? "Email (optional if you entered a phone)" : "Phone, email, or employee code"}
+                  {mode === "create" ? "Email" : "Email or employee code"}
                 </span>
 
                 <div className="login-input-wrap">
@@ -615,10 +622,10 @@ function Login() {
                     placeholder={
                       mode === "create"
                         ? "name@company.com"
-                        : "Phone, email, or employee code"
+                        : "Email or employee code"
                     }
                     autoComplete="username"
-                    required={mode !== "create"}
+                    required
                   />
 
                 </div>
@@ -643,7 +650,7 @@ function Login() {
                     placeholder={
                       mode === "create"
                         ? "At least 8 characters"
-                        : "Enter your password"
+                        : "Your password"
                     }
                     autoComplete={mode === "create" ? "new-password" : "current-password"}
                     required
@@ -652,6 +659,21 @@ function Login() {
                 </div>
 
               </label>
+
+              {mode === "create" && (
+                <label>
+                  <span>Employee code</span>
+                  <div className="login-input-wrap">
+                    <input
+                      type="text"
+                      value={employeeCode}
+                      onChange={(event) => setEmployeeCode(event.target.value)}
+                      placeholder="Leave blank if you are new"
+                      autoComplete="off"
+                    />
+                  </div>
+                </label>
+              )}
 
               {mode === "create" && (
                 <label>

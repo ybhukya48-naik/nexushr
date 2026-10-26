@@ -7,6 +7,7 @@ public class RegisterRequest {
     private String password;
     private String phone;
     private String companyCode;
+    private String employeeCode;
 
     public String getFullName() {
         return fullName;
@@ -46,5 +47,13 @@ public class RegisterRequest {
 
     public void setCompanyCode(String companyCode) {
         this.companyCode = companyCode;
+    }
+
+    public String getEmployeeCode() {
+        return employeeCode;
+    }
+
+    public void setEmployeeCode(String employeeCode) {
+        this.employeeCode = employeeCode;
     }
 }

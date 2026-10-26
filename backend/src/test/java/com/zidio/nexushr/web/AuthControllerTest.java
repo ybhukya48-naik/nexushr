@@ -2,6 +2,8 @@
 package com.zidio.nexushr.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zidio.nexushr.domain.Company;
+import com.zidio.nexushr.domain.Employee;
 import com.zidio.nexushr.repository.CompanyRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.security.JwtTokenService;
@@ -18,6 +20,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -214,6 +217,27 @@ class AuthControllerTest {
                                 {"email":"hr@gorlegroup.com","password":"newpassword1"}
                                 """))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void register_withEmailAndEmployeeCode_createsProfile() throws Exception {
+        Company company = new Company();
+        company.setCode("CYOND");
+        when(employeeRepository.findByEmployeeCodeIgnoreCase("CY-01")).thenReturn(Optional.empty());
+        when(employeeRepository.findByEmailIgnoreCase("asha@cyond.com")).thenReturn(Optional.empty());
+        when(companyRepository.findByCodeIgnoreCase("CYOND")).thenReturn(Optional.of(company));
+        when(employeeRepository.existsByEmployeeCode("CY-01")).thenReturn(false);
+        when(employeeRepository.save(org.mockito.ArgumentMatchers.any(Employee.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"fullName":"Asha","email":"asha@cyond.com","employeeCode":"CY-01","password":"password12","companyCode":"CYOND"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value("asha@cyond.com"))
+                .andExpect(jsonPath("$.employeeCode").value("CY-01"));
     }
 
     @Test
