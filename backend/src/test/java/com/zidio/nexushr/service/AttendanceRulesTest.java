@@ -35,6 +35,28 @@ class AttendanceRulesTest {
 
         assertEquals(AttendanceRules.WORK_MINUTES, day.closedWorkMinutes());
         assertEquals(45, day.breakMinutes());
+        assertEquals(465, AttendanceRules.payableWorkMinutes(day.closedWorkMinutes(), day.breakMinutes()));
+    }
+
+    @Test
+    void nineHourStayIsEightHoursOfWork() {
+        LocalDateTime in = LocalDateTime.of(2026, 10, 22, 9, 30);
+        LocalDateTime out = in.plusHours(9);
+        assertEquals(AttendanceRules.WORK_MINUTES, AttendanceRules.workedMinutes(in, out));
+    }
+
+    @Test
+    void lunchTakenAtMiddayStillLeavesEightHours() {
+        AttendanceDay day = new AttendanceDay();
+        LocalDateTime in = LocalDateTime.of(2026, 10, 22, 9, 30);
+        day.checkIn(in);
+        day.checkOut(in.plusHours(3));
+        day.checkIn(in.plusHours(4));
+        day.checkOut(in.plusHours(9));
+
+        assertEquals(60, day.breakMinutes());
+        assertEquals(AttendanceRules.WORK_MINUTES,
+                AttendanceRules.payableWorkMinutes(day.closedWorkMinutes(), day.breakMinutes()));
     }
 
     @Test

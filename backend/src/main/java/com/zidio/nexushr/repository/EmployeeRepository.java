@@ -23,6 +23,11 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
             FROM employees
             WHERE lower(trim(employee_code)) = lower(trim(:login))
                OR lower(trim(email)) = lower(trim(:login))
+               OR (
+                    length(right(regexp_replace(:login, '[^0-9]', '', 'g'), 10)) = 10
+                    AND right(regexp_replace(coalesce(phone, ''), '[^0-9]', '', 'g'), 10)
+                        = right(regexp_replace(:login, '[^0-9]', '', 'g'), 10)
+                  )
             """, nativeQuery = true)
     List<Object[]> findLoginMatches(@Param("login") String login);
 
@@ -51,6 +56,14 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     boolean existsByEmail(String email);
 
     boolean existsByEmployeeCode(String employeeCode);
+
+    @Query(value = """
+            SELECT COUNT(*) > 0
+            FROM employees
+            WHERE length(:digits) = 10
+              AND right(regexp_replace(coalesce(phone, ''), '[^0-9]', '', 'g'), 10) = :digits
+            """, nativeQuery = true)
+    boolean existsByPhoneDigits(@Param("digits") String digits);
 
     long countByLifecycleStatus(EmployeeLifecycleStatus lifecycleStatus);
 

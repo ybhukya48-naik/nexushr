@@ -14,7 +14,7 @@ import {
   getCurrentEmployee,
   getEmployeePayroll,
   getMyAttendanceStatus,
-  createPassword,
+  register as apiRegister,
   login as apiLogin,
   getAiWorkforceDashboard,
   fetchEmployeePhoto,
@@ -376,6 +376,9 @@ function Login() {
   const [searchParams] = useSearchParams();
 
   const [username, setUsername] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [companyCode, setCompanyCode] = useState<"CYOND" | "GORLE">("CYOND");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [mode, setMode] = useState<"signin" | "create">(
@@ -442,14 +445,19 @@ function Login() {
     }
   }
 
-  async function handleCreatePassword(event: FormEvent<HTMLFormElement>) {
+  async function handleCreateProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setNotice("");
 
     const email = username.trim();
-    if (!email || !password) {
-      setError("Enter your email and a new password.");
+    const mobile = phone.trim();
+    if (!fullName.trim()) {
+      setError("Enter your name.");
+      return;
+    }
+    if (!email && !mobile) {
+      setError("Enter a phone number or an email address.");
       return;
     }
     if (password.length < 8) {
@@ -463,17 +471,23 @@ function Login() {
 
     setLoading(true);
     try {
-      const response = await createPassword(email, password);
-      setUsername(response.email || email);
+      const response = await apiRegister({
+        fullName: fullName.trim(),
+        email: email || undefined,
+        phone: mobile || undefined,
+        password,
+        companyCode,
+      });
+      setUsername(email || mobile);
       setPassword("");
       setConfirmPassword("");
       setMode("signin");
-      setNotice("Password created. Sign in with your email and password.");
+      setNotice(response.message || "Profile created. Sign in with your phone or email and password.");
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "Could not create the password.",
+          : "Could not create the profile.",
       );
     } finally {
       setLoading(false);
@@ -495,7 +509,7 @@ function Login() {
 
           <form
             className="login-card"
-            onSubmit={mode === "create" ? handleCreatePassword : handleSubmit}
+            onSubmit={mode === "create" ? handleCreateProfile : handleSubmit}
           >
 
             <div className="login-card-brand">
@@ -509,13 +523,13 @@ function Login() {
             <div className="login-card-header">
 
               <h2>
-                {mode === "create" ? "Create password" : "Welcome back"}
+                {mode === "create" ? "Create your profile" : "Welcome back"}
               </h2>
 
               <p>
                 {mode === "create"
-                  ? "Use the email already saved for you in CYOND or Gorle. Choose a password, then sign in. HR does not see this password."
-                  : "Sign in with your email and the password you created."}
+                  ? "Enter your name, a phone number or email, and a password. Choose CYOND or Gorle Group. You sign in with that phone or email."
+                  : "Sign in with your phone, email, or employee code and the password you created."}
               </p>
 
             </div>
@@ -535,7 +549,7 @@ function Login() {
                 <div>
 
                   <strong>
-                    {mode === "create" ? "Could not create password" : "Sign-in failed"}
+                    {mode === "create" ? "Could not create profile" : "Sign-in failed"}
                   </strong>
 
                   <span>
@@ -553,10 +567,41 @@ function Login() {
             <div className="login-fields">
 
               {/* EMPLOYEE CODE / EMAIL */}
+              {mode === "create" && (
+                <label>
+                  <span>Full name</span>
+                  <div className="login-input-wrap">
+                    <input
+                      type="text"
+                      value={fullName}
+                      onChange={(event) => setFullName(event.target.value)}
+                      placeholder="Your name"
+                      autoComplete="name"
+                      required
+                    />
+                  </div>
+                </label>
+              )}
+
+              {mode === "create" && (
+                <label>
+                  <span>Phone number</span>
+                  <div className="login-input-wrap">
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(event) => setPhone(event.target.value)}
+                      placeholder="10-digit mobile number"
+                      autoComplete="tel"
+                    />
+                  </div>
+                </label>
+              )}
+
               <label>
 
                 <span>
-                  {mode === "create" ? "Email" : "Email or employee code"}
+                  {mode === "create" ? "Email (optional if you entered a phone)" : "Phone, email, or employee code"}
                 </span>
 
                 <div className="login-input-wrap">
@@ -569,11 +614,11 @@ function Login() {
                     }
                     placeholder={
                       mode === "create"
-                        ? "Enter your email"
-                        : "Enter email or employee code"
+                        ? "name@company.com"
+                        : "Phone, email, or employee code"
                     }
                     autoComplete="username"
-                    required
+                    required={mode !== "create"}
                   />
 
                 </div>
@@ -610,6 +655,23 @@ function Login() {
 
               {mode === "create" && (
                 <label>
+                  <span>Company</span>
+                  <div className="login-input-wrap">
+                    <select
+                      value={companyCode}
+                      onChange={(event) =>
+                        setCompanyCode(event.target.value === "GORLE" ? "GORLE" : "CYOND")
+                      }
+                    >
+                      <option value="CYOND">CYOND</option>
+                      <option value="GORLE">Gorle Group</option>
+                    </select>
+                  </div>
+                </label>
+              )}
+
+              {mode === "create" && (
+                <label>
                   <span>Confirm password</span>
                   <div className="login-input-wrap">
                     <input
@@ -638,10 +700,10 @@ function Login() {
               <span>
                 {loading
                   ? mode === "create"
-                    ? "Creating password..."
+                    ? "Creating profile..."
                     : "Signing in..."
                   : mode === "create"
-                    ? "Create password"
+                    ? "Create profile"
                     : "Sign in"}
               </span>
 
@@ -665,8 +727,8 @@ function Login() {
               }}
             >
               {mode === "create"
-                ? "Already created a password? Sign in"
-                : "Employee? Create your password"}
+                ? "Already created a profile? Sign in"
+                : "Employee? Create your profile"}
             </button>
 
             {/* SECURITY */}
@@ -885,7 +947,7 @@ function EmployeeDashboard() {
                 <div>
                   <p className="eyebrow">TODAY</p>
                   <h3>Check-in, check-out, and working hours</h3>
-                  <p>Salary uses these working hours. Inactive time from 1:00 to 2:00 is not a warning. After 2:00, 15 minutes idle is a warning. Three warnings cut half a day.</p>
+                  <p>After check-in, a day is 9 hours: 8 hours of work and 1 hour of lunch. Take that lunch hour at any time. Salary uses the 8 working hours. A later check-out adds to the morning. Chrome idle is a warning, and three warnings cut half a day. The warning does not erase hours already worked.</p>
                 </div>
                 <button className="primary-button" type="button" onClick={() => navigate("/attendance")}>
                   Check in or check out

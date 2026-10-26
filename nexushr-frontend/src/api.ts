@@ -230,9 +230,10 @@ export async function login(
 
 export interface RegisterRequest {
   fullName: string;
-  email: string;
+  email?: string;
   password: string;
   phone?: string;
+  companyCode?: string;
 }
 
 export interface RegisterResponse {

@@ -5576,6 +5576,18 @@ button.employee-summary-card {
   box-shadow: 0 0 0 4px rgba(105,65,198,0.1);
 }
 
+.login-card select {
+  width: 100%;
+  min-height: 46px;
+  margin: 0;
+  padding: 11px 13px;
+  color: #172033;
+  background: #ffffff;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  outline: none;
+}
+
 /* Existing form rows */
 
 .login-form {
@@ -6814,4 +6826,57 @@ textarea {
   .stats-grid {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+.org-chart {
+  display: grid;
+  gap: 16px;
+}
+
+.org-team {
+  border: 1px solid #d7e0ec;
+  border-radius: 12px;
+  background: #fff;
+  padding: 16px 18px;
+}
+
+.org-head p {
+  margin: 0;
+  color: #1b4f9c;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.org-head h2 {
+  margin: 4px 0 0;
+  color: #0b1f4b;
+  font-size: 22px;
+}
+
+.org-head span,
+.org-dept {
+  color: #5b6b82;
+  font-size: 13px;
+}
+
+.org-reports {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0 0 0 16px;
+  border-left: 2px solid #d7e0ec;
+}
+
+.org-person {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: baseline;
+  padding: 7px 0;
+}
+
+.org-person strong {
+  color: #0b1f4b;
+  min-width: 180px;
 }

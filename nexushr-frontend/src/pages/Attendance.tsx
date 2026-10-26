@@ -739,7 +739,12 @@ export default function Attendance() {
 
     const closedSeconds = Math.max(0, record.closedWorkMinutes ?? 0) * 60;
     const breakSeconds = Math.max(0, record.breakMinutes ?? 0) * 60;
+    const lunchSeconds = 60 * 60;
     const open = Boolean(record.checkInTime) && !record.checkOutTime;
+    const payable = (checkedInSeconds: number) => {
+      const lunchStillDue = Math.max(0, lunchSeconds - breakSeconds);
+      return Math.max(0, checkedInSeconds - lunchStillDue);
+    };
 
     if (open) {
       const start = new Date(record.sessionStartedAt || record.checkInTime);
@@ -747,21 +752,21 @@ export default function Attendance() {
         ? 0
         : Math.max(0, Math.floor((currentTime.getTime() - start.getTime()) / 1000));
       return {
-        work: formatClock(closedSeconds + live),
+        work: formatClock(payable(closedSeconds + live)),
         breakTime: formatClock(breakSeconds),
       };
     }
 
     if ((record.closedWorkMinutes ?? 0) > 0 || (record.breakMinutes ?? 0) > 0) {
       return {
-        work: formatClock(closedSeconds),
+        work: formatClock(payable(closedSeconds)),
         breakTime: formatClock(breakSeconds),
       };
     }
 
     const elapsed = elapsedSeconds(record);
     return {
-      work: elapsed == null ? "-" : formatClock(elapsed),
+      work: elapsed == null ? "-" : formatClock(payable(elapsed)),
       breakTime: formatClock(0),
     };
   }
@@ -774,8 +779,8 @@ export default function Attendance() {
           <h2>Attendance</h2>
           <p>
             {canPunch
-              ? "Check in once. A second check-in is blocked until you check out. Lunch is 1:00–1:45: check out, then check in again and work hours resume. A day is 8 working hours. Signing out of NexusHR does not delete attendance. If you are still checked in at 11:00 PM, logout happens automatically and the record is kept. Site staff use the phone app at /site."
-              : "View only. Date, check-in, check-out, flags, and working hours. Employees submit their own punches. A day is 8 working hours plus lunch from 1:00 to 1:45."}
+              ? "After check-in, this day is 9 hours: 8 hours of work and 1 hour of lunch. Take the lunch hour whenever you want. Check out for lunch, then check in again, and the hours already worked stay. A later check-out adds to the morning. It does not replace the day with only the last hour. Signing out of NexusHR does not delete attendance."
+              : "View only. A day is 9 hours from check-in: 8 hours of work and 1 flexible lunch hour."}
           </p>
         </div>
 
@@ -1123,7 +1128,7 @@ export default function Attendance() {
           <div>
             <p className="eyebrow">HISTORY</p>
             <h3>Employee attendance history</h3>
-            <p>Past punches stay after logout. Work hours resume after lunch check-out and check-in.</p>
+            <p>Past punches stay after logout. Work hours are counted from check-in. The flexible 1 hour lunch is not work.</p>
           </div>
         </div>
         <div className="employees-table-wrap">

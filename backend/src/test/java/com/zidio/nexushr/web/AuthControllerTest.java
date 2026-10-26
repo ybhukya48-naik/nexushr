@@ -2,6 +2,7 @@
 package com.zidio.nexushr.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zidio.nexushr.repository.CompanyRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.security.JwtTokenService;
 import com.zidio.nexushr.security.SecurityConfig;
@@ -42,6 +43,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private EmployeeRepository employeeRepository;
+
+    @MockitoBean
+    private CompanyRepository companyRepository;
 
     @Test
     void login_withAdminCredentials_returnsTokenAndAdminRole() throws Exception {
