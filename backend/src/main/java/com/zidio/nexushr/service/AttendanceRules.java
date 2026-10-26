@@ -11,8 +11,9 @@ import java.util.Set;
 /**
  * Office day for CYOND and Gorle Group.
  * Shift starts at 09:30. 09:30–10:15 is the arrival buffer.
- * 10:16 onward is a late arrival. Lunch is 13:00–13:45 and is not work.
- * A paid day is 8 working hours inside a 9 hour presence window.
+ * 10:16 onward is a late arrival.
+ * A day is 9 hours from check-in: 8 hours of work and 1 flexible lunch hour.
+ * The employee chooses when to take that hour. It is not fixed at 1:00.
  */
 public final class AttendanceRules {
 
@@ -24,8 +25,8 @@ public final class AttendanceRules {
     public static final LocalTime LOGOUT_DEADLINE = LocalTime.of(23, 0);
 
     public static final int WORK_MINUTES = 8 * 60;
-    public static final int LUNCH_MINUTES = 45;
-    public static final int PRESENCE_MINUTES = WORK_MINUTES + LUNCH_MINUTES;
+    public static final int LUNCH_MINUTES = 60;
+    public static final int PRESENCE_MINUTES = 9 * 60;
     public static final int INACTIVE_LIMIT_MINUTES = 15;
     public static final int WARNINGS_BEFORE_PENALTY = 3;
     public static final int LATE_DEDUCT_MINUTES = 2 * 60;
@@ -78,7 +79,7 @@ public final class AttendanceRules {
         return minutes > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) minutes;
     }
 
-    public static int workedMinutes(LocalDateTime start, LocalDateTime end) {
+    public static int sessionMinutes(LocalDateTime start, LocalDateTime end) {
         if (start == null || end == null || end.isBefore(start)) {
             return 0;
         }
@@ -86,38 +87,36 @@ public final class AttendanceRules {
         if (raw > Integer.MAX_VALUE) {
             raw = Integer.MAX_VALUE;
         }
-        return (int) Math.max(0, raw - lunchOverlapMinutes(start, end));
+        return (int) raw;
+    }
+
+    /**
+     * One flexible lunch hour per day. A break the employee already took counts
+     * toward that hour, so a 9 hour stay is 8 hours of work.
+     */
+    public static int payableWorkMinutes(int checkedInMinutes, int breakMinutes) {
+        int covered = Math.min(LUNCH_MINUTES, Math.max(0, breakMinutes));
+        int stillDue = LUNCH_MINUTES - covered;
+        return Math.max(0, Math.max(0, checkedInMinutes) - stillDue);
+    }
+
+    public static int workedMinutes(LocalDateTime start, LocalDateTime end) {
+        return payableWorkMinutes(sessionMinutes(start, end), 0);
     }
 
     public static boolean duringLunch(LocalTime time) {
         return time != null && !time.isBefore(LUNCH_START) && time.isBefore(LUNCH_END);
     }
 
-    /**
-     * Idle time from 13:00 to 14:00 is lunch. It is not an inactivity warning.
-     * Idle after 14:00 counts again once it passes 15 minutes.
-     */
     public static int countableInactiveMinutes(LocalDateTime from, LocalDateTime to) {
         if (from == null || to == null || !to.isAfter(from)) {
             return 0;
         }
-        if (!from.toLocalDate().equals(to.toLocalDate())) {
-            long raw = Duration.between(from, to).toMinutes();
-            return raw > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) raw;
-        }
         long raw = Duration.between(from, to).toMinutes();
-        LocalDateTime graceStart = from.toLocalDate().atTime(LUNCH_START);
-        LocalDateTime graceEnd = from.toLocalDate().atTime(LUNCH_RETURN_DEADLINE);
-        LocalDateTime overlapFrom = from.isAfter(graceStart) ? from : graceStart;
-        LocalDateTime overlapTo = to.isBefore(graceEnd) ? to : graceEnd;
-        long overlap = overlapTo.isAfter(overlapFrom)
-                ? Duration.between(overlapFrom, overlapTo).toMinutes()
-                : 0;
-        long countable = Math.max(0, raw - overlap);
-        return countable > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) countable;
+        return raw > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) raw;
     }
 
     public static boolean duringInactivityGrace(LocalTime time) {
-        return time != null && !time.isBefore(LUNCH_START) && time.isBefore(LUNCH_RETURN_DEADLINE);
+        return false;
     }
 }

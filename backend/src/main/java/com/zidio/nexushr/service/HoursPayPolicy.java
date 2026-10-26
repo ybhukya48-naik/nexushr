@@ -5,7 +5,7 @@ import java.time.LocalDate;
 import java.util.Set;
 
 /**
- * A paid day is 8 working hours. Lunch from 1:00 to 1:45 is not work.
+ * A paid day is 8 working hours inside 9 hours. The other hour is a flexible lunch.
  * One casual leave and one paid leave each month are not deducted.
  * Sundays and listed public holidays are not working days.
  * Gorle Group also does not deduct the second Saturday.

@@ -63,17 +63,19 @@ public class AttendancePolicyService {
 
     public void onCheckOut(AttendanceRecord record, Employee actor) {
         LocalDateTime now = record.getCheckOutTime();
+        // Idle time raises a yellow warning. It does not erase hours already
+        // worked. Three warnings in a month still deduct half a day.
         int idle = idleMinutes(record, now, !actorIsSiteVisitor(record));
-        if (idle > 0) {
-            int closed = record.getClosedWorkMinutes() == null ? 0 : record.getClosedWorkMinutes();
-            int payable = Math.max(0, closed - idle);
-            record.setClosedWorkMinutes(payable);
-            record.setWorkMinutes(payable);
+        if (idle > AttendanceRules.INACTIVE_LIMIT_MINUTES && !Boolean.TRUE.equals(record.getYellowFlag())) {
+            record.setYellowFlag(true);
+            record.setSessionIdleMinutes(zero(record.getSessionIdleMinutes()) + idle);
+            audit(record, actor, "YELLOW_FLAG",
+                    "Chrome was inactive for " + idle + " minutes. Three yellow flags in a month deduct half a day.");
         }
         record.setSessionIdleMinutes(0);
         record.setLastActivityAt(now);
         applyMonthPenalties(record);
-        audit(record, actor, "CHECK_OUT", "Check-out at " + now + ". Attendance record kept.");
+        audit(record, actor, "CHECK_OUT", "Check-out at " + now + ". Worked hours are kept.");
     }
 
     @Transactional
@@ -129,7 +131,8 @@ public class AttendancePolicyService {
             record.setSessionStartedAt(null);
             record.setClosedWorkMinutes(day.closedWorkMinutes());
             record.setBreakMinutes(day.breakMinutes());
-            record.setWorkMinutes(day.closedWorkMinutes());
+            record.setWorkMinutes(AttendanceRules.payableWorkMinutes(
+                    day.closedWorkMinutes(), day.breakMinutes()));
             record.setAttendanceStatus("CLOSED");
         } catch (IllegalStateException ex) {
             record.setAttendanceStatus("BLUE_FLAG");

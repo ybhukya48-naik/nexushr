@@ -192,6 +192,7 @@ public class AttendanceService {
             throw badRequest("Site visitors must check in with a selfie photo");
         }
 
+        restoreClockedWork(record);
         AttendanceDay day = dayFrom(record);
         try {
             day.checkIn(now);
@@ -246,6 +247,7 @@ public class AttendanceService {
                         ));
 
         LocalDateTime now = LocalDateTime.now(COMPANY_ZONE);
+        restoreClockedWork(record);
         AttendanceDay day = dayFrom(record);
         try {
             day.checkOut(now);
@@ -354,6 +356,63 @@ public class AttendanceService {
         return attendancePolicyService.auditTrail(employeeId);
     }
 
+    /**
+     * Work for the day is time checked in, minus one flexible lunch hour.
+     * A single check-in and check-out uses the full span. Idle time does not replace it.
+     */
+    static int clockedMinutes(AttendanceRecord record) {
+        if (record == null) {
+            return 0;
+        }
+        int breakMinutes = record.getBreakMinutes() == null ? 0 : record.getBreakMinutes();
+        int closed = record.getClosedWorkMinutes() == null ? 0 : record.getClosedWorkMinutes();
+        if (breakMinutes == 0
+                && record.getCheckInTime() != null
+                && record.getCheckOutTime() != null) {
+            closed = Math.max(closed, AttendanceRules.sessionMinutes(
+                    record.getCheckInTime(), record.getCheckOutTime()));
+        }
+        if (closed == 0) {
+            return record.getWorkMinutes() == null ? 0 : record.getWorkMinutes();
+        }
+        return AttendanceRules.payableWorkMinutes(closed, breakMinutes);
+    }
+
+    private void restoreClockedWork(AttendanceRecord record) {
+        if (record == null || record.getCheckInTime() == null || record.getCheckOutTime() == null) {
+            return;
+        }
+        int breakMinutes = record.getBreakMinutes() == null ? 0 : record.getBreakMinutes();
+        int closed = record.getClosedWorkMinutes() == null ? 0 : record.getClosedWorkMinutes();
+        if (breakMinutes == 0) {
+            closed = Math.max(closed, AttendanceRules.sessionMinutes(
+                    record.getCheckInTime(), record.getCheckOutTime()));
+        }
+        int payable = AttendanceRules.payableWorkMinutes(closed, breakMinutes);
+        int stored = record.getWorkMinutes() == null ? 0 : record.getWorkMinutes();
+        int storedClosed = record.getClosedWorkMinutes() == null ? 0 : record.getClosedWorkMinutes();
+        if (stored == payable && storedClosed == closed) {
+            return;
+        }
+        record.setClosedWorkMinutes(closed);
+        record.setWorkMinutes(payable);
+        record.setOvertimeMinutes(calculateOvertimeMinutes(payable));
+    }
+
+    private void restoreListed(List<AttendanceRecord> records) {
+        if (records == null) {
+            return;
+        }
+        for (AttendanceRecord record : records) {
+            int before = record.getWorkMinutes() == null ? 0 : record.getWorkMinutes();
+            restoreClockedWork(record);
+            int after = record.getWorkMinutes() == null ? 0 : record.getWorkMinutes();
+            if (after != before) {
+                attendanceRepository.save(record);
+            }
+        }
+    }
+
     private AttendanceDay dayFrom(AttendanceRecord record) {
         AttendanceDay day = new AttendanceDay();
         int closed = record.getClosedWorkMinutes() == null ? 0 : record.getClosedWorkMinutes();
@@ -378,7 +437,8 @@ public class AttendanceService {
         record.setSessionStartedAt(day.sessionStartedAt());
         record.setClosedWorkMinutes(day.closedWorkMinutes());
         record.setBreakMinutes(day.breakMinutes());
-        record.setWorkMinutes(day.closedWorkMinutes());
+        record.setWorkMinutes(AttendanceRules.payableWorkMinutes(
+                day.closedWorkMinutes(), day.breakMinutes()));
         record.setAttendanceStatus(day.status());
     }
 
@@ -396,15 +456,19 @@ public class AttendanceService {
             throw badRequest("Date is required");
         }
 
-        return attendanceRepository.findByAttendanceDate(date);
+        List<AttendanceRecord> records = attendanceRepository.findByAttendanceDate(date);
+        restoreListed(records);
+        return records;
     }
 
     public List<AttendanceRecord> listByEmployee(Long employeeId) {
 
         getActiveEmployee(employeeId);
 
-        return attendanceRepository
+        List<AttendanceRecord> records = attendanceRepository
                 .findByEmployee_IdOrderByAttendanceDateDesc(employeeId);
+        restoreListed(records);
+        return records;
     }
 
     public AttendanceMetricsResponse getMetrics(LocalDate date) {
@@ -620,8 +684,10 @@ public class AttendanceService {
                                 : AttendanceRules.workedMinutes(checkIn, checkOut);
 
                         record.setWorkMinutes(workMinutes);
-                        record.setClosedWorkMinutes(workMinutes);
-                        record.setBreakMinutes(AttendanceRules.lunchOverlapMinutes(checkIn, checkOut));
+                        record.setClosedWorkMinutes(checkOut == null
+                                ? 0
+                                : AttendanceRules.sessionMinutes(checkIn, checkOut));
+                        record.setBreakMinutes(0);
                         record.setAttendanceStatus(checkOut == null ? "OPEN" : "CLOSED");
                         int lateMinutes = calculateLateArrivalMinutes(checkIn);
                         record.setLateArrivalMinutes(lateMinutes);
@@ -740,8 +806,8 @@ public class AttendanceService {
                 record.setCheckOutTime(parsed.checkOut());
                 int workMinutes = AttendanceRules.workedMinutes(parsed.checkIn(), parsed.checkOut());
                 record.setWorkMinutes(workMinutes);
-                record.setClosedWorkMinutes(workMinutes);
-                record.setBreakMinutes(AttendanceRules.lunchOverlapMinutes(parsed.checkIn(), parsed.checkOut()));
+                record.setClosedWorkMinutes(AttendanceRules.sessionMinutes(parsed.checkIn(), parsed.checkOut()));
+                record.setBreakMinutes(0);
                 int lateMinutes = calculateLateArrivalMinutes(parsed.checkIn());
                 record.setLateArrivalMinutes(lateMinutes);
                 record.setLateWarning(lateMinutes > 0);
@@ -1159,7 +1225,7 @@ public class AttendanceService {
         for (AttendanceRecord r : allMonthAttendance) {
             if (r.getEmployee() != null && r.getEmployee().getId() != null
                     && r.getWorkMinutes() != null) {
-                workedMinutesByEmployee.merge(r.getEmployee().getId(), r.getWorkMinutes(), Integer::sum);
+                workedMinutesByEmployee.merge(r.getEmployee().getId(), clockedMinutes(r), Integer::sum);
                 deductedMinutesByEmployee.merge(
                         r.getEmployee().getId(),
                         r.getDeductedMinutes() == null ? 0 : r.getDeductedMinutes(),

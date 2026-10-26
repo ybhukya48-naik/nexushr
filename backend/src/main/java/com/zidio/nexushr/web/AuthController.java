@@ -1,9 +1,11 @@
 package com.zidio.nexushr.web;
 
+import com.zidio.nexushr.domain.Company;
 import com.zidio.nexushr.domain.Employee;
 import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
 import com.zidio.nexushr.domain.GenderType;
 import com.zidio.nexushr.domain.RoleType;
+import com.zidio.nexushr.repository.CompanyRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.security.JwtTokenService;
 import com.zidio.nexushr.service.ExcelPayrollService;
@@ -33,6 +35,7 @@ public class AuthController {
 
     private final JwtTokenService jwtTokenService;
     private final EmployeeRepository employeeRepository;
+    private final CompanyRepository companyRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${app.auth.demo-users-enabled:true}")
@@ -41,10 +44,12 @@ public class AuthController {
     public AuthController(
             JwtTokenService jwtTokenService,
             EmployeeRepository employeeRepository,
+            CompanyRepository companyRepository,
             PasswordEncoder passwordEncoder) {
 
         this.jwtTokenService = jwtTokenService;
         this.employeeRepository = employeeRepository;
+        this.companyRepository = companyRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -55,23 +60,36 @@ public class AuthController {
         if (request == null ||
                 request.getFullName() == null ||
                 request.getFullName().isBlank() ||
-                request.getEmail() == null ||
-                request.getEmail().isBlank() ||
                 request.getPassword() == null ||
                 request.getPassword().isBlank()) {
 
             return ResponseEntity.badRequest()
                     .body(Map.of("message",
-                            "Full name, email and password are required"));
+                            "Full name and password are required"));
         }
 
         String fullName = request.getFullName().trim();
-        String email = request.getEmail().trim().toLowerCase();
+        String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
+        String phone = request.getPhone() == null ? "" : request.getPhone().trim();
+        String phoneDigits = phoneKey(phone);
+        String employeeCode = request.getEmployeeCode() == null
+                ? ""
+                : request.getEmployeeCode().trim();
         String password = request.getPassword();
+
+        if (email.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "Enter your email address"));
+        }
 
         if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
             return ResponseEntity.badRequest()
                     .body(Map.of("message", "Please enter a valid email address"));
+        }
+
+        if (!phone.isBlank() && phoneDigits.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "Enter a 10-digit phone number"));
         }
 
         if (password.length() < 8) {
@@ -80,16 +98,47 @@ public class AuthController {
                             "Password must contain at least 8 characters"));
         }
 
-        if (employeeRepository.existsByEmail(email)) {
+        Employee byCode = employeeCode.isBlank()
+                ? null
+                : employeeRepository.findByEmployeeCodeIgnoreCase(employeeCode).orElse(null);
+        Employee byEmail = employeeRepository.findByEmailIgnoreCase(email).orElse(null);
+        if (byCode != null && byEmail != null && !byCode.getId().equals(byEmail.getId())) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("message",
-                            "An account with this email already exists"));
+                    .body(Map.of("message", "That email belongs to a different employee code"));
+        }
+        Employee existing = byCode != null ? byCode : byEmail;
+        if (existing != null) {
+            return saveOwnCredentials(existing, fullName, email, phone, password);
         }
 
-        String employeeCode = generateEmployeeCode();
+        if (!phoneDigits.isBlank() && employeeRepository.existsByPhoneDigits(phoneDigits)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message",
+                            "An account with this phone number already exists. Sign in with your email or employee code."));
+        }
+
+        String companyCode = request.getCompanyCode() == null
+                ? ""
+                : request.getCompanyCode().trim().toUpperCase();
+        if (!companyCode.equals("CYOND") && !companyCode.equals("GORLE")) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "Choose CYOND or Gorle Group"));
+        }
+        Company company = companyRepository.findByCodeIgnoreCase(companyCode).orElse(null);
+        if (company == null) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "That company is not set up yet"));
+        }
+        if (employeeCode.isBlank()) {
+            employeeCode = generateEmployeeCode();
+        } else if (employeeRepository.existsByEmployeeCode(employeeCode)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message", "That employee code is already used"));
+        }
 
         Employee employee = new Employee();
 
+        employee.setCompany(company);
         employee.setEmployeeCode(employeeCode);
         employee.setFullName(fullName);
         employee.setEmail(email);
@@ -116,11 +165,73 @@ public class AuthController {
         Employee saved = employeeRepository.save(employee);
 
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(Map.of(
-                        "message", "Account created successfully",
-                        "employeeCode", saved.getEmployeeCode(),
-                        "email", saved.getEmail()
-                ));
+                .body(profileBody(
+                        "Profile created. Sign in with your email or employee code and this password.",
+                        saved));
+    }
+
+    private ResponseEntity<?> saveOwnCredentials(
+            Employee existing,
+            String fullName,
+            String email,
+            String phone,
+            String password) {
+        if (isManagement(existing)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message",
+                            "This email belongs to an HR or admin account. Employees use their own email."));
+        }
+        if (!passwordUnset(existing)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message",
+                            "This profile already has a password. Sign in with your email or employee code."));
+        }
+        Employee emailOwner = employeeRepository.findByEmailIgnoreCase(email).orElse(null);
+        if (emailOwner != null && existing.getId() != null && !existing.getId().equals(emailOwner.getId())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message", "That email belongs to a different employee"));
+        }
+        existing.setFullName(fullName);
+        existing.setEmail(email);
+        existing.setPassword(passwordEncoder.encode(password));
+        if (!phone.isBlank()) {
+            existing.setPhone(phone.trim());
+        }
+        Employee saved = employeeRepository.save(existing);
+        return ResponseEntity.ok(profileBody(
+                "Password saved. Sign in with your email or employee code and this password.",
+                saved));
+    }
+
+    private static Map<String, String> profileBody(String message, Employee employee) {
+        return Map.of(
+                "message", message,
+                "employeeCode", employee.getEmployeeCode() == null ? "" : employee.getEmployeeCode(),
+                "email", employee.getEmail() == null ? "" : employee.getEmail()
+        );
+    }
+
+    private static boolean isManagement(Employee employee) {
+        RoleType role = employee.getRoleType();
+        return role == RoleType.ADMIN || role == RoleType.HR || role == RoleType.SUPER_ADMIN;
+    }
+
+    private static boolean passwordUnset(Employee employee) {
+        String hash = employee.getPassword();
+        return hash == null
+                || hash.isBlank()
+                || ExcelPayrollService.UNSET_PASSWORD_HASH.equals(hash);
+    }
+
+    private static String phoneKey(String value) {
+        if (value == null) {
+            return "";
+        }
+        String digits = value.replaceAll("\\D", "");
+        if (digits.length() > 10) {
+            digits = digits.substring(digits.length() - 10);
+        }
+        return digits.length() == 10 ? digits : "";
     }
 
     private String generateEmployeeCode() {
@@ -310,7 +421,7 @@ public class AuthController {
 
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("message",
-                            "This account cannot create a password here. Sign in with the password already on the employee."));
+                            "This email belongs to an HR or admin account. Employees create a password with their own email."));
         } catch (Exception ex) {
             log.error("CREATE_PASSWORD_FAILED", ex);
             return ResponseEntity.status(HttpStatus.CONFLICT)

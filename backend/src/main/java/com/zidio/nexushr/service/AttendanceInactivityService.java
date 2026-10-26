@@ -19,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 
 @Service
@@ -65,21 +64,7 @@ public class AttendanceInactivityService {
     @Scheduled(cron = "0 5 14 * * MON-SAT", zone = "Asia/Kolkata")
     @Transactional
     public void alertMissedLunchReturn() {
-        LocalDate today = LocalDate.now(AttendanceService.COMPANY_ZONE);
-        for (Employee employee : employeeRepository.findAll()) {
-            if (employee.getId() == null || !employee.isActive()) {
-                continue;
-            }
-            attendanceRepository.findByEmployee_IdAndAttendanceDate(employee.getId(), today)
-                    .ifPresent(record -> {
-                        if (missedLunchReturn(record)) {
-                            attendancePolicyService.markMissedLunchReturn(record);
-                            attendanceRepository.save(record);
-                            notify(employee, "Lunch return missed",
-                                    today + " lunch return missed. Back by 2:00 PM after the 1:00–1:45 lunch.");
-                        }
-                    });
-        }
+        // Lunch is a flexible hour chosen by the employee, not a 1:00–2:00 deadline.
     }
 
     @Scheduled(cron = "0 */5 9-22 * * MON-SAT", zone = "Asia/Kolkata")
@@ -187,26 +172,6 @@ public class AttendanceInactivityService {
                 "Automatic logout",
                 marker + ". You were logged out at 11:00 PM. The attendance record is kept and marked with a blue flag.");
         notifyReportingManager(employee, marker, "was logged out automatically at 11:00 PM");
-    }
-
-    private boolean missedLunchReturn(AttendanceRecord record) {
-        if (record.getCheckInTime() == null || Boolean.TRUE.equals(record.getRedFlag())) {
-            return false;
-        }
-        LocalTime arrival = record.getCheckInTime().toLocalTime();
-        if (!arrival.isBefore(AttendanceRules.LUNCH_START)) {
-            return false;
-        }
-        boolean stillOpen = record.getCheckOutTime() == null;
-        boolean resumedAfterLunch = record.getSessionStartedAt() != null
-                && !record.getSessionStartedAt().toLocalTime().isBefore(AttendanceRules.LUNCH_END);
-        if (stillOpen) {
-            return !resumedAfterLunch;
-        }
-        LocalTime checkout = record.getCheckOutTime().toLocalTime();
-        return !checkout.isBefore(AttendanceRules.LUNCH_START)
-                && checkout.isBefore(AttendanceRules.LUNCH_RETURN_DEADLINE)
-                && record.getSessionStartedAt() == null;
     }
 
     private void notifyReportingManager(Employee employee, String marker, String reason) {

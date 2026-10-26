@@ -46,6 +46,81 @@ function statusClass(status: EmployeeLifecycleStatus) {
   }
 }
 
+function OrgChart({ people }: { people: EmployeeResponse[] }) {
+  const ids = new Set(people.map((person) => person.id));
+  const children = new Map<number, EmployeeResponse[]>();
+  const roots: EmployeeResponse[] = [];
+  const sorted = [...people].sort((left, right) =>
+    left.employeeCode.localeCompare(right.employeeCode),
+  );
+
+  for (const person of sorted) {
+    const managerId = person.reportingManagerId;
+    if (managerId != null && ids.has(managerId)) {
+      const reports = children.get(managerId) ?? [];
+      reports.push(person);
+      children.set(managerId, reports);
+    } else {
+      roots.push(person);
+    }
+  }
+
+  const groups = new Map<string, EmployeeResponse[]>();
+  for (const root of roots) {
+    const heads = groups.get(root.department) ?? [];
+    heads.push(root);
+    groups.set(root.department, heads);
+  }
+
+  function Node({ person }: { person: EmployeeResponse }) {
+    const reports = children.get(person.id) ?? [];
+    return (
+      <li className="org-node">
+        <div className="org-person">
+          <strong>{person.fullName}</strong>
+          <span>{person.designation}</span>
+          <span className="org-dept">{person.department}</span>
+        </div>
+        {reports.length > 0 && (
+          <ul className="org-reports">
+            {reports.map((report) => (
+              <Node key={report.id} person={report} />
+            ))}
+          </ul>
+        )}
+      </li>
+    );
+  }
+
+  if (people.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="org-chart">
+      {[...groups.entries()].map(([department, heads]) => {
+        const reports = heads.flatMap((head) => children.get(head.id) ?? []);
+        return (
+          <section key={department} className="org-team">
+            <header className="org-head">
+              <p>{department}</p>
+              <h2>{heads.map((head) => head.fullName).join(" / ")}</h2>
+              <span>{heads[0]?.designation}</span>
+            </header>
+            {reports.length > 0 && (
+              <ul className="org-reports">
+                {reports.map((person) => (
+                  <Node key={person.id} person={person} />
+                ))}
+              </ul>
+            )}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 function roleLabel(role: EmployeeRole) {
   switch (role) {
     case "ADMIN":
@@ -428,7 +503,9 @@ export default function Employees() {
         <div>
           <p className="page-eyebrow">Employee Lifecycle</p>
           <h1>Employees</h1>
-          <p>Manage your workforce and employee lifecycle.</p>
+          <p>
+            Gorle and Cyond teams from the staff sheets. A person reports to the manager marked on the sheet. Gorle managers report to Sunil. Office staff report to the admin.
+          </p>
         </div>
 
         <button
@@ -443,6 +520,12 @@ export default function Employees() {
           Add Employee
         </button>
       </div>
+
+      <OrgChart
+        people={employees.filter((employee) =>
+          isCompanyMatch(employee.companyCode, company),
+        )}
+      />
 
       <div className="employee-summary-grid">
         <div className="employee-summary-card">
@@ -577,17 +660,9 @@ export default function Employees() {
               />
             </label>
 
-            <label>
-              Password
-              <input
-                required
-                type="password"
-                value={form.password}
-                onChange={(event) =>
-                  updateForm("password", event.target.value)
-                }
-              />
-            </label>
+            <p className="employee-password-note">
+              No password is saved here. The employee uses this email on the sign-in page, creates a password, then logs in. This works for both CYOND and Gorle.
+            </p>
 
             <label>
               Role
@@ -771,6 +846,7 @@ export default function Employees() {
                     <th>Company</th>
                     <th>Department</th>
                     <th>Designation</th>
+                    <th>Reports to</th>
                     <th>Role</th>
                     <th>Joining Date</th>
                     <th>Status</th>
@@ -802,6 +878,10 @@ export default function Employees() {
                       <td><strong>{employee.companyName}</strong></td>
                       <td>{employee.department}</td>
                       <td>{employee.designation}</td>
+                      <td>
+                        {employees.find((manager) => manager.id === employee.reportingManagerId)?.fullName
+                          ?? "—"}
+                      </td>
                       <td>{roleLabel(employee.roleType)}</td>
                       <td>{employee.joiningDate}</td>
                       <td>

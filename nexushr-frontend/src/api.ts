@@ -233,6 +233,8 @@ export interface RegisterRequest {
   email: string;
   password: string;
   phone?: string;
+  companyCode?: string;
+  employeeCode?: string;
 }
 
 export interface RegisterResponse {

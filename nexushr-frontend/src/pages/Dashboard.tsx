@@ -307,7 +307,7 @@ export default function Dashboard() {
               ))}
             </ul>
           )}
-          <p className="hr-empty">Salary uses these working hours. Inactive time from 1:00 to 2:00 is not a warning. Three warnings cut half a day.</p>
+          <p className="hr-empty">A day is 9 hours from check-in: 8 hours of work and 1 flexible lunch hour. Three idle warnings cut half a day.</p>
         </article>
 
         <article className="hr-card hr-actions">

@@ -51,13 +51,6 @@ public class EmployeeService {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Unknown company: " + companyCode
                 ));
-        if (request.getPassword() == null
-                || request.getPassword().isBlank()) {
-            throw new IllegalArgumentException(
-                    "Employee password is required"
-            );
-        }
-
         if (employeeRepository.existsByEmployeeCode(
                 request.getEmployeeCode())) {
             throw new IllegalArgumentException(
@@ -79,8 +72,11 @@ public class EmployeeService {
         employee.setEmail(request.getEmail());
         employee.setPhone(request.getPhone());
         employee.setAccountNumber(request.getAccountNumber());
+        String rawPassword = request.getPassword();
         employee.setPassword(
-                passwordEncoder.encode(request.getPassword())
+                rawPassword == null || rawPassword.isBlank()
+                        ? ExcelPayrollService.UNSET_PASSWORD_HASH
+                        : passwordEncoder.encode(rawPassword)
         );
         employee.setRoleType(request.getRoleType());
         employee.setDepartment(request.getDepartment());
