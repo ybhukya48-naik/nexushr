@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
 @Table(
@@ -133,6 +134,13 @@ public class AttendanceRecord {
     }
 
     public Integer getWorkMinutes() {
+        if (checkInTime != null && checkOutTime == null) {
+            int elapsed = com.zidio.nexushr.service.AttendanceRules.sessionMinutes(
+                    checkInTime,
+                    LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
+            int breaks = breakMinutes == null ? 0 : breakMinutes;
+            return Math.max(0, elapsed - breaks);
+        }
         return workMinutes;
     }
 

@@ -28,6 +28,7 @@ import {
   getLeaves,
   sendAttendanceHeartbeat,
   type AttendanceAuditEntry,
+  clockedWorkMinutes,
   type AttendanceRecord,
 } from "./pages/Attendance";
 import {
@@ -946,7 +947,7 @@ function EmployeeDashboard() {
         const pairs = punchPairs(audit, today, todayRecord);
         const month = today.slice(0, 7);
         const monthRows = records.filter((row) => row.attendanceDate.startsWith(month));
-        const monthMinutes = monthRows.reduce((sum, row) => sum + (row.workMinutes ?? 0), 0);
+        const monthMinutes = monthRows.reduce((sum, row) => sum + clockedWorkMinutes(row), 0);
         const warnings = monthRows.filter((row) => row.yellowFlag).length;
         const halfDay = warnings >= 3 ? Math.round(Number(employee.baseSalary || 0) / 26 / 2) : 0;
         const workday = new Date().getDay() !== 0;
@@ -992,7 +993,7 @@ function EmployeeDashboard() {
                 </ul>
               )}
               <p>
-                Working hours today: {hoursLabel(todayRecord?.workMinutes)}
+                Working hours today: {hoursLabel(clockedWorkMinutes(todayRecord))}
                 {" · "}
                 This month: {hoursLabel(monthMinutes)}
                 {halfDay > 0 ? ` · Half-day cut ₹${halfDay.toLocaleString("en-IN")}` : ""}
@@ -1011,7 +1012,7 @@ function EmployeeDashboard() {
                 <ul className="dash-punches">
                   {records.slice(0, 8).map((row) => (
                     <li key={row.id}>
-                      {row.attendanceDate.slice(0, 10)} · In {formatClock(row.checkInTime)} · Out {formatClock(row.checkOutTime)} · {hoursLabel(row.workMinutes)}
+                      {row.attendanceDate.slice(0, 10)} · In {formatClock(row.checkInTime)} · Out {formatClock(row.checkOutTime)} · {hoursLabel(clockedWorkMinutes(row))}
                       {row.yellowFlag ? " · Inactive warning" : ""}
                     </li>
                   ))}

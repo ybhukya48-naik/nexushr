@@ -14,6 +14,7 @@ import {
   getAttendanceByDate,
   getLeaves,
   type AttendanceAuditEntry,
+  clockedWorkMinutes,
   type AttendanceRecord,
   type LeaveRequest,
 } from "./Attendance";
@@ -299,7 +300,7 @@ export default function Dashboard() {
                       {punchPairs(audit, row.employee.id, today, row).map((pair) =>
                         `${pair.checkIn}–${pair.checkOut ?? "in"}`).join(", ")}
                       {" · "}
-                      {Math.floor((row.workMinutes ?? 0) / 60)}h {(row.workMinutes ?? 0) % 60}m
+                      {Math.floor(clockedWorkMinutes(row) / 60)}h {clockedWorkMinutes(row) % 60}m
                       {row.yellowFlag ? " · warning" : ""}
                     </em>
                   </button>
@@ -362,7 +363,7 @@ export default function Dashboard() {
                 <button type="button" onClick={() => navigate(`/employees/${row.employee.id}`)}>
                   <strong>{row.employee.fullName}</strong>
                   <span>
-                    {row.attendanceDate.slice(0, 10)} · {clock(row.checkInTime)}–{row.checkOutTime ? clock(row.checkOutTime) : "in"} · {Math.floor((row.workMinutes ?? 0) / 60)}h {(row.workMinutes ?? 0) % 60}m
+                    {row.attendanceDate.slice(0, 10)} · {clock(row.checkInTime)}–{row.checkOutTime ? clock(row.checkOutTime) : "in"} · {Math.floor(clockedWorkMinutes(row) / 60)}h {clockedWorkMinutes(row) % 60}m
                     {row.yellowFlag ? " · warning" : ""}
                   </span>
                 </button>

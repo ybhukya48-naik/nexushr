@@ -45,6 +45,34 @@ function normalizeAttendanceDate(value?: string) {
   return String(value ?? "").trim().slice(0, 10);
 }
 
+export function clockedWorkMinutes(
+  record?: Pick<AttendanceRecord, "checkInTime" | "checkOutTime" | "breakMinutes" | "workMinutes"> | null,
+  now = new Date(),
+) {
+  if (!record?.checkInTime) {
+    return Math.max(0, record?.workMinutes ?? 0);
+  }
+  const start = new Date(record.checkInTime);
+  if (Number.isNaN(start.getTime())) {
+    return Math.max(0, record.workMinutes ?? 0);
+  }
+  const end = record.checkOutTime ? new Date(record.checkOutTime) : now;
+  if (Number.isNaN(end.getTime())) {
+    return Math.max(0, record.workMinutes ?? 0);
+  }
+  const breakMinutes = Math.max(0, record.breakMinutes ?? 0);
+  const checkedIn = Math.max(
+    0,
+    Math.floor((end.getTime() - start.getTime()) / 60000) - breakMinutes,
+  );
+  if (!record.checkOutTime) {
+    return checkedIn;
+  }
+  const lunchStillDue = Math.max(0, 60 - breakMinutes);
+  const afterEightHours = Math.max(0, checkedIn + breakMinutes - 8 * 60);
+  return Math.max(0, checkedIn - Math.min(lunchStillDue, afterEightHours));
+}
+
 async function attendanceRequest<T>(
   path: string,
   options: RequestInit = {},
@@ -1151,7 +1179,7 @@ export default function Attendance() {
                   <td>{formatDate(row.attendanceDate)}</td>
                   <td>{formatTime(row.checkInTime)}</td>
                   <td>{formatTime(row.checkOutTime)}</td>
-                  <td>{row.workMinutes}</td>
+                  <td>{clockedWorkMinutes(row, currentTime)}</td>
                   <td>
                     {[
                       row.lateWarning ? "Late" : "",
