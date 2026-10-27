@@ -10,6 +10,8 @@ import {
   type EmployeeResponse,
 } from "../api";
 import {
+  checkIn,
+  checkOut,
   getAttendanceAudit,
   getAttendanceByDate,
   getLeaves,
@@ -128,6 +130,10 @@ export default function Dashboard() {
   const [holidays, setHolidays] = useState<HolidayMark[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [lunchEmployeeId, setLunchEmployeeId] = useState("");
+  const [punching, setPunching] = useState(false);
+  const [punchNote, setPunchNote] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -187,7 +193,7 @@ export default function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [company]);
+  }, [company, refreshTick]);
 
   if (loading) {
     return (
@@ -226,6 +232,39 @@ export default function Dashboard() {
   const cells = monthCells(now.getFullYear(), now.getMonth());
   const holidayDays = new Set(holidays.filter((holiday) => holiday.date.startsWith(today.slice(0, 7))).map((holiday) => Number(holiday.date.slice(8))));
   const displayName = me?.fullName || localStorage.getItem("nexushr_user") || "there";
+  const lunchPerson = people.find((person) => String(person.id) === lunchEmployeeId);
+  const lunchRecord = todayRows.find((row) => String(row.employee?.id) === lunchEmployeeId);
+  const lunchOpen = Boolean(
+    lunchPerson && !lunchPerson.siteVisitor && lunchRecord?.checkInTime && !lunchRecord.checkOutTime,
+  );
+  const lunchResume = Boolean(
+    lunchPerson && !lunchPerson.siteVisitor && lunchRecord?.checkOutTime,
+  );
+
+  async function punchLunch(kind: "out" | "in") {
+    if (!lunchPerson) {
+      return;
+    }
+    setPunching(true);
+    setPunchNote("");
+    try {
+      await (kind === "out" ? checkOut(lunchPerson.id) : checkIn(lunchPerson.id));
+      setPunchNote(
+        kind === "out"
+          ? "Lunch check-out saved. Working hours are paused."
+          : "Lunch check-in saved. Working hours continue.",
+      );
+      setRefreshTick((value) => value + 1);
+    } catch (err) {
+      setPunchNote(
+        err instanceof Error
+          ? err.message.replace(/^Attendance API failed:\s*/i, "")
+          : "Lunch punch could not be saved.",
+      );
+    } finally {
+      setPunching(false);
+    }
+  }
 
   return (
     <div className="hr-home">
@@ -256,6 +295,48 @@ export default function Dashboard() {
           <span>Pending requests</span>
           <strong>{pending.length || summary?.pendingLeaveRequests || 0}</strong>
         </button>
+      </section>
+
+      <section className="hr-card hr-lunch">
+        <div className="hr-card-title">
+          <h3>Lunch</h3>
+        </div>
+        <label className="hr-lunch-pick">
+          <span>Employee</span>
+          <select
+            value={lunchEmployeeId}
+            onChange={(event) => {
+              setLunchEmployeeId(event.target.value);
+              setPunchNote("");
+            }}
+          >
+            <option value="">Select an employee</option>
+            {people.filter((person) => person.active).map((person) => (
+              <option key={person.id} value={person.id}>
+                {person.fullName} - {person.employeeCode}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="attendance-actions">
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={punching || !lunchOpen}
+            onClick={() => void punchLunch("out")}
+          >
+            Lunch Check Out
+          </button>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={punching || !lunchResume}
+            onClick={() => void punchLunch("in")}
+          >
+            Lunch Check In
+          </button>
+        </div>
+        {punchNote && <p className="hr-empty">{punchNote}</p>}
       </section>
 
       <section className="hr-home-grid">

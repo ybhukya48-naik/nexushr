@@ -95,6 +95,23 @@
   padding: 16px 18px;
 }
 
+.hr-lunch {
+  margin-bottom: 16px;
+}
+
+.hr-lunch-pick {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  max-width: 420px;
+}
+
+.hr-lunch-pick select {
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
 .hr-card-title button,
 .hr-alerts button {
   border: 0;

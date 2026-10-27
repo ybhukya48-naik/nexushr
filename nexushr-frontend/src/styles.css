@@ -6872,6 +6872,16 @@ textarea {
   margin-top: 8px;
 }
 
+.org-root-card {
+  background: #f4f7fb;
+}
+
+.org-branches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
 .org-person {
   display: flex;
   flex-wrap: wrap;

@@ -99,6 +99,47 @@ function OrgChart({ people }: { people: EmployeeResponse[] }) {
     return null;
   }
 
+  const treeRoots = [...groups.values()].flat();
+  if (treeRoots.length === 1) {
+    const root = treeRoots[0];
+    const reports = children.get(root.id) ?? [];
+    const branches = new Map<string, EmployeeResponse[]>();
+    for (const person of reports) {
+      const branch = person.department.trim() || "Team";
+      const members = branches.get(branch) ?? [];
+      members.push(person);
+      branches.set(branch, members);
+    }
+    const branchEntries = [...branches.entries()].sort(([left], [right]) =>
+      left.localeCompare(right),
+    );
+    return (
+      <div className="org-chart">
+        <section className="org-team org-root-card">
+          <header className="org-head">
+            <p>{root.department}</p>
+            <h2>{root.fullName}</h2>
+            <span>{root.designation}</span>
+          </header>
+        </section>
+        <div className="org-branches">
+          {branchEntries.map(([department, heads]) => (
+            <section key={department} className="org-team">
+              <header className="org-head">
+                <p>{department}</p>
+              </header>
+              <ul className="org-reports org-roots">
+                {heads.map((person) => (
+                  <Node key={person.id} person={person} />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="org-chart">
       {[...groups.entries()].map(([department, heads]) => (

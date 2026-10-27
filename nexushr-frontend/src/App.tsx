@@ -23,6 +23,8 @@ import {
   type EmployeeResponse,
 } from "./api";
 import {
+  checkIn,
+  checkOut,
   getAttendanceAudit,
   getEmployeeAttendance,
   getLeaves,
@@ -849,6 +851,8 @@ function EmployeeDashboard() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [punching, setPunching] = useState(false);
+  const [punchNote, setPunchNote] = useState("");
 
   useEffect(() => {
     getCurrentEmployee()
@@ -920,6 +924,31 @@ function EmployeeDashboard() {
     return null;
   }
 
+  const signedInEmployee = employee;
+
+  async function punchLunch(kind: "out" | "in") {
+    setPunching(true);
+    setPunchNote("");
+    try {
+      await (kind === "out" ? checkOut(signedInEmployee.id) : checkIn(signedInEmployee.id));
+      const history = await getEmployeeAttendance(signedInEmployee.id);
+      setRecords([...history].sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate)));
+      setPunchNote(
+        kind === "out"
+          ? "Lunch check-out saved. Working hours are paused."
+          : "Lunch check-in saved. Working hours continue.",
+      );
+    } catch (err) {
+      setPunchNote(
+        err instanceof Error
+          ? err.message.replace(/^Attendance API failed:\s*/i, "")
+          : "Lunch punch could not be saved.",
+      );
+    } finally {
+      setPunching(false);
+    }
+  }
+
   return (
     <div className="dashboard-page employee-dashboard">
 
@@ -972,10 +1001,26 @@ function EmployeeDashboard() {
                   <h3>Check-in, check-out, and working hours</h3>
                   <p>After check-in, a day is 9 hours: 8 hours of work and 1 hour of lunch. Take that lunch hour at any time. Salary uses the 8 working hours. A later check-out adds to the morning. Chrome idle is a warning, and three warnings cut half a day. The warning does not erase hours already worked.</p>
                 </div>
-                <button className="primary-button" type="button" onClick={() => navigate("/attendance")}>
-                  Check in or check out
-                </button>
+                <div className="attendance-actions">
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={punching || !todayRecord?.checkInTime || Boolean(todayRecord?.checkOutTime)}
+                    onClick={() => void punchLunch("out")}
+                  >
+                    Lunch Check Out
+                  </button>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={punching || !todayRecord?.checkOutTime}
+                    onClick={() => void punchLunch("in")}
+                  >
+                    Lunch Check In
+                  </button>
+                </div>
               </div>
+              {punchNote && <p>{punchNote}</p>}
               {notices.length > 0 && (
                 <ul className="dash-notices">
                   {notices.map((notice) => <li key={notice}>{notice}</li>)}
