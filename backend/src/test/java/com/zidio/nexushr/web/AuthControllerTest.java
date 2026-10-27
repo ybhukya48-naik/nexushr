@@ -4,7 +4,9 @@ package com.zidio.nexushr.web;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zidio.nexushr.domain.Company;
 import com.zidio.nexushr.domain.Employee;
+import com.zidio.nexushr.domain.RoleType;
 import com.zidio.nexushr.repository.CompanyRepository;
+import com.zidio.nexushr.service.ExcelPayrollService;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.security.JwtTokenService;
 import com.zidio.nexushr.security.SecurityConfig;
@@ -183,6 +185,44 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.accessToken").value("employee-token"))
                 .andExpect(jsonPath("$.role").value("EMPLOYEE"))
                 .andExpect(jsonPath("$.username").value("Staff Name"));
+    }
+
+    @Test
+    void login_withAdminEmail_savesPasswordOnFirstSignIn() throws Exception {
+        Employee admin = new Employee();
+        admin.setEmployeeCode("GG-AD-001");
+        admin.setEmail("b.ganesh@gorlegroup.com");
+        admin.setFullName("B. Ganesh");
+        admin.setRoleType(RoleType.ADMIN);
+        admin.setPassword(ExcelPayrollService.UNSET_PASSWORD_HASH);
+        when(employeeRepository.findLoginMatches("b.ganesh@gorlegroup.com"))
+                .thenReturn(List.<Object[]>of(new Object[]{
+                        "b.ganesh@gorlegroup.com",
+                        ExcelPayrollService.UNSET_PASSWORD_HASH,
+                        "GG-AD-001",
+                        "ADMIN",
+                        true,
+                        "ACTIVE",
+                        "B. Ganesh"
+                }));
+        when(employeeRepository.findByEmployeeCodeIgnoreCase("GG-AD-001"))
+                .thenReturn(Optional.of(admin));
+        when(employeeRepository.save(org.mockito.ArgumentMatchers.any(Employee.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(jwtTokenService.generate(anyString(), anyMap()))
+                .thenReturn("admin-token");
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"username":"b.ganesh@gorlegroup.com","password":"ganeshpass"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("admin-token"))
+                .andExpect(jsonPath("$.role").value("ADMIN"))
+                .andExpect(jsonPath("$.username").value("B. Ganesh"));
+
+        assertTrue(new BCryptPasswordEncoder().matches("ganeshpass", admin.getPassword()));
     }
 
     @Test

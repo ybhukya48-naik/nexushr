@@ -179,7 +179,7 @@ public class AuthController {
         if (isManagement(existing)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("message",
-                            "This email belongs to an HR or admin account. Employees use their own email."));
+                            "This email is an admin account. Sign in with this email and your password."));
         }
         if (!passwordUnset(existing)) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -303,6 +303,11 @@ public class AuthController {
                     continue;
                 }
                 if (!passwordMatches(request.password(), text(row, 1))) {
+                    ResponseEntity<?> claimed = claimManagementPassword(
+                            row, request.password(), normalizedUsername);
+                    if (claimed != null) {
+                        return claimed;
+                    }
                     continue;
                 }
 
@@ -336,6 +341,54 @@ public class AuthController {
                     "Sign-in could not check this account. Use the employee email and the new password."
             ));
         }
+    }
+
+    /**
+     * An admin or HR account signs in with their own email and password.
+     * The first sign-in saves that password. Later sign-ins must match it.
+     * A new visitor cannot create an admin account from this path.
+     */
+    private ResponseEntity<?> claimManagementPassword(Object[] row, String rawPassword, String loginName) {
+        String role = text(row, 3);
+        if (!isManagementRole(role) || !storedPasswordUnset(text(row, 1))) {
+            return null;
+        }
+        if (rawPassword.length() < 8) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "Password must contain at least 8 characters"));
+        }
+        String code = text(row, 2);
+        String email = text(row, 0);
+        Employee employee = code == null
+                ? null
+                : employeeRepository.findByEmployeeCodeIgnoreCase(code).orElse(null);
+        if (employee == null && email != null) {
+            employee = employeeRepository.findByEmailIgnoreCase(email).orElse(null);
+        }
+        if (employee == null || !passwordUnset(employee) || !isManagement(employee)) {
+            return null;
+        }
+        employee.setPassword(passwordEncoder.encode(rawPassword));
+        employeeRepository.save(employee);
+        String name = text(row, 6);
+        if (name == null || name.isBlank()) {
+            name = employee.getFullName() == null || employee.getFullName().isBlank()
+                    ? loginName
+                    : employee.getFullName();
+        }
+        String tokenSubject = email == null || email.isBlank() ? loginName.toLowerCase() : email;
+        String token = jwtTokenService.generate(tokenSubject, Map.of("role", role));
+        return ResponseEntity.ok(new AuthDtos.LoginResponse(token, role, name));
+    }
+
+    private static boolean isManagementRole(String role) {
+        return "ADMIN".equals(role) || "HR".equals(role) || "SUPER_ADMIN".equals(role);
+    }
+
+    private static boolean storedPasswordUnset(String hash) {
+        return hash == null
+                || hash.isBlank()
+                || ExcelPayrollService.UNSET_PASSWORD_HASH.equals(hash);
     }
 
     private boolean passwordMatches(String rawPassword, String storedHash) {
@@ -421,7 +474,7 @@ public class AuthController {
 
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("message",
-                            "This email belongs to an HR or admin account. Employees create a password with their own email."));
+                            "This email is an admin account. Sign in with this email and your password."));
         } catch (Exception ex) {
             log.error("CREATE_PASSWORD_FAILED", ex);
             return ResponseEntity.status(HttpStatus.CONFLICT)

@@ -536,7 +536,7 @@ function Login() {
               <p>
                 {mode === "create"
                   ? "Create your profile with your own email and password. If you already have an employee code, enter it. Then sign in with that email or employee code and the same password."
-                  : "Sign in with your email or employee code and the password you created."}
+                  : "Admins and employees sign in here with their own email and password. Employees who have not saved a password yet use Create your profile."}
               </p>
 
             </div>
