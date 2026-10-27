@@ -6868,6 +6868,10 @@ textarea {
   border-left: 2px solid #d7e0ec;
 }
 
+.org-roots {
+  margin-top: 8px;
+}
+
 .org-person {
   display: flex;
   flex-wrap: wrap;

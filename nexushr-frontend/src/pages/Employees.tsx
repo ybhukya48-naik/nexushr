@@ -67,6 +67,9 @@ function OrgChart({ people }: { people: EmployeeResponse[] }) {
 
   const groups = new Map<string, EmployeeResponse[]>();
   for (const root of roots) {
+    if (root.department.trim().toLowerCase() === "general") {
+      continue;
+    }
     const heads = groups.get(root.department) ?? [];
     heads.push(root);
     groups.set(root.department, heads);
@@ -98,25 +101,18 @@ function OrgChart({ people }: { people: EmployeeResponse[] }) {
 
   return (
     <div className="org-chart">
-      {[...groups.entries()].map(([department, heads]) => {
-        const reports = heads.flatMap((head) => children.get(head.id) ?? []);
-        return (
+      {[...groups.entries()].map(([department, heads]) => (
           <section key={department} className="org-team">
             <header className="org-head">
               <p>{department}</p>
-              <h2>{heads.map((head) => head.fullName).join(" / ")}</h2>
-              <span>{heads[0]?.designation}</span>
             </header>
-            {reports.length > 0 && (
-              <ul className="org-reports">
-                {reports.map((person) => (
-                  <Node key={person.id} person={person} />
-                ))}
-              </ul>
-            )}
+            <ul className="org-reports org-roots">
+              {heads.map((person) => (
+                <Node key={person.id} person={person} />
+              ))}
+            </ul>
           </section>
-        );
-      })}
+      ))}
     </div>
   );
 }

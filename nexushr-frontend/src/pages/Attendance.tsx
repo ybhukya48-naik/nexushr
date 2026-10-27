@@ -662,7 +662,9 @@ export default function Attendance() {
 
     try {
       const saved = await action();
-      const exactTime = formatTime(saved.checkOutTime || saved.checkInTime);
+      const exactTime = formatTime(
+        saved.checkOutTime || saved.sessionStartedAt || saved.checkInTime,
+      );
       setRecords((current) => {
         const savedDate = normalizeAttendanceDate(saved.attendanceDate);
         const savedEmployeeId = String(saved.employee?.id ?? "");
@@ -726,6 +728,16 @@ export default function Attendance() {
     });
   }
 
+
+  function formatAsHours(totalMinutes: number) {
+    const safe = Math.max(0, Math.round(totalMinutes));
+    const hours = Math.floor(safe / 60);
+    const minutes = safe % 60;
+    if (minutes === 0) {
+      return `${hours}h`;
+    }
+    return `${hours}h ${minutes}m`;
+  }
 
   function formatClock(totalSeconds: number) {
     const safe = Math.max(0, totalSeconds);
@@ -808,13 +820,13 @@ export default function Attendance() {
           <p className="eyebrow">WORKFORCE OPERATIONS</p>
           <h2>Attendance</h2>
           <p>
-            {canPunch
-              ? "Working hours follow the clock from check-in. A full day is 9 hours, and 1 of those hours is flexible lunch when you check out and check in again. That lunch hour is not cut from the running clock. System inactive is only a warning."
+            {canPunch || isManagementRole
+              ? "Lunch is the employee’s flexible hour. Select the employee, check in, then use Lunch Check Out and Lunch Check In. That gap is lunch, not a warning. Working hours pause, then continue."
               : "View only. A day is 9 hours from check-in: 8 hours of work and 1 flexible lunch hour."}
           </p>
         </div>
 
-        {canPunch && (
+        {(canPunch || isManagementRole) && (
         <div className="attendance-actions">
           {siteVisitor && (
             <label className="secondary-button">
@@ -901,6 +913,67 @@ export default function Attendance() {
                 : actionEmployeeRecord?.checkOutTime
                   ? `Checked Out ${formatTime(actionEmployeeRecord.checkOutTime)}`
                   : "Check Out"}
+          </button>
+
+          <button
+            className="secondary-button"
+            onClick={() =>
+              void runAction(
+                () => siteVisitor && canPunch
+                  ? siteCheckOut(selfie as File)
+                  : checkOut(actionEmployee?.id),
+                "Lunch check-out saved. Working hours are paused.",
+              )
+            }
+            disabled={
+              loading ||
+              !attendanceLoaded ||
+              !isToday ||
+              !actionEmployee ||
+              !sessionOpen ||
+              (siteVisitor && canPunch && !selfie)
+            }
+            title={
+              !actionEmployee
+                ? "Select an employee, then check out for lunch."
+                : !sessionOpen
+                  ? "Check in first. Lunch check-out pauses working hours."
+                  : "Check out for lunch. The system is inactive while you are away."
+            }
+          >
+            Lunch Check Out
+          </button>
+
+          <button
+            className="secondary-button"
+            onClick={() =>
+              void runAction(
+                () => siteVisitor && canPunch
+                  ? siteCheckIn(selfie as File)
+                  : checkIn(actionEmployee?.id),
+                "Lunch check-in saved. Working hours continue.",
+              )
+            }
+            disabled={
+              loading ||
+              !attendanceLoaded ||
+              !isToday ||
+              !actionEmployee ||
+              sessionOpen ||
+              !canResume ||
+              (siteVisitor && canPunch && !selfie)
+            }
+            title={
+              !actionEmployee
+                ? "Select an employee, then check in after lunch."
+                : sessionOpen
+                  ? "Check out for lunch before checking in again."
+                  : !canResume
+                    ? "Check in for the day before the lunch check-in."
+                    : "Check in after lunch. Working hours continue."
+            }
+          >
+            Lunch Check In
           </button>
         </div>
         )}
@@ -1107,7 +1180,7 @@ export default function Attendance() {
             }
           >
             {record.lateArrivalMinutes > 0
-              ? `${record.lateArrivalMinutes} min`
+              ? formatAsHours(record.lateArrivalMinutes)
               : "On time"}
           </span>
         ) : (
@@ -1158,7 +1231,7 @@ export default function Attendance() {
           <div>
             <p className="eyebrow">HISTORY</p>
             <h3>Employee attendance history</h3>
-            <p>Working hours match the clock since check-in. The 1 hour lunch is inside the 9 hour day and is not taken off this running clock. System inactive stays a warning.</p>
+            <p>Check out for lunch, then check in when you are back. That gap is your flexible hour. A warning applies only if the system stays inactive while you are still checked in.</p>
           </div>
         </div>
         <div className="employees-table-wrap">
