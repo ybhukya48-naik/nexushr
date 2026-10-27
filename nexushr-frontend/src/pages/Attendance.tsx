@@ -749,12 +749,12 @@ export default function Attendance() {
     };
 
     if (open) {
-      const start = new Date(record.sessionStartedAt || record.checkInTime);
-      const live = Number.isNaN(start.getTime())
+      const start = new Date(record.checkInTime);
+      const sinceCheckIn = Number.isNaN(start.getTime())
         ? 0
         : Math.max(0, Math.floor((currentTime.getTime() - start.getTime()) / 1000));
       return {
-        work: formatClock(payable(closedSeconds + live)),
+        work: formatClock(Math.max(0, sinceCheckIn - breakSeconds)),
         breakTime: formatClock(breakSeconds),
       };
     }
@@ -781,7 +781,7 @@ export default function Attendance() {
           <h2>Attendance</h2>
           <p>
             {canPunch
-              ? "After check-in, this day is 9 hours: 8 hours of work and 1 hour of lunch. Take the lunch hour whenever you want. Check out for lunch, then check in again, and the hours already worked stay. A later check-out adds to the morning. It does not replace the day with only the last hour. Signing out of NexusHR does not delete attendance."
+              ? "Working hours follow the clock from check-in. A full day is 9 hours, and 1 of those hours is flexible lunch when you check out and check in again. That lunch hour is not cut from the running clock. System inactive is only a warning."
               : "View only. A day is 9 hours from check-in: 8 hours of work and 1 flexible lunch hour."}
           </p>
         </div>
@@ -1130,7 +1130,7 @@ export default function Attendance() {
           <div>
             <p className="eyebrow">HISTORY</p>
             <h3>Employee attendance history</h3>
-            <p>Past punches stay after logout. Work hours are counted from check-in. The 1 hour lunch comes off after 8 hours, or when you check out for lunch.</p>
+            <p>Working hours match the clock since check-in. The 1 hour lunch is inside the 9 hour day and is not taken off this running clock. System inactive stays a warning.</p>
           </div>
         </div>
         <div className="employees-table-wrap">
