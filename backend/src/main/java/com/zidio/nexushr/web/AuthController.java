@@ -176,15 +176,10 @@ public class AuthController {
             String email,
             String phone,
             String password) {
-        if (isManagement(existing)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("message",
-                            "This email is an admin account. Sign in with this email and your password."));
-        }
         if (!passwordUnset(existing)) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(Map.of("message",
-                            "This profile already has a password. Sign in with your email or employee code."));
+                            "This profile already has a password. Sign in with your own email or employee code."));
         }
         Employee emailOwner = employeeRepository.findByEmailIgnoreCase(email).orElse(null);
         if (emailOwner != null && existing.getId() != null && !existing.getId().equals(emailOwner.getId())) {
@@ -199,7 +194,7 @@ public class AuthController {
         }
         Employee saved = employeeRepository.save(existing);
         return ResponseEntity.ok(profileBody(
-                "Password saved. Sign in with your email or employee code and this password.",
+                "Your email is saved. Sign in with this email and the same password.",
                 saved));
     }
 
@@ -209,11 +204,6 @@ public class AuthController {
                 "employeeCode", employee.getEmployeeCode() == null ? "" : employee.getEmployeeCode(),
                 "email", employee.getEmail() == null ? "" : employee.getEmail()
         );
-    }
-
-    private static boolean isManagement(Employee employee) {
-        RoleType role = employee.getRoleType();
-        return role == RoleType.ADMIN || role == RoleType.HR || role == RoleType.SUPER_ADMIN;
     }
 
     private static boolean passwordUnset(Employee employee) {
@@ -303,11 +293,6 @@ public class AuthController {
                     continue;
                 }
                 if (!passwordMatches(request.password(), text(row, 1))) {
-                    ResponseEntity<?> claimed = claimManagementPassword(
-                            row, request.password(), normalizedUsername);
-                    if (claimed != null) {
-                        return claimed;
-                    }
                     continue;
                 }
 
@@ -329,10 +314,10 @@ public class AuthController {
             }
 
             String message = rows.isEmpty()
-                    ? "No employee uses that email or employee code."
+                    ? "That email is not saved yet. Use Create your profile, enter your employee code and your own email, then sign in with that email."
                     : sawInactive
                     ? "This employee account is not active."
-                    : "Password does not match. Sign in with the password you just created.";
+                    : "Password does not match. Sign in with the email and password you saved.";
             return ResponseEntity.status(401).body(Map.of("message", message));
         } catch (Exception ex) {
             log.error("LOGIN_FAILED", ex);
@@ -341,54 +326,6 @@ public class AuthController {
                     "Sign-in could not check this account. Use the employee email and the new password."
             ));
         }
-    }
-
-    /**
-     * An admin or HR account signs in with their own email and password.
-     * The first sign-in saves that password. Later sign-ins must match it.
-     * A new visitor cannot create an admin account from this path.
-     */
-    private ResponseEntity<?> claimManagementPassword(Object[] row, String rawPassword, String loginName) {
-        String role = text(row, 3);
-        if (!isManagementRole(role) || !storedPasswordUnset(text(row, 1))) {
-            return null;
-        }
-        if (rawPassword.length() < 8) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "Password must contain at least 8 characters"));
-        }
-        String code = text(row, 2);
-        String email = text(row, 0);
-        Employee employee = code == null
-                ? null
-                : employeeRepository.findByEmployeeCodeIgnoreCase(code).orElse(null);
-        if (employee == null && email != null) {
-            employee = employeeRepository.findByEmailIgnoreCase(email).orElse(null);
-        }
-        if (employee == null || !passwordUnset(employee) || !isManagement(employee)) {
-            return null;
-        }
-        employee.setPassword(passwordEncoder.encode(rawPassword));
-        employeeRepository.save(employee);
-        String name = text(row, 6);
-        if (name == null || name.isBlank()) {
-            name = employee.getFullName() == null || employee.getFullName().isBlank()
-                    ? loginName
-                    : employee.getFullName();
-        }
-        String tokenSubject = email == null || email.isBlank() ? loginName.toLowerCase() : email;
-        String token = jwtTokenService.generate(tokenSubject, Map.of("role", role));
-        return ResponseEntity.ok(new AuthDtos.LoginResponse(token, role, name));
-    }
-
-    private static boolean isManagementRole(String role) {
-        return "ADMIN".equals(role) || "HR".equals(role) || "SUPER_ADMIN".equals(role);
-    }
-
-    private static boolean storedPasswordUnset(String hash) {
-        return hash == null
-                || hash.isBlank()
-                || ExcelPayrollService.UNSET_PASSWORD_HASH.equals(hash);
     }
 
     private boolean passwordMatches(String rawPassword, String storedHash) {
@@ -474,7 +411,7 @@ public class AuthController {
 
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("message",
-                            "This email is an admin account. Sign in with this email and your password."));
+                            "Use Create your profile with your employee code and your own email."));
         } catch (Exception ex) {
             log.error("CREATE_PASSWORD_FAILED", ex);
             return ResponseEntity.status(HttpStatus.CONFLICT)

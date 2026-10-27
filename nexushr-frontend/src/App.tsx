@@ -535,8 +535,8 @@ function Login() {
 
               <p>
                 {mode === "create"
-                  ? "Create your profile with your own email and password. If you already have an employee code, enter it. Then sign in with that email or employee code and the same password."
-                  : "Admins and employees sign in here with their own email and password. Employees who have not saved a password yet use Create your profile."}
+                  ? "Enter your employee code, your own email, and a password. Admin and manager keep their role. Then sign in with that same email and password."
+                  : "Sign in with your own email and password. Admin and manager save that email once, using their employee code."}
               </p>
 
             </div>
@@ -668,7 +668,7 @@ function Login() {
                       type="text"
                       value={employeeCode}
                       onChange={(event) => setEmployeeCode(event.target.value)}
-                      placeholder="Leave blank if you are new"
+                      placeholder="Your employee code"
                       autoComplete="off"
                     />
                   </div>
@@ -749,8 +749,8 @@ function Login() {
               }}
             >
               {mode === "create"
-                ? "Already created a profile? Sign in"
-                : "Employee? Create your profile"}
+                ? "Already saved your email? Sign in"
+                : "Admin, manager, or employee? Set your own email"}
             </button>
 
             {/* SECURITY */}

@@ -188,41 +188,53 @@ class AuthControllerTest {
     }
 
     @Test
-    void login_withAdminEmail_savesPasswordOnFirstSignIn() throws Exception {
+    void register_adminAndManagerSaveTheirOwnEmail() throws Exception {
         Employee admin = new Employee();
+        admin.setId(1L);
         admin.setEmployeeCode("GG-AD-001");
         admin.setEmail("b.ganesh@gorlegroup.com");
         admin.setFullName("B. Ganesh");
         admin.setRoleType(RoleType.ADMIN);
         admin.setPassword(ExcelPayrollService.UNSET_PASSWORD_HASH);
-        when(employeeRepository.findLoginMatches("b.ganesh@gorlegroup.com"))
-                .thenReturn(List.<Object[]>of(new Object[]{
-                        "b.ganesh@gorlegroup.com",
-                        ExcelPayrollService.UNSET_PASSWORD_HASH,
-                        "GG-AD-001",
-                        "ADMIN",
-                        true,
-                        "ACTIVE",
-                        "B. Ganesh"
-                }));
-        when(employeeRepository.findByEmployeeCodeIgnoreCase("GG-AD-001"))
-                .thenReturn(Optional.of(admin));
+        when(employeeRepository.findByEmployeeCodeIgnoreCase("GG-AD-001")).thenReturn(Optional.of(admin));
+        when(employeeRepository.findByEmailIgnoreCase("ganesh.own@gmail.com")).thenReturn(Optional.empty());
         when(employeeRepository.save(org.mockito.ArgumentMatchers.any(Employee.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(jwtTokenService.generate(anyString(), anyMap()))
-                .thenReturn("admin-token");
 
-        mockMvc.perform(post("/api/v1/auth/login")
+        mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"username":"b.ganesh@gorlegroup.com","password":"ganeshpass"}
+                                {"fullName":"B. Ganesh","email":"ganesh.own@gmail.com","employeeCode":"GG-AD-001","password":"ganeshpass","companyCode":"GORLE"}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").value("admin-token"))
-                .andExpect(jsonPath("$.role").value("ADMIN"))
-                .andExpect(jsonPath("$.username").value("B. Ganesh"));
+                .andExpect(jsonPath("$.email").value("ganesh.own@gmail.com"))
+                .andExpect(jsonPath("$.employeeCode").value("GG-AD-001"));
 
         assertTrue(new BCryptPasswordEncoder().matches("ganeshpass", admin.getPassword()));
+        org.junit.jupiter.api.Assertions.assertEquals(RoleType.ADMIN, admin.getRoleType());
+        org.junit.jupiter.api.Assertions.assertEquals("ganesh.own@gmail.com", admin.getEmail());
+
+        Employee manager = new Employee();
+        manager.setId(2L);
+        manager.setEmployeeCode("GG-TB-001");
+        manager.setEmail("akdul.aziz.mohd@gorlegroup.com");
+        manager.setFullName("Akdul Aziz Mohd");
+        manager.setRoleType(RoleType.MANAGER);
+        manager.setPassword(ExcelPayrollService.UNSET_PASSWORD_HASH);
+        when(employeeRepository.findByEmployeeCodeIgnoreCase("GG-TB-001")).thenReturn(Optional.of(manager));
+        when(employeeRepository.findByEmailIgnoreCase("akdul.own@gmail.com")).thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"fullName":"Akdul Aziz Mohd","email":"akdul.own@gmail.com","employeeCode":"GG-TB-001","password":"managerpass","companyCode":"GORLE"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("akdul.own@gmail.com"))
+                .andExpect(jsonPath("$.employeeCode").value("GG-TB-001"));
+
+        org.junit.jupiter.api.Assertions.assertEquals(RoleType.MANAGER, manager.getRoleType());
+        org.junit.jupiter.api.Assertions.assertEquals("akdul.own@gmail.com", manager.getEmail());
     }
 
     @Test
