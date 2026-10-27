@@ -743,7 +743,9 @@ export default function Attendance() {
     const open = Boolean(record.checkInTime) && !record.checkOutTime;
     const payable = (checkedInSeconds: number) => {
       const lunchStillDue = Math.max(0, lunchSeconds - breakSeconds);
-      return Math.max(0, checkedInSeconds - lunchStillDue);
+      const afterEightHours = Math.max(0, checkedInSeconds + breakSeconds - 8 * 60 * 60);
+      const automaticLunch = Math.min(lunchStillDue, afterEightHours);
+      return Math.max(0, checkedInSeconds - automaticLunch);
     };
 
     if (open) {
@@ -1128,7 +1130,7 @@ export default function Attendance() {
           <div>
             <p className="eyebrow">HISTORY</p>
             <h3>Employee attendance history</h3>
-            <p>Past punches stay after logout. Work hours are counted from check-in. The flexible 1 hour lunch is not work.</p>
+            <p>Past punches stay after logout. Work hours are counted from check-in. The 1 hour lunch comes off after 8 hours, or when you check out for lunch.</p>
           </div>
         </div>
         <div className="employees-table-wrap">

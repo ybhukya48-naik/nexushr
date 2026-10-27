@@ -91,13 +91,17 @@ public final class AttendanceRules {
     }
 
     /**
-     * One flexible lunch hour per day. A break the employee already took counts
-     * toward that hour, so a 9 hour stay is 8 hours of work.
+     * One flexible lunch hour per day. It is not removed from the morning.
+     * A break already taken counts toward that hour. Any lunch still due is
+     * removed only after 8 hours, so a 9 hour stay is 8 hours of work.
      */
     public static int payableWorkMinutes(int checkedInMinutes, int breakMinutes) {
-        int covered = Math.min(LUNCH_MINUTES, Math.max(0, breakMinutes));
-        int stillDue = LUNCH_MINUTES - covered;
-        return Math.max(0, Math.max(0, checkedInMinutes) - stillDue);
+        int checkedIn = Math.max(0, checkedInMinutes);
+        int taken = Math.max(0, breakMinutes);
+        int lunchStillDue = Math.max(0, LUNCH_MINUTES - Math.min(LUNCH_MINUTES, taken));
+        int afterEightHours = Math.max(0, checkedIn + taken - WORK_MINUTES);
+        int automaticLunch = Math.min(lunchStillDue, afterEightHours);
+        return Math.max(0, checkedIn - automaticLunch);
     }
 
     public static int workedMinutes(LocalDateTime start, LocalDateTime end) {

@@ -39,6 +39,13 @@ class AttendanceRulesTest {
     }
 
     @Test
+    void morningHoursKeepTheFullTimeSinceCheckIn() {
+        LocalDateTime in = LocalDateTime.of(2026, 10, 27, 10, 4);
+        LocalDateTime noon = in.plusHours(2).plusMinutes(8);
+        assertEquals(128, AttendanceRules.workedMinutes(in, noon));
+    }
+
+    @Test
     void nineHourStayIsEightHoursOfWork() {
         LocalDateTime in = LocalDateTime.of(2026, 10, 22, 9, 30);
         LocalDateTime out = in.plusHours(9);
