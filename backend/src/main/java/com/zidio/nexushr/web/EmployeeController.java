@@ -48,8 +48,8 @@ public class EmployeeController {
 
         if (employeeId == null) {
             throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.UNAUTHORIZED,
-                    "Authenticated employee profile could not be resolved"
+                    org.springframework.http.HttpStatus.NOT_FOUND,
+                    "This sign-in has no employee profile"
             );
         }
 

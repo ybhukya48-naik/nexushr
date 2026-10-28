@@ -42,7 +42,7 @@ public class AttendanceController {
                 ? employeeId
                 : attendanceService.findEmployeeIdByUsername(authentication.getName());
 
-        Long actorId = attendanceService.findEmployeeIdByUsername(authentication.getName());
+        Long actorId = attendanceService.findEmployeeIdIfPresent(authentication.getName());
         return attendanceService.checkIn(targetEmployeeId, actorId, false);
     }
 
@@ -56,7 +56,7 @@ public class AttendanceController {
                 ? employeeId
                 : attendanceService.findEmployeeIdByUsername(authentication.getName());
 
-        Long actorId = attendanceService.findEmployeeIdByUsername(authentication.getName());
+        Long actorId = attendanceService.findEmployeeIdIfPresent(authentication.getName());
         return attendanceService.checkOut(targetEmployeeId, actorId);
     }
 
@@ -110,7 +110,14 @@ public class AttendanceController {
 
     @PostMapping("/heartbeat")
     public java.util.Map<String, Object> heartbeat(Authentication authentication) {
-        Long employeeId = attendanceService.findEmployeeIdByUsername(authentication.getName());
+        Long employeeId = attendanceService.findEmployeeIdIfPresent(authentication.getName());
+        if (employeeId == null) {
+            return java.util.Map.of(
+                    "status", "NONE",
+                    "checkedIn", false,
+                    "checkedOut", false,
+                    "message", "Check in is missing");
+        }
         attendanceService.heartbeat(employeeId);
         return attendanceService.myStatus(employeeId);
     }
@@ -119,7 +126,7 @@ public class AttendanceController {
     public java.util.List<com.zidio.nexushr.domain.AttendanceAuditLog> audit(
             @RequestParam(required = false) Long employeeId,
             Authentication authentication) {
-        Long self = attendanceService.findEmployeeIdByUsername(authentication.getName());
+        Long self = attendanceService.findEmployeeIdIfPresent(authentication.getName());
         boolean management = authentication.getAuthorities().stream().anyMatch(authority -> {
             String role = authority.getAuthority();
             return role.equals("ROLE_HR")
@@ -128,6 +135,9 @@ public class AttendanceController {
                     || role.equals("ROLE_MANAGER");
         });
         if (!management) {
+            if (self == null) {
+                return java.util.List.of();
+            }
             employeeId = self;
         }
         return attendanceService.auditTrail(employeeId);
@@ -136,7 +146,14 @@ public class AttendanceController {
     @GetMapping("/my-status")
     public java.util.Map<String, Object> myStatus(Authentication authentication) {
         try {
-            Long employeeId = attendanceService.findEmployeeIdByUsername(authentication.getName());
+            Long employeeId = attendanceService.findEmployeeIdIfPresent(authentication.getName());
+            if (employeeId == null) {
+                return java.util.Map.of(
+                        "status", "NONE",
+                        "checkedIn", false,
+                        "checkedOut", false,
+                        "message", "Check in is missing");
+            }
             return attendanceService.myStatus(employeeId);
         } catch (RuntimeException ex) {
             return java.util.Map.of(
@@ -152,6 +169,15 @@ public class AttendanceController {
             @RequestParam LocalDate date) {
 
         return attendanceService.listByDate(date);
+    }
+
+    @GetMapping("/range")
+    @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER')")
+    public List<AttendanceRecord> listBetween(
+            @RequestParam LocalDate from,
+            @RequestParam LocalDate to) {
+
+        return attendanceService.listBetween(from, to);
     }
 
     @GetMapping("/metrics")

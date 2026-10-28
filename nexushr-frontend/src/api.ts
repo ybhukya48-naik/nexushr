@@ -118,7 +118,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
+    if (response.status === 401 && !path.startsWith("/employees/me")) {
       localStorage.removeItem("nexushr_token");
       localStorage.removeItem("nexushr_user");
       localStorage.removeItem("nexushr_role");

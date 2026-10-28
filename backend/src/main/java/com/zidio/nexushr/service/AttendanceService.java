@@ -45,6 +45,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -457,6 +458,21 @@ public class AttendanceService {
         }
 
         List<AttendanceRecord> records = attendanceRepository.findByAttendanceDate(date);
+        restoreListed(records);
+        return records;
+    }
+
+    public List<AttendanceRecord> listBetween(LocalDate from, LocalDate to) {
+        if (from == null || to == null) {
+            throw badRequest("From and to dates are required");
+        }
+        if (to.isBefore(from)) {
+            throw badRequest("The end date is before the start date");
+        }
+        if (ChronoUnit.DAYS.between(from, to) > 31) {
+            throw badRequest("Ask for at most 31 days at a time");
+        }
+        List<AttendanceRecord> records = attendanceRepository.findByAttendanceDateBetween(from, to);
         restoreListed(records);
         return records;
     }
@@ -1334,6 +1350,16 @@ public class AttendanceService {
                 );
 
         return employee.getId();
+    }
+
+    public Long findEmployeeIdIfPresent(String username) {
+        if (username == null || username.isBlank()) {
+            return null;
+        }
+        return employeeRepository.findByEmail(username)
+                .or(() -> employeeRepository.findByEmployeeCode(username))
+                .map(Employee::getId)
+                .orElse(null);
     }
 
     private Employee getActiveEmployee(Long employeeId) {

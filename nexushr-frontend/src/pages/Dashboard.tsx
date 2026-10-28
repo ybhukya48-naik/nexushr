@@ -14,6 +14,7 @@ import {
   checkOut,
   getAttendanceAudit,
   getAttendanceByDate,
+  getAttendanceRange,
   getEmployeeAttendance,
   getLeaves,
   type AttendanceAuditEntry,
@@ -142,13 +143,18 @@ export default function Dashboard() {
     let cancelled = false;
     const today = todayIso();
     const dates = monthDateKeys();
+    const from = dates[0];
+    const to = dates[dates.length - 1];
 
     Promise.all([
       getDashboardSummary().catch(() => null),
       getCurrentEmployee().catch(() => null),
       getEmployees().catch(() => [] as EmployeeResponse[]),
       getAttendanceByDate(today).catch(() => [] as AttendanceRecord[]),
-      Promise.all(dates.map((date) => getAttendanceByDate(date).catch(() => [] as AttendanceRecord[]))),
+      getAttendanceRange(from, to).catch(() =>
+        Promise.all(dates.slice(-7).map((date) => getAttendanceByDate(date).catch(() => [] as AttendanceRecord[])))
+          .then((days) => days.flat()),
+      ),
       getLeaves().catch(() => [] as LeaveRequest[]),
       getHolidays().catch(() => [] as CompanyHoliday[]),
       getAttendanceAudit().catch(() => [] as AttendanceAuditEntry[]),
@@ -157,21 +163,28 @@ export default function Dashboard() {
         if (cancelled) {
           return;
         }
+        const monthRows = history.filter((row) =>
+          isCompanyMatch(row.employee?.companyCode, company),
+        );
+        const byDate = new Map<string, AttendanceRecord[]>();
+        for (const row of monthRows) {
+          const key = String(row.attendanceDate ?? "").slice(0, 10);
+          const bucket = byDate.get(key) ?? [];
+          bucket.push(row);
+          byDate.set(key, bucket);
+        }
         setSummary(dashboard);
         setMe(current);
         setPeople(employees.filter((employee) => isCompanyMatch(employee.companyCode, company)));
         setTodayRows(attendance.filter((row) => isCompanyMatch(row.employee?.companyCode, company)));
-        setRecentRows(history.flat().filter((row) =>
-          isCompanyMatch(row.employee?.companyCode, company) && row.checkInTime,
-        ).sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate)));
+        setRecentRows(monthRows.filter((row) => row.checkInTime && row.employee).sort((a, b) =>
+          String(b.attendanceDate).localeCompare(String(a.attendanceDate)),
+        ));
         setAudit(punches);
-        const weekDates = dates.slice(-7);
-        const weekHistory = history.slice(-7);
-        setWeek(weekDates.map((date, index) => ({
+        setWeek(dates.slice(-7).map((date) => ({
           label: date.slice(8),
-          present: weekHistory[index].filter((row) =>
-            isCompanyMatch(row.employee?.companyCode, company)
-            && row.checkInTime
+          present: (byDate.get(date) ?? []).filter((row) =>
+            row.checkInTime
             && row.attendanceStatus !== "INACTIVE",
           ).length,
         })));
@@ -395,11 +408,11 @@ export default function Dashboard() {
             <ul className="hr-people">
               {present.slice(0, 6).map((row) => (
                 <li key={row.id}>
-                  <button type="button" onClick={() => navigate(`/employees/${row.employee.id}`)}>
-                    <span>{initials(row.employee.fullName || "Employee")}</span>
-                    <strong>{row.employee.fullName}</strong>
+                  <button type="button" onClick={() => row.employee?.id && navigate(`/employees/${row.employee.id}`)}>
+                    <span>{initials(row.employee?.fullName || "Employee")}</span>
+                    <strong>{row.employee?.fullName || "Employee"}</strong>
                     <em>
-                      {punchPairs(audit, row.employee.id, today, row).map((pair) =>
+                      {punchPairs(audit, row.employee?.id ?? 0, today, row).map((pair) =>
                         `${pair.checkIn}–${pair.checkOut ?? "in"}`).join(", ")}
                       {" · "}
                       {Math.floor(clockedWorkMinutes(row) / 60)}h {clockedWorkMinutes(row) % 60}m
@@ -439,7 +452,7 @@ export default function Dashboard() {
                 </button>
               </li>
             ))}
-            {todayRows.filter((row) => row.checkInTime && !row.checkOutTime).slice(0, 6).map((row) => (
+            {todayRows.filter((row) => row.checkInTime && !row.checkOutTime && row.employee).slice(0, 6).map((row) => (
               <li key={`out-${row.id}`}>
                 <button type="button" onClick={() => navigate(`/employees/${row.employee.id}`)}>
                   <strong>{row.employee.fullName}</strong>
@@ -470,7 +483,7 @@ export default function Dashboard() {
             </thead>
             <tbody>
               {lunchPerson ? monthDateKeys().slice().reverse().map((date) => {
-                const row = personHistory.find((item) => item.attendanceDate.slice(0, 10) === date);
+                const row = personHistory.find((item) => item.attendanceDate?.slice(0, 10) === date);
                 return (
                   <tr key={date}>
                     <td>{date}</td>
@@ -485,8 +498,8 @@ export default function Dashboard() {
                 </tr>
               ) : recentRows.map((row) => (
                 <tr key={row.id}>
-                  <td>{row.attendanceDate.slice(0, 10)}</td>
-                  <td>{row.employee.fullName}</td>
+                  <td>{String(row.attendanceDate ?? "").slice(0, 10)}</td>
+                  <td>{row.employee?.fullName ?? "Employee"}</td>
                   <td>{clock(row.checkInTime)}</td>
                   <td>{row.checkOutTime ? clock(row.checkOutTime) : "Still in"}</td>
                   <td>{Math.floor(clockedWorkMinutes(row) / 60)}h {clockedWorkMinutes(row) % 60}m</td>

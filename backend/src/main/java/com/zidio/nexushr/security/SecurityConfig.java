@@ -329,7 +329,8 @@ public class SecurityConfig {
                 .requestMatchers(
                     HttpMethod.GET,
                     "/api/v1/attendance",
-                    "/api/v1/attendance/metrics"
+                    "/api/v1/attendance/metrics",
+                    "/api/v1/attendance/range"
                 )
                 .hasAnyRole(
                     "HR",

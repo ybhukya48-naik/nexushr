@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Component, Suspense, lazy, useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import {
   BrowserRouter,
@@ -865,12 +865,14 @@ function EmployeeDashboard() {
           getLeaves().catch(() => []),
           getEmployeePayroll(me.id).catch(() => []),
         ]);
-        setRecords([...history].sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate)));
-        setAudit(punches);
-        setLeaveCount(leaves.length);
-        const pay = [...payroll].sort((a, b) =>
-          b.payMonth.localeCompare(a.payMonth),
-        )[0];
+        setRecords(history.filter((row) => row?.attendanceDate).sort((a, b) =>
+          b.attendanceDate.localeCompare(a.attendanceDate),
+        ));
+        setAudit(Array.isArray(punches) ? punches : []);
+        setLeaveCount(Array.isArray(leaves) ? leaves.length : 0);
+        const pay = (Array.isArray(payroll) ? payroll : [])
+          .filter((item) => item?.payMonth)
+          .sort((a, b) => b.payMonth.localeCompare(a.payMonth))[0];
         setLatestPay(pay ? pay.payMonth : "No payslip yet");
       })
       .catch((err) => {
@@ -1065,7 +1067,7 @@ function EmployeeDashboard() {
                   </thead>
                   <tbody>
                     {monthDateKeys().slice().reverse().map((date) => {
-                      const row = records.find((item) => item.attendanceDate.slice(0, 10) === date);
+                      const row = records.find((item) => item.attendanceDate?.slice(0, 10) === date);
                       const pairs = punchPairs(audit, date, row);
                       return (
                         <tr key={date}>
@@ -1330,6 +1332,29 @@ function AIInsights() {
    APP
 ============================================================ */
 
+class PageGuard extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (this.state.failed) {
+      return (
+        <div className="page-heading">
+          <h2>This page hit a problem</h2>
+          <p>Your attendance is still saved. Reload the page to continue.</p>
+          <button className="primary-button" type="button" onClick={() => window.location.reload()}>
+            Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -1354,7 +1379,9 @@ export default function App() {
           path="*"
           element={
             <ProtectedRoute>
-              <AppRoutes />
+              <PageGuard>
+                <AppRoutes />
+              </PageGuard>
             </ProtectedRoute>
           }
         />

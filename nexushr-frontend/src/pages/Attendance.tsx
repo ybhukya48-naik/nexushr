@@ -241,6 +241,12 @@ export async function getAttendanceByDate(date: string) {
   );
 }
 
+export async function getAttendanceRange(from: string, to: string) {
+  return attendanceRequest<AttendanceRecord[]>(
+    `/attendance/range?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+  );
+}
+
 interface AttendanceMetricsApiResponse {
   date: string;
   totalEmployees: number;
@@ -1260,7 +1266,7 @@ export default function Attendance() {
             </thead>
             <tbody>
               {historyEmployeeId ? monthDateKeys().slice().reverse().map((date) => {
-                const row = history.find((item) => item.attendanceDate.slice(0, 10) === date);
+                const row = history.find((item) => item.attendanceDate?.slice(0, 10) === date);
                 return (
                 <tr key={date}>
                   <td>{formatDate(date)}</td>
