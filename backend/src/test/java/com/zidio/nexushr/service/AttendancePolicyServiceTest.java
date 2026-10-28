@@ -91,6 +91,6 @@ class AttendancePolicyServiceTest {
 
         assertThat(record.getWorkMinutes()).isEqualTo(337);
         assertThat(record.getClosedWorkMinutes()).isEqualTo(337);
-        assertThat(record.getYellowFlag()).isTrue();
+        assertThat(record.getYellowFlag()).isNotEqualTo(true);
     }
 }

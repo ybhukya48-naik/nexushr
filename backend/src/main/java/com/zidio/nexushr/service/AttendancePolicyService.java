@@ -63,19 +63,15 @@ public class AttendancePolicyService {
 
     public void onCheckOut(AttendanceRecord record, Employee actor) {
         LocalDateTime now = record.getCheckOutTime();
-        // Idle time raises a yellow warning. It does not erase hours already
-        // worked. Three warnings in a month still deduct half a day.
-        int idle = idleMinutes(record, now, !actorIsSiteVisitor(record));
-        if (idle > AttendanceRules.INACTIVE_LIMIT_MINUTES && !Boolean.TRUE.equals(record.getYellowFlag())) {
-            record.setYellowFlag(true);
-            record.setSessionIdleMinutes(zero(record.getSessionIdleMinutes()) + idle);
-            audit(record, actor, "YELLOW_FLAG",
-                    "Chrome was inactive for " + idle + " minutes. Three yellow flags in a month deduct half a day.");
-        }
+        // Flexible lunch is the employee's own hour. They check out, the
+        // system is inactive while they are away, and they check in again
+        // after lunch. That gap is break time, not a warning. A warning is
+        // only raised while they are still checked in.
         record.setSessionIdleMinutes(0);
         record.setLastActivityAt(now);
         applyMonthPenalties(record);
-        audit(record, actor, "CHECK_OUT", "Check-out at " + now + ". Worked hours are kept.");
+        audit(record, actor, "CHECK_OUT",
+                "Check-out at " + now + ". Time until the next check-in is lunch, not working time.");
     }
 
     @Transactional
@@ -265,23 +261,6 @@ public class AttendancePolicyService {
         log.setAttendanceDate(record.getAttendanceDate());
         log.setCreatedAt(LocalDateTime.now(AttendanceService.COMPANY_ZONE));
         auditRepository.save(log);
-    }
-
-    private static boolean actorIsSiteVisitor(AttendanceRecord record) {
-        return record.getEmployee() != null && record.getEmployee().isSiteVisitor();
-    }
-
-    private static int idleMinutes(AttendanceRecord record, LocalDateTime now, boolean countChromeIdle) {
-        if (!countChromeIdle) {
-            return 0;
-        }
-        int stored = zero(record.getSessionIdleMinutes());
-        int trailing = AttendanceRules.countableInactiveMinutes(record.getLastActivityAt(), now);
-        if (trailing > AttendanceRules.INACTIVE_LIMIT_MINUTES
-                && (now == null || !AttendanceRules.duringInactivityGrace(now.toLocalTime()))) {
-            stored += trailing;
-        }
-        return stored;
     }
 
     private static int zero(Integer value) {
