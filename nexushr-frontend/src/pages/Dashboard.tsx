@@ -14,9 +14,11 @@ import {
   checkOut,
   getAttendanceAudit,
   getAttendanceByDate,
+  getEmployeeAttendance,
   getLeaves,
   type AttendanceAuditEntry,
   clockedWorkMinutes,
+  monthDateKeys,
   type AttendanceRecord,
   type LeaveRequest,
 } from "./Attendance";
@@ -134,17 +136,12 @@ export default function Dashboard() {
   const [lunchEmployeeId, setLunchEmployeeId] = useState("");
   const [punching, setPunching] = useState(false);
   const [punchNote, setPunchNote] = useState("");
+  const [personHistory, setPersonHistory] = useState<AttendanceRecord[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     const today = todayIso();
-    const dates = Array.from({ length: 7 }, (_, index) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (6 - index));
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      return `${date.getFullYear()}-${month}-${day}`;
-    });
+    const dates = monthDateKeys();
 
     Promise.all([
       getDashboardSummary().catch(() => null),
@@ -168,9 +165,11 @@ export default function Dashboard() {
           isCompanyMatch(row.employee?.companyCode, company) && row.checkInTime,
         ).sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate)));
         setAudit(punches);
-        setWeek(dates.map((date, index) => ({
+        const weekDates = dates.slice(-7);
+        const weekHistory = history.slice(-7);
+        setWeek(weekDates.map((date, index) => ({
           label: date.slice(8),
-          present: history[index].filter((row) =>
+          present: weekHistory[index].filter((row) =>
             isCompanyMatch(row.employee?.companyCode, company)
             && row.checkInTime
             && row.attendanceStatus !== "INACTIVE",
@@ -194,6 +193,28 @@ export default function Dashboard() {
       cancelled = true;
     };
   }, [company, refreshTick]);
+
+  useEffect(() => {
+    if (!lunchEmployeeId) {
+      setPersonHistory([]);
+      return;
+    }
+    let cancelled = false;
+    getEmployeeAttendance(Number(lunchEmployeeId))
+      .then((rows) => {
+        if (!cancelled) {
+          setPersonHistory(rows);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPersonHistory([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [lunchEmployeeId, refreshTick]);
 
   if (loading) {
     return (
@@ -432,26 +453,48 @@ export default function Dashboard() {
 
       <section className="hr-card">
         <div className="hr-card-title">
-          <h3>Attendance history</h3>
+          <h3>{lunchPerson ? `${lunchPerson.fullName} · last 30 days` : "Attendance history · last 30 days"}</h3>
           <button type="button" onClick={() => navigate("/attendance")}>Open attendance</button>
         </div>
-        {recentRows.length === 0 ? (
-          <p className="hr-empty">No attendance history yet.</p>
-        ) : (
-          <ul className="hr-leaves">
-            {recentRows.slice(0, 8).map((row) => (
-              <li key={row.id}>
-                <button type="button" onClick={() => navigate(`/employees/${row.employee.id}`)}>
-                  <strong>{row.employee.fullName}</strong>
-                  <span>
-                    {row.attendanceDate.slice(0, 10)} · {clock(row.checkInTime)}–{row.checkOutTime ? clock(row.checkOutTime) : "in"} · {Math.floor(clockedWorkMinutes(row) / 60)}h {clockedWorkMinutes(row) % 60}m
-                    {row.yellowFlag ? " · warning" : ""}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <p className="hr-empty">Check-in and check-out for each day. Working hours, and salary, are calculated from these times.</p>
+        <div className="hr-history-table">
+          <table className="employees-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                {lunchPerson ? null : <th>Employee</th>}
+                <th>Check in</th>
+                <th>Check out</th>
+                <th>Working hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lunchPerson ? monthDateKeys().slice().reverse().map((date) => {
+                const row = personHistory.find((item) => item.attendanceDate.slice(0, 10) === date);
+                return (
+                  <tr key={date}>
+                    <td>{date}</td>
+                    <td>{row?.checkInTime ? clock(row.checkInTime) : "—"}</td>
+                    <td>{row?.checkInTime && !row.checkOutTime ? "Still in" : row?.checkOutTime ? clock(row.checkOutTime) : "—"}</td>
+                    <td>{row?.checkInTime ? `${Math.floor(clockedWorkMinutes(row) / 60)}h ${clockedWorkMinutes(row) % 60}m` : "No check-in"}</td>
+                  </tr>
+                );
+              }) : recentRows.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>No attendance in the last 30 days. Select an employee above to see one person's days, including days with no check-in.</td>
+                </tr>
+              ) : recentRows.map((row) => (
+                <tr key={row.id}>
+                  <td>{row.attendanceDate.slice(0, 10)}</td>
+                  <td>{row.employee.fullName}</td>
+                  <td>{clock(row.checkInTime)}</td>
+                  <td>{row.checkOutTime ? clock(row.checkOutTime) : "Still in"}</td>
+                  <td>{Math.floor(clockedWorkMinutes(row) / 60)}h {clockedWorkMinutes(row) % 60}m</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="hr-home-grid hr-home-lower">

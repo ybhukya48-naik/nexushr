@@ -31,6 +31,7 @@ import {
   sendAttendanceHeartbeat,
   type AttendanceAuditEntry,
   clockedWorkMinutes,
+  monthDateKeys,
   type AttendanceRecord,
 } from "./pages/Attendance";
 import {
@@ -1048,21 +1049,36 @@ function EmployeeDashboard() {
               <div className="panel-header">
                 <div>
                   <p className="eyebrow">HISTORY</p>
-                  <h3>Attendance history</h3>
+                  <h3>Last 30 days</h3>
+                  <p>Check-in, check-out, and the working hours used for salary.</p>
                 </div>
               </div>
-              {records.length === 0 ? (
-                <p>No attendance history yet.</p>
-              ) : (
-                <ul className="dash-punches">
-                  {records.slice(0, 8).map((row) => (
-                    <li key={row.id}>
-                      {row.attendanceDate.slice(0, 10)} · In {formatClock(row.checkInTime)} · Out {formatClock(row.checkOutTime)} · {hoursLabel(clockedWorkMinutes(row))}
-                      {row.yellowFlag ? " · Inactive warning" : ""}
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <div className="employees-table-wrap month-history">
+                <table className="employees-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Check in</th>
+                      <th>Check out</th>
+                      <th>Working hours</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monthDateKeys().slice().reverse().map((date) => {
+                      const row = records.find((item) => item.attendanceDate.slice(0, 10) === date);
+                      const pairs = punchPairs(audit, date, row);
+                      return (
+                        <tr key={date}>
+                          <td>{date}</td>
+                          <td>{pairs.length > 0 ? pairs.map((pair) => pair.checkIn).join(", ") : "—"}</td>
+                          <td>{row?.checkInTime && !row.checkOutTime ? "Still in" : pairs.length > 0 ? pairs.map((pair) => pair.checkOut ?? "—").join(", ") : "—"}</td>
+                          <td>{row?.checkInTime ? hoursLabel(clockedWorkMinutes(row)) : "No check-in"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </section>
           </>
         );

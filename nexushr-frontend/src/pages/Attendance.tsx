@@ -277,6 +277,18 @@ export async function getEmployeeAttendance(employeeId: number) {
   );
 }
 
+export function monthDateKeys(count = 30) {
+  const dates: string[] = [];
+  const now = new Date();
+  for (let offset = count - 1; offset >= 0; offset -= 1) {
+    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset);
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    dates.push(`${date.getFullYear()}-${month}-${day}`);
+  }
+  return dates;
+}
+
 export interface LeaveRequest {
   id?: number;
   employee: EmployeeResponse;
@@ -1230,43 +1242,45 @@ export default function Attendance() {
         <div className="panel-header">
           <div>
             <p className="eyebrow">HISTORY</p>
-            <h3>Employee attendance history</h3>
-            <p>Check out for lunch, then check in when you are back. That gap is your flexible hour. A warning applies only if the system stays inactive while you are still checked in.</p>
+            <h3>Last 30 days</h3>
+            <p>Each day shows check-in, check-out, and working hours. Salary is calculated from these hours.</p>
           </div>
         </div>
-        <div className="employees-table-wrap">
+        <div className="employees-table-wrap month-history">
           <table className="employees-table">
             <thead>
               <tr>
                 <th>Date</th>
                 <th>Check in</th>
                 <th>Check out</th>
-                <th>Work minutes</th>
+                <th>Working hours</th>
                 <th>Flags</th>
                 <th>Deduction</th>
               </tr>
             </thead>
             <tbody>
-              {history.map((row) => (
-                <tr key={row.id}>
-                  <td>{formatDate(row.attendanceDate)}</td>
-                  <td>{formatTime(row.checkInTime)}</td>
-                  <td>{formatTime(row.checkOutTime)}</td>
-                  <td>{clockedWorkMinutes(row, currentTime)}</td>
+              {historyEmployeeId ? monthDateKeys().slice().reverse().map((date) => {
+                const row = history.find((item) => item.attendanceDate.slice(0, 10) === date);
+                return (
+                <tr key={date}>
+                  <td>{formatDate(date)}</td>
+                  <td>{row ? formatTime(row.checkInTime) : "—"}</td>
+                  <td>{row?.checkInTime && !row.checkOutTime ? "Still in" : row ? formatTime(row.checkOutTime) : "—"}</td>
+                  <td>{row?.checkInTime ? formatAsHours(clockedWorkMinutes(row, currentTime)) : "No check-in"}</td>
                   <td>
                     {[
-                      row.lateWarning ? "Late" : "",
-                      row.yellowFlag ? "Yellow" : "",
-                      row.redFlag ? "Red" : "",
-                      row.blueFlag ? "Blue" : "",
+                      row?.lateWarning ? "Late" : "",
+                      row?.yellowFlag ? "Yellow" : "",
+                      row?.redFlag ? "Red" : "",
+                      row?.blueFlag ? "Blue" : "",
                     ].filter(Boolean).join(", ") || "-"}
                   </td>
-                  <td>{row.deductedMinutes ? `${row.deductedMinutes} min` : "-"}</td>
+                  <td>{row?.deductedMinutes ? formatAsHours(row.deductedMinutes) : "-"}</td>
                 </tr>
-              ))}
-              {history.length === 0 && (
+                );
+              }) : (
                 <tr>
-                  <td colSpan={6}>No attendance history for this employee yet.</td>
+                  <td colSpan={6}>Select an employee to see the last 30 days.</td>
                 </tr>
               )}
             </tbody>

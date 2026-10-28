@@ -112,6 +112,12 @@
   padding: 8px 10px;
 }
 
+.hr-history-table {
+  max-height: 480px;
+  overflow: auto;
+  margin-top: 12px;
+}
+
 .hr-card-title button,
 .hr-alerts button {
   border: 0;

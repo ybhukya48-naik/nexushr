@@ -4579,6 +4579,11 @@ button.employee-summary-card {
   background: #fff;
 }
 
+.month-history {
+  max-height: 480px;
+  overflow: auto;
+}
+
 .leave-page .employees-table {
   width: 100%;
   min-width: 850px;
