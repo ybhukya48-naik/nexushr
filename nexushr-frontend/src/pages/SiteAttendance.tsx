@@ -2,9 +2,12 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import {
+  beginWebsiteSession,
+  clearWebsiteSession,
   getCurrentEmployee,
   getMyAttendanceStatus,
   login,
+  websiteSessionActive,
   type EmployeeResponse,
 } from "../api";
 import { siteCheckIn, siteCheckOut } from "./Attendance";
@@ -21,7 +24,7 @@ export default function SiteAttendance() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
-  const signedIn = Boolean(localStorage.getItem("nexushr_token"));
+  const signedIn = websiteSessionActive();
 
   useEffect(() => {
     if (!signedIn) {
@@ -76,6 +79,7 @@ export default function SiteAttendance() {
       localStorage.setItem("nexushr_token", response.accessToken);
       localStorage.setItem("nexushr_user", response.username);
       localStorage.setItem("nexushr_role", response.role);
+      beginWebsiteSession();
       const me = await getCurrentEmployee();
       setEmployee(me);
     } catch (err) {
@@ -91,9 +95,7 @@ export default function SiteAttendance() {
   }
 
   function leave() {
-    localStorage.removeItem("nexushr_token");
-    localStorage.removeItem("nexushr_user");
-    localStorage.removeItem("nexushr_role");
+    clearWebsiteSession();
     setEmployee(null);
     setSelfie(null);
     setCheckedIn(false);

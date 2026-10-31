@@ -15,9 +15,8 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Simple sliding-window rate limiter for the /api/v1/auth/login endpoint.
  *
- * Limits each client IP to {@link #MAX_REQUESTS} login attempts within
- * any {@link #WINDOW_MILLIS}-millisecond window. Uses a lock-free
- * ConcurrentHashMap with periodic cleanup to bound memory usage.
+ * Limits each client IP to 5 login attempts within any 1-minute window.
+ * Uses a lock-free map with periodic cleanup to bound memory usage.
  *
  * For production, replace with a Redis-backed rate limiter
  * (e.g. Bucket4j + Redis) to support multi-instance deployments.
@@ -25,7 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class AuthRateLimitFilter extends OncePerRequestFilter {
 
-    static final int  MAX_REQUESTS  = 10;          // max login attempts per window
+    static final int  MAX_REQUESTS  = 5;           // employee login attempts per minute
     static final long WINDOW_MILLIS = 60_000L;     // 1 minute sliding window
 
     private static final String LOGIN_PATH = "/api/v1/auth/login";

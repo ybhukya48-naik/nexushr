@@ -1,6 +1,6 @@
 ﻿import { isCompanyMatch } from "../utils/company";
 import { getWorkspaceCompany } from "../utils/workspace";
-import { API_BASE } from "../api";
+import { API_BASE, clearWebsiteSession } from "../api";
 import { useEffect, useState } from "react";
 import {
   getCurrentEmployee,
@@ -117,9 +117,7 @@ async function attendanceRequest<T>(
     }
 
     if (response.status === 401) {
-      localStorage.removeItem("nexushr_token");
-      localStorage.removeItem("nexushr_user");
-      localStorage.removeItem("nexushr_role");
+      clearWebsiteSession();
       message = "Your session has expired. Please log in again.";
     }
 

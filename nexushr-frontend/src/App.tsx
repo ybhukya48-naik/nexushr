@@ -19,6 +19,9 @@ import {
   getAiWorkforceDashboard,
   fetchEmployeePhoto,
   API_BASE,
+  beginWebsiteSession,
+  clearWebsiteSession,
+  websiteSessionActive,
   type AiWorkforceDashboardResponse,
   type EmployeeResponse,
 } from "./api";
@@ -70,7 +73,7 @@ const navItems: ReadonlyArray<
 ] as const;
 
 function isAuthenticated() {
-  return Boolean(localStorage.getItem("nexushr_token"));
+  return websiteSessionActive();
 }
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -98,6 +101,15 @@ function AppRoutes() {
   const [attendanceAlert, setAttendanceAlert] = useState("");
   const [me, setMe] = useState<EmployeeResponse | null>(null);
   const [myPhoto, setMyPhoto] = useState("");
+
+  useEffect(() => {
+    const watch = window.setInterval(() => {
+      if (!websiteSessionActive()) {
+        navigate("/login", { replace: true });
+      }
+    }, 15000);
+    return () => window.clearInterval(watch);
+  }, [navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,9 +194,7 @@ function AppRoutes() {
   function handleLogout() {
     // Logging out only clears this browser session. It does not delete attendance.
     void fetch(`${API_BASE}/auth/logout`, { method: "POST" }).catch(() => undefined);
-    localStorage.removeItem("nexushr_token");
-    localStorage.removeItem("nexushr_user");
-    localStorage.removeItem("nexushr_role");
+    clearWebsiteSession();
     clearWorkspaceCompany();
     navigate("/login", { replace: true });
   }
@@ -427,6 +437,7 @@ function Login() {
         "nexushr_role",
         response.role,
       );
+      beginWebsiteSession();
 
       clearWorkspaceCompany();
       navigate("/", { replace: true });

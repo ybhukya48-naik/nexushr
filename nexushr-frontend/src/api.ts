@@ -9,6 +9,32 @@ function resolveApiBase() {
 
 export const API_BASE = resolveApiBase();
 
+const SESSION_KEY = "nexushr_session_until";
+export const WEBSITE_SESSION_MS = 60 * 60 * 1000;
+
+export function beginWebsiteSession() {
+  localStorage.setItem(SESSION_KEY, String(Date.now() + WEBSITE_SESSION_MS));
+}
+
+export function clearWebsiteSession() {
+  localStorage.removeItem("nexushr_token");
+  localStorage.removeItem("nexushr_user");
+  localStorage.removeItem("nexushr_role");
+  localStorage.removeItem(SESSION_KEY);
+}
+
+export function websiteSessionActive() {
+  const token = localStorage.getItem("nexushr_token");
+  const until = Number(localStorage.getItem(SESSION_KEY) || "0");
+  if (!token || !until || Date.now() >= until) {
+    if (token || localStorage.getItem(SESSION_KEY)) {
+      clearWebsiteSession();
+    }
+    return false;
+  }
+  return true;
+}
+
 export interface LoginResponse {
   accessToken: string;
   role: string;
@@ -128,9 +154,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     if (response.status === 401 && !path.startsWith("/employees/me")) {
-      localStorage.removeItem("nexushr_token");
-      localStorage.removeItem("nexushr_user");
-      localStorage.removeItem("nexushr_role");
+      clearWebsiteSession();
     }
 
     let message = `API request failed: ${response.status}`;
@@ -999,9 +1023,7 @@ export async function downloadPayslipPdf(id: number): Promise<Blob> {
 
   if (!response.ok) {
     if (response.status === 401) {
-      localStorage.removeItem("nexushr_token");
-      localStorage.removeItem("nexushr_user");
-      localStorage.removeItem("nexushr_role");
+      clearWebsiteSession();
     }
 
     throw new Error(
@@ -1126,9 +1148,7 @@ export async function emailPayslip(id: number): Promise<string> {
 
   if (!response.ok) {
     if (response.status === 401) {
-      localStorage.removeItem("nexushr_token");
-      localStorage.removeItem("nexushr_user");
-      localStorage.removeItem("nexushr_role");
+      clearWebsiteSession();
     }
 
     const errorText = await response.text();

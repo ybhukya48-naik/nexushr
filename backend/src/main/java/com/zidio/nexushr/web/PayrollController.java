@@ -69,6 +69,7 @@ public class PayrollController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@authorizationService.canAccessPayroll(#id, authentication)")
     public PayrollResponse getById(@PathVariable Long id) {
 
         return PayrollResponse.from(

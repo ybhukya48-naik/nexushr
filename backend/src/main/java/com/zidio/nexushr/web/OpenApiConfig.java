@@ -26,10 +26,7 @@ public class OpenApiConfig {
                         .description("""
                                 AI-Enabled Enterprise HR and Workforce Intelligence Platform.
 
-                                **Authentication:** Use `POST /api/v1/auth/login` to obtain a JWT access token,
-                                then click **Authorize** and enter `Bearer <token>`.
-
-                                **Demo users:** `admin`, `hr`, `manager`, `employee` (any password).
+                                **Authentication:** Every route except login, create-password, register, and the health check requires an `Authorization: Bearer` token. Use `POST /api/v1/auth/login`, then Authorize with that token.
                                 """)
                         .version("1.0.0")
                         .contact(new Contact()

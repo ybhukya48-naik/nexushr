@@ -391,6 +391,18 @@ public class SecurityConfig {
                     "MANAGER"
                 )
 
+                // A single payroll row is readable only by that employee or by management.
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/api/v1/payroll/*"
+                )
+                .hasAnyRole(
+                    "HR",
+                    "ADMIN",
+                    "MANAGER",
+                    "EMPLOYEE"
+                )
+
                 // Management can list all payroll records.
                 .requestMatchers(
                     HttpMethod.GET,
