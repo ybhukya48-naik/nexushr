@@ -404,13 +404,17 @@ public class AttendanceService {
         if (records == null) {
             return;
         }
+        List<AttendanceRecord> changed = new ArrayList<>();
         for (AttendanceRecord record : records) {
             int before = record.getWorkMinutes() == null ? 0 : record.getWorkMinutes();
             restoreClockedWork(record);
             int after = record.getWorkMinutes() == null ? 0 : record.getWorkMinutes();
             if (after != before) {
-                attendanceRepository.save(record);
+                changed.add(record);
             }
+        }
+        if (!changed.isEmpty()) {
+            attendanceRepository.saveAll(changed);
         }
     }
 

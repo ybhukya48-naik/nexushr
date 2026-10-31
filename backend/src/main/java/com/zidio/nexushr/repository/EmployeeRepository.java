@@ -3,6 +3,7 @@ package com.zidio.nexushr.repository;
 import com.zidio.nexushr.domain.Employee;
 import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
 import com.zidio.nexushr.domain.RoleType;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -13,6 +14,10 @@ import java.util.List;
 import java.util.Optional;
 
 public interface EmployeeRepository extends JpaRepository<Employee, Long> {
+
+    @Override
+    @EntityGraph(attributePaths = "company")
+    List<Employee> findAll();
 
     Optional<Employee> findByEmail(String email);
 

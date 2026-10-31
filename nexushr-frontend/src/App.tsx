@@ -862,40 +862,59 @@ function EmployeeDashboard() {
   const [latestPay, setLatestPay] = useState("");
 
   const [loading, setLoading] = useState(true);
+  const [detailsLoading, setDetailsLoading] = useState(true);
   const [error, setError] = useState("");
   const [punching, setPunching] = useState(false);
   const [punchNote, setPunchNote] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
     getCurrentEmployee()
-      .then(async (me) => {
+      .then((me) => {
+        if (cancelled) {
+          return;
+        }
         setEmployee(me);
-        const [history, punches, leaves, payroll] = await Promise.all([
+        setLoading(false);
+        return Promise.all([
           getEmployeeAttendance(me.id).catch(() => []),
           getAttendanceAudit(me.id).catch(() => []),
           getLeaves().catch(() => []),
           getEmployeePayroll(me.id).catch(() => []),
-        ]);
-        setRecords(history.filter((row) => row?.attendanceDate).sort((a, b) =>
-          b.attendanceDate.localeCompare(a.attendanceDate),
-        ));
-        setAudit(Array.isArray(punches) ? punches : []);
-        setLeaveCount(Array.isArray(leaves) ? leaves.length : 0);
-        const pay = (Array.isArray(payroll) ? payroll : [])
-          .filter((item) => item?.payMonth)
-          .sort((a, b) => b.payMonth.localeCompare(a.payMonth))[0];
-        setLatestPay(pay ? pay.payMonth : "No payslip yet");
+        ]).then(([history, punches, leaves, payroll]) => {
+          if (cancelled) {
+            return;
+          }
+          setRecords(history.filter((row) => row?.attendanceDate).sort((a, b) =>
+            b.attendanceDate.localeCompare(a.attendanceDate),
+          ));
+          setAudit(Array.isArray(punches) ? punches : []);
+          setLeaveCount(Array.isArray(leaves) ? leaves.length : 0);
+          const pay = (Array.isArray(payroll) ? payroll : [])
+            .filter((item) => item?.payMonth)
+            .sort((a, b) => b.payMonth.localeCompare(a.payMonth))[0];
+          setLatestPay(pay ? pay.payMonth : "No payslip yet");
+        });
       })
       .catch((err) => {
         console.error(err);
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load your employee details.",
-        );
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load your employee details.",
+          );
+        }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+          setDetailsLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (loading) {
@@ -1040,7 +1059,9 @@ function EmployeeDashboard() {
                   {notices.map((notice) => <li key={notice}>{notice}</li>)}
                 </ul>
               )}
-              {pairs.length === 0 ? (
+              {detailsLoading ? (
+                <p>Loading today's hours...</p>
+              ) : pairs.length === 0 ? (
                 <p>No check-in yet today.</p>
               ) : (
                 <ul className="dash-punches">
@@ -1077,7 +1098,11 @@ function EmployeeDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {monthDateKeys().slice().reverse().map((date) => {
+                    {detailsLoading ? (
+                      <tr>
+                        <td colSpan={4}>Loading the last 30 days...</td>
+                      </tr>
+                    ) : monthDateKeys().slice().reverse().map((date) => {
                       const row = records.find((item) => item.attendanceDate?.slice(0, 10) === date);
                       const pairs = punchPairs(audit, date, row);
                       return (

@@ -132,6 +132,7 @@ export default function Dashboard() {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [holidays, setHolidays] = useState<HolidayMark[]>([]);
   const [loading, setLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshTick, setRefreshTick] = useState(0);
   const [lunchEmployeeId, setLunchEmployeeId] = useState("");
@@ -145,21 +146,44 @@ export default function Dashboard() {
     const dates = monthDateKeys();
     const from = dates[0];
     const to = dates[dates.length - 1];
+    setHistoryLoading(true);
 
     Promise.all([
       getDashboardSummary().catch(() => null),
       getCurrentEmployee().catch(() => null),
       getEmployees().catch(() => [] as EmployeeResponse[]),
       getAttendanceByDate(today).catch(() => [] as AttendanceRecord[]),
-      getAttendanceRange(from, to).catch(() =>
-        Promise.all(dates.slice(-7).map((date) => getAttendanceByDate(date).catch(() => [] as AttendanceRecord[])))
-          .then((days) => days.flat()),
-      ),
       getLeaves().catch(() => [] as LeaveRequest[]),
       getHolidays().catch(() => [] as CompanyHoliday[]),
-      getAttendanceAudit().catch(() => [] as AttendanceAuditEntry[]),
     ])
-      .then(([dashboard, current, employees, attendance, history, leaveRows, extraHolidays, punches]) => {
+      .then(([dashboard, current, employees, attendance, leaveRows, extraHolidays]) => {
+        if (cancelled) {
+          return;
+        }
+        setSummary(dashboard);
+        setMe(current);
+        setPeople(employees.filter((employee) => isCompanyMatch(employee.companyCode, company)));
+        setTodayRows(attendance.filter((row) => isCompanyMatch(row.employee?.companyCode, company)));
+        setLeaves(leaveRows.filter((leave) => isCompanyMatch(leave.employee?.companyCode, company)));
+        setHolidays(upcomingHolidays(extraHolidays, company));
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Unable to load the dashboard.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    getAttendanceRange(from, to)
+      .catch(() =>
+        Promise.all(dates.slice(-7).map((date) => getAttendanceByDate(date).catch(() => [] as AttendanceRecord[])))
+          .then((days) => days.flat()),
+      )
+      .then((history) => {
         if (cancelled) {
           return;
         }
@@ -173,14 +197,9 @@ export default function Dashboard() {
           bucket.push(row);
           byDate.set(key, bucket);
         }
-        setSummary(dashboard);
-        setMe(current);
-        setPeople(employees.filter((employee) => isCompanyMatch(employee.companyCode, company)));
-        setTodayRows(attendance.filter((row) => isCompanyMatch(row.employee?.companyCode, company)));
         setRecentRows(monthRows.filter((row) => row.checkInTime && row.employee).sort((a, b) =>
           String(b.attendanceDate).localeCompare(String(a.attendanceDate)),
         ));
-        setAudit(punches);
         setWeek(dates.slice(-7).map((date) => ({
           label: date.slice(8),
           present: (byDate.get(date) ?? []).filter((row) =>
@@ -188,17 +207,19 @@ export default function Dashboard() {
             && row.attendanceStatus !== "INACTIVE",
           ).length,
         })));
-        setLeaves(leaveRows.filter((leave) => isCompanyMatch(leave.employee?.companyCode, company)));
-        setHolidays(upcomingHolidays(extraHolidays, company));
       })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Unable to load the dashboard.");
-        }
-      })
+      .catch(() => undefined)
       .finally(() => {
         if (!cancelled) {
-          setLoading(false);
+          setHistoryLoading(false);
+        }
+      });
+
+    getAttendanceAudit()
+      .catch(() => [] as AttendanceAuditEntry[])
+      .then((punches) => {
+        if (!cancelled) {
+          setAudit(punches);
         }
       });
 
@@ -482,7 +503,11 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {lunchPerson ? monthDateKeys().slice().reverse().map((date) => {
+              {!lunchPerson && historyLoading && recentRows.length === 0 ? (
+                <tr>
+                  <td colSpan={5}>Loading the last 30 days...</td>
+                </tr>
+              ) : lunchPerson ? monthDateKeys().slice().reverse().map((date) => {
                 const row = personHistory.find((item) => item.attendanceDate?.slice(0, 10) === date);
                 return (
                   <tr key={date}>
