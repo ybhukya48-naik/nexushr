@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nexushr-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-31",
+  "observability": {
+    "enabled": true
+  },
+  // The public API is this Worker. The Java service runs in one Container
+  // because a Worker cannot run Spring Boot. Secrets stay in Cloudflare:
+  // JWT_SECRET, DB_URL, DB_USER, DB_PASSWORD, AWS_REGION, AWS_S3_BUCKET,
+  // AWS_ENDPOINT_URL_S3, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, RESEND_API_KEY
+  "containers": [
+    {
+      "name": "nexushr-api",
+      "image": "../backend/Dockerfile",
+      "image_build_context": "../backend",
+      "max_instances": 1,
+      "instance_type": "basic"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "API",
+        "class_name": "NexusHrContainer"
+      }
+    ]
+  },
+  "exports": {
+    "NexusHrContainer": {
+      "type": "durable-object",
+      "storage": "sqlite",
+      "container": "nexushr-api"
+    }
+  },
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  }
+}

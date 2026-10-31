@@ -56,6 +56,10 @@ class AttendanceControllerTest {
                 "employee@example.com"))
                 .thenReturn(100L);
 
+        when(attendanceService.findEmployeeIdIfPresent(
+                "employee@example.com"))
+                .thenReturn(100L);
+
         when(attendanceService.checkIn(100L, 100L, false))
                 .thenReturn(record);
 
@@ -76,6 +80,10 @@ class AttendanceControllerTest {
         record.setWorkMinutes(480);
 
         when(attendanceService.findEmployeeIdByUsername(
+                "employee@example.com"))
+                .thenReturn(100L);
+
+        when(attendanceService.findEmployeeIdIfPresent(
                 "employee@example.com"))
                 .thenReturn(100L);
 

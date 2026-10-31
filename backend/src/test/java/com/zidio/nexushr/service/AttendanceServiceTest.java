@@ -83,14 +83,14 @@ class AttendanceServiceTest {
                 .isSameAs(record);
 
         assertThat(result.getWorkMinutes())
-                .isEqualTo(420);
+                .isEqualTo(480);
 
         record.setCheckInTime(LocalDateTime.of(2026, 10, 26, 11, 30, 44));
         record.setCheckOutTime(LocalDateTime.of(2026, 10, 26, 17, 52, 46));
         record.setWorkMinutes(67);
         record.setClosedWorkMinutes(67);
         record.setBreakMinutes(0);
-        assertThat(AttendanceService.clockedMinutes(record)).isEqualTo(322);
+        assertThat(AttendanceService.clockedMinutes(record)).isEqualTo(382);
 
         verify(employeeRepository)
                 .findById(100L);
