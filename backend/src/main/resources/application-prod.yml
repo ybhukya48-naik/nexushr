@@ -46,7 +46,8 @@ spring:
 
 app:
   security:
-    cors-allowed-origins: ${CORS_ALLOWED_ORIGINS}
+    cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:https://hr.cyond.com,https://cyond.com,https://www.cyond.com}
+    browser-gate: true
     swagger-enabled: ${SWAGGER_ENABLED:false}
 
   jwt:
@@ -54,7 +55,7 @@ app:
     expiration-minutes: ${JWT_EXPIRATION_MINUTES:120}
 
   auth:
-    demo-users-enabled: ${DEMO_USERS_ENABLED:true}
+    demo-users-enabled: ${DEMO_USERS_ENABLED:false}
 
 aws:
   region: ${AWS_REGION}

@@ -1,4 +1,13 @@
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8080/api/v1`;
+function resolveApiBase() {
+  const host = typeof window === "undefined" ? "" : window.location.hostname;
+  if (host === "hr.cyond.com" || host === "cyond.com" || host === "www.cyond.com") {
+    return "/api/v1";
+  }
+  return import.meta.env.VITE_API_BASE_URL
+    || `${window.location.protocol}//${host}:8080/api/v1`;
+}
+
+export const API_BASE = resolveApiBase();
 
 export interface LoginResponse {
   accessToken: string;

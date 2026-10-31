@@ -27,13 +27,17 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final String corsAllowedOrigin;
+    private final boolean browserGate;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
             @org.springframework.beans.factory.annotation.Value("${app.security.cors-allowed-origins:http://localhost:5173,http://127.0.0.1:5173,http://localhost:5175,http://127.0.0.1:5175}")
-            String corsAllowedOrigin) {
+            String corsAllowedOrigin,
+            @org.springframework.beans.factory.annotation.Value("${app.security.browser-gate:false}")
+            boolean browserGate) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.corsAllowedOrigin = corsAllowedOrigin;
+        this.browserGate = browserGate;
     }
 
     /**
@@ -105,12 +109,9 @@ public class SecurityConfig {
 
                 .requestMatchers(
                     "/swagger-ui/**",
-                    "/swagger-ui.html"
-                ).permitAll()
-
-                .requestMatchers(
+                    "/swagger-ui.html",
                     "/v3/api-docs/**"
-                ).permitAll()
+                ).authenticated()
 
 
                 // =========================================================
@@ -492,28 +493,32 @@ public class SecurityConfig {
 
         CorsConfiguration configuration = new CorsConfiguration();
 
-        List<String> configuredOrigins = Arrays.stream(corsAllowedOrigin.split(","))
-            .map(String::trim)
-            .filter(origin -> !origin.isBlank())
-            .toList();
+        if (browserGate) {
+            configuration.setAllowedOrigins(new ArrayList<>(CyondBrowserGateFilter.ALLOWED_ORIGINS));
+        } else {
+            List<String> configuredOrigins = Arrays.stream(corsAllowedOrigin.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isBlank())
+                .toList();
 
-        List<String> allowedOrigins = new ArrayList<>();
-        List<String> allowedOriginPatterns = new ArrayList<>();
+            List<String> allowedOrigins = new ArrayList<>();
+            List<String> allowedOriginPatterns = new ArrayList<>();
 
-        for (String origin : configuredOrigins) {
-            if (origin.contains("*")) {
-                allowedOriginPatterns.add(origin);
-            } else {
-                allowedOrigins.add(origin);
+            for (String origin : configuredOrigins) {
+                if (origin.contains("*")) {
+                    allowedOriginPatterns.add(origin);
+                } else {
+                    allowedOrigins.add(origin);
+                }
             }
-        }
 
-        if (!allowedOrigins.isEmpty()) {
-            configuration.setAllowedOrigins(allowedOrigins);
-        }
+            if (!allowedOrigins.isEmpty()) {
+                configuration.setAllowedOrigins(allowedOrigins);
+            }
 
-        if (!allowedOriginPatterns.isEmpty()) {
-            configuration.setAllowedOriginPatterns(allowedOriginPatterns);
+            if (!allowedOriginPatterns.isEmpty()) {
+                configuration.setAllowedOriginPatterns(allowedOriginPatterns);
+            }
         }
 
         configuration.setAllowedMethods(
