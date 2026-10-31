@@ -53,6 +53,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             Claims claims = jwtTokenService.parse(token);
             String username = claims.getSubject();
             String role = claims.get("role", String.class);
+            if (username == null || username.isBlank() || role == null || role.isBlank()) {
+                SecurityContextHolder.clearContext();
+                filterChain.doFilter(request, response);
+                return;
+            }
 
             List<SimpleGrantedAuthority> authorities = new ArrayList<>();
             authorities.add(new SimpleGrantedAuthority("ROLE_" + role));

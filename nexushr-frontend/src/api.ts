@@ -243,14 +243,10 @@ export async function login(
   if (!response.ok) {
     let message = "Invalid username or password";
     try {
-      const errorBody = await response.json();
-      if (
-        errorBody &&
-        typeof errorBody === "object" &&
-        typeof errorBody.message === "string" &&
-        errorBody.message.trim()
-      ) {
-        message = errorBody.message;
+      const errorBody = await response.json() as { message?: string; error?: string };
+      const detail = errorBody?.message || errorBody?.error;
+      if (typeof detail === "string" && detail.trim()) {
+        message = detail;
       }
     } catch {
       // Keep the fallback when the server sends an empty error.

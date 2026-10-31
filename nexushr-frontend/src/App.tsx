@@ -885,7 +885,7 @@ function EmployeeDashboard() {
           if (cancelled) {
             return;
           }
-          setRecords(history.filter((row) => row?.attendanceDate).sort((a, b) =>
+          setRecords((Array.isArray(history) ? history : []).filter((row) => row?.attendanceDate).sort((a, b) =>
             b.attendanceDate.localeCompare(a.attendanceDate),
           ));
           setAudit(Array.isArray(punches) ? punches : []);
@@ -1399,15 +1399,17 @@ export default function App() {
 
         <Route
           path="/login"
-          element={<Login />}
+          element={<PageGuard><Login /></PageGuard>}
         />
 
         <Route
           path="/site"
           element={
-            <Suspense fallback={<div className="page-loading">Loading site attendance</div>}>
-              <SiteAttendance />
-            </Suspense>
+            <PageGuard>
+              <Suspense fallback={<div className="page-loading">Loading site attendance</div>}>
+                <SiteAttendance />
+              </Suspense>
+            </PageGuard>
           }
         />
 

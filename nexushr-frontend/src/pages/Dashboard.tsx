@@ -50,11 +50,11 @@ function clock(value?: string) {
 
 function punchPairs(entries: AttendanceAuditEntry[], employeeId: number, date: string, record?: AttendanceRecord) {
   const pairs: Array<{ checkIn: string; checkOut?: string }> = [];
-  const relevant = entries
+  const relevant = asList<AttendanceAuditEntry>(entries)
     .filter((entry) => entry.employeeId === employeeId
       && (entry.attendanceDate ?? "").slice(0, 10) === date
       && (entry.action === "CHECK_IN" || entry.action === "CHECK_OUT"))
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    .sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
   for (const entry of relevant) {
     const time = clock(entry.detail) === "—" ? clock(entry.createdAt) : clock(entry.detail);
     if (entry.action === "CHECK_IN") {
@@ -77,6 +77,10 @@ function initials(name: string) {
   return (parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "");
 }
 
+function asList<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
 function upcomingHolidays(extra: CompanyHoliday[], company: string): HolidayMark[] {
   const today = todayIso();
   const year = Number(today.slice(0, 4));
@@ -92,7 +96,10 @@ function upcomingHolidays(extra: CompanyHoliday[], company: string): HolidayMark
     marks.push({ date, name: holiday.name });
   }
 
-  for (const holiday of extra) {
+  for (const holiday of asList<CompanyHoliday>(extra)) {
+    if (!holiday?.holidayDate) {
+      continue;
+    }
     const code = holiday.companyCode?.trim();
     if (code && !isCompanyMatch(code, company)) {
       continue;
@@ -162,10 +169,10 @@ export default function Dashboard() {
         }
         setSummary(dashboard);
         setMe(current);
-        setPeople(employees.filter((employee) => isCompanyMatch(employee.companyCode, company)));
-        setTodayRows(attendance.filter((row) => isCompanyMatch(row.employee?.companyCode, company)));
-        setLeaves(leaveRows.filter((leave) => isCompanyMatch(leave.employee?.companyCode, company)));
-        setHolidays(upcomingHolidays(extraHolidays, company));
+        setPeople(asList<EmployeeResponse>(employees).filter((employee) => isCompanyMatch(employee.companyCode, company)));
+        setTodayRows(asList<AttendanceRecord>(attendance).filter((row) => isCompanyMatch(row.employee?.companyCode, company)));
+        setLeaves(asList<LeaveRequest>(leaveRows).filter((leave) => isCompanyMatch(leave.employee?.companyCode, company)));
+        setHolidays(upcomingHolidays(asList<CompanyHoliday>(extraHolidays), company));
       })
       .catch((err) => {
         if (!cancelled) {
@@ -187,7 +194,7 @@ export default function Dashboard() {
         if (cancelled) {
           return;
         }
-        const monthRows = history.filter((row) =>
+        const monthRows = asList<AttendanceRecord>(history).filter((row) =>
           isCompanyMatch(row.employee?.companyCode, company),
         );
         const byDate = new Map<string, AttendanceRecord[]>();
@@ -219,7 +226,7 @@ export default function Dashboard() {
       .catch(() => [] as AttendanceAuditEntry[])
       .then((punches) => {
         if (!cancelled) {
-          setAudit(punches);
+          setAudit(asList<AttendanceAuditEntry>(punches));
         }
       });
 
@@ -285,7 +292,7 @@ export default function Dashboard() {
   const maxPresent = Math.max(1, ...week.map((day) => day.present));
   const now = new Date();
   const cells = monthCells(now.getFullYear(), now.getMonth());
-  const holidayDays = new Set(holidays.filter((holiday) => holiday.date.startsWith(today.slice(0, 7))).map((holiday) => Number(holiday.date.slice(8))));
+  const holidayDays = new Set(holidays.filter((holiday) => String(holiday.date ?? "").startsWith(today.slice(0, 7))).map((holiday) => Number(String(holiday.date).slice(8))));
   const displayName = me?.fullName || localStorage.getItem("nexushr_user") || "there";
   const lunchPerson = people.find((person) => String(person.id) === lunchEmployeeId);
   const lunchRecord = todayRows.find((row) => String(row.employee?.id) === lunchEmployeeId);
