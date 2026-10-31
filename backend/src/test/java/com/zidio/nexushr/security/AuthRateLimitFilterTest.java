@@ -63,7 +63,7 @@ class AuthRateLimitFilterTest {
         MockHttpServletResponse response = invokeFilter("/api/v1/auth/login", "10.0.0.2");
         assertThat(response.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
         assertThat(response.getHeader("Retry-After")).isNotNull();
-        assertThat(response.getContentAsString()).contains("error");
+        assertThat(response.getContentAsString()).contains("Too many login attempts");
     }
 
     @Test
