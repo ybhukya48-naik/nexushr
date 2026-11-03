@@ -1198,7 +1198,7 @@ export default function Attendance() {
               className="panel-link"
               onClick={() => setSelectedEmployee("")}
             >
-              Show all employees
+              View all
             </button>
           )}
         </div>

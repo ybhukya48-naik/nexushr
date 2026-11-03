@@ -300,6 +300,14 @@ export default function Dashboard() {
     lunchPerson && !lunchPerson.siteVisitor && lunchRecord?.checkOutTime,
   );
 
+  function viewAllToday() {
+    setLunchEmployeeId("");
+    setPunchNote("");
+    window.setTimeout(() => {
+      document.getElementById("employee-month")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }
+
   function openEmployeeMonth(employeeId?: number) {
     if (!employeeId) {
       return;
@@ -436,7 +444,7 @@ export default function Dashboard() {
         <article className="hr-card">
           <div className="hr-card-title">
             <h3>Today</h3>
-            <button type="button" onClick={() => navigate("/attendance")}>View all</button>
+            <button type="button" onClick={viewAllToday}>View all</button>
           </div>
           {present.length === 0 ? (
             <p className="hr-empty">No check-ins yet today.</p>
@@ -477,7 +485,7 @@ export default function Dashboard() {
         <section className="hr-card">
           <div className="hr-card-title">
             <h3>Check-in and check-out missing</h3>
-            <button type="button" onClick={() => navigate("/attendance")}>Open attendance</button>
+            <button type="button" onClick={viewAllToday}>View all</button>
           </div>
           <ul className="hr-leaves">
             {people.filter((employee) => employee.active && !todayRows.some((row) => row.employee?.id === employee.id && row.checkInTime)).slice(0, 6).map((employee) => (
@@ -504,16 +512,52 @@ export default function Dashboard() {
         <div className="hr-card-title">
           <h3>{lunchPerson ? `${lunchPerson.fullName} · last 30 days` : "All employees today"}</h3>
           {lunchPerson ? (
-            <button type="button" onClick={() => setLunchEmployeeId("")}>All employees</button>
+            <button type="button" onClick={viewAllToday}>View all</button>
           ) : (
             <button type="button" onClick={() => navigate("/attendance")}>Open attendance</button>
           )}
         </div>
         {lunchPerson ? (
-          <p className="hr-empty">Only {lunchPerson.fullName}'s check-in, check-out, and working hours. Choose another employee to see that person's month instead.</p>
+          <p className="hr-empty">Only {lunchPerson.fullName}'s check-in, check-out, and working hours. View all returns to everyone for today.</p>
         ) : (
-          <p className="hr-empty">{present.length} present today. Click a name to open that employee's month. Months are not mixed together.</p>
+          <p className="hr-empty">{present.length} present today. Click a name to open that employee's month.</p>
         )}
+        {!lunchPerson ? (
+        <div className="hr-history-table">
+          <table className="employees-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Check in</th>
+                <th>Check out</th>
+                <th>Working hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              {people.filter((person) => person.active).length === 0 ? (
+                <tr>
+                  <td colSpan={4}>No employees for this company.</td>
+                </tr>
+              ) : people.filter((person) => person.active).map((person) => {
+                const row = todayRows.find((item) => item.employee?.id === person.id);
+                const checkOut = shownCheckOut(row);
+                return (
+                  <tr key={person.id}>
+                    <td>
+                      <button type="button" className="panel-link" onClick={() => openEmployeeMonth(person.id)}>
+                        {person.fullName}
+                      </button>
+                    </td>
+                    <td>{row?.checkInTime ? clock(row.checkInTime) : "—"}</td>
+                    <td>{checkOut ? clock(checkOut) : row?.checkInTime ? "Still in" : "—"}</td>
+                    <td>{row?.checkInTime ? `${Math.floor(clockedWorkMinutes(row) / 60)}h ${clockedWorkMinutes(row) % 60}m` : "No check-in"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        ) : null}
         {lunchPerson ? (
         <div className="hr-history-table">
           <table className="employees-table">
