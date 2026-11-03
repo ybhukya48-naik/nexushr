@@ -113,7 +113,7 @@ const DASHBOARD_SNAPSHOT = "nexushr_dashboard_snapshot";
 
 export function readDashboardSnapshot(): { employee: EmployeeResponse; records: AttendanceRecord[] } | null {
   try {
-    const parsed = JSON.parse(sessionStorage.getItem(DASHBOARD_SNAPSHOT) || "null");
+    const parsed = JSON.parse(localStorage.getItem(DASHBOARD_SNAPSHOT) || "null");
     if (!parsed?.employee?.id || !Array.isArray(parsed.records)) {
       return null;
     }
@@ -128,7 +128,7 @@ export function readDashboardSnapshot(): { employee: EmployeeResponse; records: 
 
 export function writeDashboardSnapshot(employee: EmployeeResponse, records: AttendanceRecord[]) {
   try {
-    sessionStorage.setItem(DASHBOARD_SNAPSHOT, JSON.stringify({
+    localStorage.setItem(DASHBOARD_SNAPSHOT, JSON.stringify({
       employee,
       records: records.slice(0, 40),
     }));

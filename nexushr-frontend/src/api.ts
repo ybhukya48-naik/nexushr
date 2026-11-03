@@ -20,6 +20,7 @@ export function clearWebsiteSession() {
   localStorage.removeItem("nexushr_token");
   localStorage.removeItem("nexushr_user");
   localStorage.removeItem("nexushr_role");
+  localStorage.removeItem("nexushr_dashboard_snapshot");
   localStorage.removeItem(SESSION_KEY);
 }
 
