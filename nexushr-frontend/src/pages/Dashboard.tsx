@@ -134,13 +134,12 @@ export default function Dashboard() {
   const [me, setMe] = useState<EmployeeResponse | null>(null);
   const [people, setPeople] = useState<EmployeeResponse[]>([]);
   const [todayRows, setTodayRows] = useState<AttendanceRecord[]>([]);
-  const [recentRows, setRecentRows] = useState<AttendanceRecord[]>([]);
   const [audit, setAudit] = useState<AttendanceAuditEntry[]>([]);
   const [week, setWeek] = useState<Array<{ label: string; present: number }>>([]);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [holidays, setHolidays] = useState<HolidayMark[]>([]);
   const [loading, setLoading] = useState(true);
-  const [historyLoading, setHistoryLoading] = useState(true);
+  const [personHistoryLoading, setPersonHistoryLoading] = useState(false);
   const [error, setError] = useState("");
   const [refreshTick, setRefreshTick] = useState(0);
   const [lunchEmployeeId, setLunchEmployeeId] = useState("");
@@ -154,8 +153,6 @@ export default function Dashboard() {
     const dates = monthDateKeys();
     const from = dates[0];
     const to = dates[dates.length - 1];
-    setHistoryLoading(true);
-
     Promise.all([
       getDashboardSummary().catch(() => null),
       getCurrentEmployee().catch(() => null),
@@ -205,9 +202,6 @@ export default function Dashboard() {
           bucket.push(row);
           byDate.set(key, bucket);
         }
-        setRecentRows(monthRows.filter((row) => row.checkInTime && row.employee).sort((a, b) =>
-          String(b.attendanceDate).localeCompare(String(a.attendanceDate)),
-        ));
         setWeek(dates.slice(-7).map((date) => ({
           label: date.slice(8),
           present: (byDate.get(date) ?? []).filter((row) =>
@@ -216,12 +210,7 @@ export default function Dashboard() {
           ).length,
         })));
       })
-      .catch(() => undefined)
-      .finally(() => {
-        if (!cancelled) {
-          setHistoryLoading(false);
-        }
-      });
+      .catch(() => undefined);
 
     getAttendanceAudit()
       .catch(() => [] as AttendanceAuditEntry[])
@@ -239,9 +228,11 @@ export default function Dashboard() {
   useEffect(() => {
     if (!lunchEmployeeId) {
       setPersonHistory([]);
+      setPersonHistoryLoading(false);
       return;
     }
     let cancelled = false;
+    setPersonHistoryLoading(true);
     getEmployeeAttendance(Number(lunchEmployeeId))
       .then((rows) => {
         if (!cancelled) {
@@ -251,6 +242,11 @@ export default function Dashboard() {
       .catch(() => {
         if (!cancelled) {
           setPersonHistory([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPersonHistoryLoading(false);
         }
       });
     return () => {
@@ -303,6 +299,17 @@ export default function Dashboard() {
   const lunchResume = Boolean(
     lunchPerson && !lunchPerson.siteVisitor && lunchRecord?.checkOutTime,
   );
+
+  function openEmployeeMonth(employeeId?: number) {
+    if (!employeeId) {
+      return;
+    }
+    setLunchEmployeeId(String(employeeId));
+    setPunchNote("");
+    window.setTimeout(() => {
+      document.getElementById("employee-month")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }
 
   async function punchLunch(kind: "out" | "in") {
     if (!lunchPerson) {
@@ -437,7 +444,7 @@ export default function Dashboard() {
             <ul className="hr-people">
               {present.slice(0, 6).map((row) => (
                 <li key={row.id}>
-                  <button type="button" onClick={() => row.employee?.id && navigate(`/employees/${row.employee.id}`)}>
+                  <button type="button" onClick={() => openEmployeeMonth(row.employee?.id)}>
                     <span>{initials(row.employee?.fullName || "Employee")}</span>
                     <strong>{row.employee?.fullName || "Employee"}</strong>
                     <em>
@@ -475,7 +482,7 @@ export default function Dashboard() {
           <ul className="hr-leaves">
             {people.filter((employee) => employee.active && !todayRows.some((row) => row.employee?.id === employee.id && row.checkInTime)).slice(0, 6).map((employee) => (
               <li key={employee.id}>
-                <button type="button" onClick={() => navigate(`/employees/${employee.id}`)}>
+                <button type="button" onClick={() => openEmployeeMonth(employee.id)}>
                   <strong>{employee.fullName}</strong>
                   <span>Check-in is missing</span>
                 </button>
@@ -483,7 +490,7 @@ export default function Dashboard() {
             ))}
             {todayRows.filter((row) => row.checkInTime && !row.checkOutTime && row.employee).slice(0, 6).map((row) => (
               <li key={`out-${row.id}`}>
-                <button type="button" onClick={() => navigate(`/employees/${row.employee.id}`)}>
+                <button type="button" onClick={() => openEmployeeMonth(row.employee.id)}>
                   <strong>{row.employee.fullName}</strong>
                   <span>Checked in {clock(row.checkInTime)}. Check-out is missing.</span>
                 </button>
@@ -493,29 +500,37 @@ export default function Dashboard() {
         </section>
       )}
 
-      <section className="hr-card">
+      <section className="hr-card" id="employee-month">
         <div className="hr-card-title">
-          <h3>{lunchPerson ? `${lunchPerson.fullName} · last 30 days` : "Attendance history · last 30 days"}</h3>
-          <button type="button" onClick={() => navigate("/attendance")}>Open attendance</button>
+          <h3>{lunchPerson ? `${lunchPerson.fullName} · last 30 days` : "All employees today"}</h3>
+          {lunchPerson ? (
+            <button type="button" onClick={() => setLunchEmployeeId("")}>All employees</button>
+          ) : (
+            <button type="button" onClick={() => navigate("/attendance")}>Open attendance</button>
+          )}
         </div>
-        <p className="hr-empty">Check-in and check-out for each day. Working hours, and salary, are calculated from these times.</p>
+        {lunchPerson ? (
+          <p className="hr-empty">Only {lunchPerson.fullName}'s check-in, check-out, and working hours. Choose another employee to see that person's month instead.</p>
+        ) : (
+          <p className="hr-empty">{present.length} present today. Click a name to open that employee's month. Months are not mixed together.</p>
+        )}
+        {lunchPerson ? (
         <div className="hr-history-table">
           <table className="employees-table">
             <thead>
               <tr>
                 <th>Date</th>
-                {lunchPerson ? null : <th>Employee</th>}
                 <th>Check in</th>
                 <th>Check out</th>
                 <th>Working hours</th>
               </tr>
             </thead>
             <tbody>
-              {!lunchPerson && historyLoading && recentRows.length === 0 ? (
+              {personHistoryLoading && personHistory.length === 0 ? (
                 <tr>
-                  <td colSpan={5}>Loading the last 30 days...</td>
+                  <td colSpan={4}>Loading {lunchPerson.fullName}'s month...</td>
                 </tr>
-              ) : lunchPerson ? monthDateKeys().slice().reverse().map((date) => {
+              ) : monthDateKeys().slice().reverse().map((date) => {
                 const row = personHistory.find((item) => item.attendanceDate?.slice(0, 10) === date);
                 const checkOut = shownCheckOut(row);
                 return (
@@ -526,22 +541,11 @@ export default function Dashboard() {
                     <td>{row?.checkInTime ? `${Math.floor(clockedWorkMinutes(row) / 60)}h ${clockedWorkMinutes(row) % 60}m` : "No check-in"}</td>
                   </tr>
                 );
-              }) : recentRows.length === 0 ? (
-                <tr>
-                  <td colSpan={5}>No attendance in the last 30 days. Select an employee above to see one person's days, including days with no check-in.</td>
-                </tr>
-              ) : recentRows.map((row) => (
-                <tr key={row.id}>
-                  <td>{String(row.attendanceDate ?? "").slice(0, 10)}</td>
-                  <td>{row.employee?.fullName ?? "Employee"}</td>
-                  <td>{clock(row.checkInTime)}</td>
-                  <td>{shownCheckOut(row) ? clock(shownCheckOut(row)) : "Still in"}</td>
-                  <td>{Math.floor(clockedWorkMinutes(row) / 60)}h {clockedWorkMinutes(row) % 60}m</td>
-                </tr>
-              ))}
+              })}
             </tbody>
           </table>
         </div>
+        ) : null}
       </section>
 
       <section className="hr-home-grid hr-home-lower">

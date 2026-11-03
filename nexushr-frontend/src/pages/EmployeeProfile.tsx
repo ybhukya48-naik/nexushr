@@ -12,6 +12,13 @@ import {
   type EmployeeLifecycleStatus,
   type EmployeeRole,
 } from "../api";
+import {
+  clockedWorkMinutes,
+  getEmployeeAttendance,
+  monthDateKeys,
+  shownCheckOut,
+  type AttendanceRecord,
+} from "./Attendance";
 
 function statusLabel(status?: EmployeeLifecycleStatus) {
   switch (status) {
@@ -83,6 +90,8 @@ export default function EmployeeProfile() {
   const [saveError, setSaveError] = useState("");
 
   const [form, setForm] = useState<EmployeeRequest | null>(null);
+  const [month, setMonth] = useState<AttendanceRecord[]>([]);
+  const [monthLoading, setMonthLoading] = useState(true);
 
   useEffect(() => {
     if (!mine && (!Number.isInteger(employeeId) || employeeId <= 0)) {
@@ -134,6 +143,34 @@ export default function EmployeeProfile() {
       cancelled = true;
     };
   }, [employeeId, mine]);
+
+  useEffect(() => {
+    const targetId = mine ? employee?.id : employeeId;
+    if (!targetId) {
+      return;
+    }
+    let cancelled = false;
+    setMonthLoading(true);
+    getEmployeeAttendance(targetId)
+      .then((rows) => {
+        if (!cancelled) {
+          setMonth(Array.isArray(rows) ? rows : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMonth([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setMonthLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [employee?.id, employeeId, mine]);
 
   useEffect(() => {
     if (!employee?.hasProfilePhoto) {
@@ -376,6 +413,47 @@ export default function EmployeeProfile() {
               {statusLabel(employee.lifecycleStatus)}
             </span>
           </strong>
+        </div>
+      </div>
+
+      <div className="employees-panel">
+        <div className="employees-header">
+          <div>
+            <p className="page-eyebrow">ATTENDANCE</p>
+            <h2>{employee.fullName} · last 30 days</h2>
+            <p>Only this employee's check-in, check-out, and working hours.</p>
+          </div>
+        </div>
+        <div className="employees-table-wrap">
+          <table className="employees-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Check in</th>
+                <th>Check out</th>
+                <th>Working hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monthLoading ? (
+                <tr>
+                  <td colSpan={4}>Loading this month...</td>
+                </tr>
+              ) : monthDateKeys().slice().reverse().map((date) => {
+                const row = month.find((item) => item.attendanceDate?.slice(0, 10) === date);
+                const checkOut = shownCheckOut(row);
+                const minutes = row?.checkInTime ? clockedWorkMinutes(row) : 0;
+                return (
+                  <tr key={date}>
+                    <td>{date}</td>
+                    <td>{row?.checkInTime ? row.checkInTime.slice(11, 19) : "—"}</td>
+                    <td>{checkOut ? checkOut.slice(11, 19) : row?.checkInTime ? "Still in" : "—"}</td>
+                    <td>{row?.checkInTime ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : "No check-in"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 

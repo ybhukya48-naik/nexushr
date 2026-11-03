@@ -477,7 +477,9 @@ export default function Attendance() {
   const isManagementRole = ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"].includes(currentRole);
   const canPunch = currentRole === "EMPLOYEE";
   const siteVisitor = Boolean(currentEmployee?.siteVisitor);
-  const historyEmployeeId = selectedEmployee || (currentEmployee ? String(currentEmployee.id) : "");
+  const historyEmployeeId = isManagementRole
+    ? selectedEmployee
+    : (currentEmployee ? String(currentEmployee.id) : "");
 
   useEffect(() => {
     if (!isManagementRole) {
@@ -492,6 +494,10 @@ export default function Attendance() {
     void getEmployeeAttendance(id).then(setHistory).catch(() => setHistory([]));
     void getAttendanceAudit(id).then(setAudit).catch(() => setAudit([]));
   }, [historyEmployeeId, message, isManagementRole]);
+
+  const historyPerson = employees.find(
+    (employee) => String(employee.id) === String(historyEmployeeId),
+  );
 
   const companyEmployees = employees.filter(
     (employee) =>
@@ -1217,7 +1223,17 @@ export default function Attendance() {
     <tr key={employee.id}>
       <td>
         <div className="attendance-employee-cell">
-          <strong>{employee.fullName}</strong>
+          {isManagementRole ? (
+            <button
+              type="button"
+              className="panel-link"
+              onClick={() => setSelectedEmployee(String(employee.id))}
+            >
+              <strong>{employee.fullName}</strong>
+            </button>
+          ) : (
+            <strong>{employee.fullName}</strong>
+          )}
           <span>{employee.employeeCode}</span>
           {record?.attendanceStatus === "INACTIVE" && (
             <span className="attendance-inactive">Inactive</span>
@@ -1325,8 +1341,12 @@ export default function Attendance() {
         <div className="panel-header">
           <div>
             <p className="eyebrow">HISTORY</p>
-            <h3>Last 30 days</h3>
-            <p>Each day shows check-in, check-out, and working hours. Salary is calculated from these hours.</p>
+            <h3>{historyPerson ? `${historyPerson.fullName} · last 30 days` : "Last 30 days"}</h3>
+            <p>
+              {historyPerson
+                ? `Only ${historyPerson.fullName}'s check-in, check-out, and working hours. Choose another employee to see that person's month.`
+                : "Choose one employee. Each person's month stays separate. The count above is who is present for the selected day."}
+            </p>
           </div>
         </div>
         <div className="employees-table-wrap month-history">
