@@ -20,6 +20,7 @@ import {
   type AttendanceAuditEntry,
   clockedWorkMinutes,
   monthDateKeys,
+  shownCheckOut,
   type AttendanceRecord,
   type LeaveRequest,
 } from "./Attendance";
@@ -516,11 +517,12 @@ export default function Dashboard() {
                 </tr>
               ) : lunchPerson ? monthDateKeys().slice().reverse().map((date) => {
                 const row = personHistory.find((item) => item.attendanceDate?.slice(0, 10) === date);
+                const checkOut = shownCheckOut(row);
                 return (
                   <tr key={date}>
                     <td>{date}</td>
                     <td>{row?.checkInTime ? clock(row.checkInTime) : "—"}</td>
-                    <td>{row?.checkInTime && !row.checkOutTime ? "Still in" : row?.checkOutTime ? clock(row.checkOutTime) : "—"}</td>
+                    <td>{checkOut ? clock(checkOut) : row?.checkInTime ? "Still in" : "—"}</td>
                     <td>{row?.checkInTime ? `${Math.floor(clockedWorkMinutes(row) / 60)}h ${clockedWorkMinutes(row) % 60}m` : "No check-in"}</td>
                   </tr>
                 );
@@ -533,7 +535,7 @@ export default function Dashboard() {
                   <td>{String(row.attendanceDate ?? "").slice(0, 10)}</td>
                   <td>{row.employee?.fullName ?? "Employee"}</td>
                   <td>{clock(row.checkInTime)}</td>
-                  <td>{row.checkOutTime ? clock(row.checkOutTime) : "Still in"}</td>
+                  <td>{shownCheckOut(row) ? clock(shownCheckOut(row)) : "Still in"}</td>
                   <td>{Math.floor(clockedWorkMinutes(row) / 60)}h {clockedWorkMinutes(row) % 60}m</td>
                 </tr>
               ))}

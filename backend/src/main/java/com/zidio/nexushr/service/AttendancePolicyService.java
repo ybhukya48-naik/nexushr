@@ -112,6 +112,9 @@ public class AttendancePolicyService {
                 ? LocalDate.now(AttendanceService.COMPANY_ZONE)
                 : record.getAttendanceDate();
         LocalDateTime deadline = date.atTime(AttendanceRules.LOGOUT_DEADLINE);
+        LocalDateTime checkoutAt = record.getCheckInTime().isAfter(deadline)
+                ? record.getCheckInTime()
+                : deadline;
         AttendanceDay day = new AttendanceDay();
         int closed = record.getClosedWorkMinutes() == null ? 0 : record.getClosedWorkMinutes();
         day.restore(
@@ -122,7 +125,7 @@ public class AttendancePolicyService {
                 record.getBreakMinutes() == null ? 0 : record.getBreakMinutes(),
                 record.getAttendanceStatus());
         try {
-            day.checkOut(deadline);
+            day.checkOut(checkoutAt);
             record.setCheckOutTime(day.lastCheckOut());
             record.setSessionStartedAt(null);
             record.setClosedWorkMinutes(day.closedWorkMinutes());
@@ -131,10 +134,13 @@ public class AttendancePolicyService {
                     day.closedWorkMinutes(), day.breakMinutes()));
             record.setAttendanceStatus("CLOSED");
         } catch (IllegalStateException ex) {
+            if (record.getCheckOutTime() == null) {
+                record.setCheckOutTime(checkoutAt);
+            }
             record.setAttendanceStatus("BLUE_FLAG");
         }
         record.setBlueFlag(true);
-        record.setLastActivityAt(deadline);
+        record.setLastActivityAt(checkoutAt);
         applyMonthPenalties(record);
         audit(record, record.getEmployee(), "AUTO_LOGOUT",
                 "Automatic logout at 11:00 PM. The attendance record is kept.");

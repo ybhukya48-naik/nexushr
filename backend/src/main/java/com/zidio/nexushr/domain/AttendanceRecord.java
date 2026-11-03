@@ -2,6 +2,8 @@ package com.zidio.nexushr.domain;
 
 import jakarta.persistence.*;
 
+import com.zidio.nexushr.service.AttendanceRules;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -135,11 +137,20 @@ public class AttendanceRecord {
 
     public Integer getWorkMinutes() {
         if (checkInTime != null && checkOutTime == null) {
-            int elapsed = com.zidio.nexushr.service.AttendanceRules.sessionMinutes(
-                    checkInTime,
-                    LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
+            LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Kolkata"));
+            LocalDate day = attendanceDate != null ? attendanceDate : checkInTime.toLocalDate();
+            LocalDateTime deadline = day.atTime(AttendanceRules.LOGOUT_DEADLINE);
+            LocalDateTime end = now.isAfter(deadline) ? deadline : now;
+            if (end.isBefore(checkInTime)) {
+                end = checkInTime;
+            }
+            int elapsed = AttendanceRules.sessionMinutes(checkInTime, end);
             int breaks = breakMinutes == null ? 0 : breakMinutes;
-            return Math.max(0, elapsed - breaks);
+            int presence = Math.max(0, elapsed - breaks);
+            if (now.isBefore(deadline)) {
+                return presence;
+            }
+            return AttendanceRules.payableWorkMinutes(presence, breaks);
         }
         return workMinutes;
     }

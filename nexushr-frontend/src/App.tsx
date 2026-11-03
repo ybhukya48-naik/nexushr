@@ -35,6 +35,9 @@ import {
   type AttendanceAuditEntry,
   clockedWorkMinutes,
   monthDateKeys,
+  readDashboardSnapshot,
+  shownCheckOut,
+  writeDashboardSnapshot,
   type AttendanceRecord,
 } from "./pages/Attendance";
 import {
@@ -854,15 +857,16 @@ function hoursLabel(minutes?: number) {
 
 function EmployeeDashboard() {
   const navigate = useNavigate();
+  const cachedDashboard = readDashboardSnapshot();
   const [employee, setEmployee] =
-    useState<EmployeeResponse | null>(null);
-  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+    useState<EmployeeResponse | null>(cachedDashboard?.employee ?? null);
+  const [records, setRecords] = useState<AttendanceRecord[]>(cachedDashboard?.records ?? []);
   const [audit, setAudit] = useState<AttendanceAuditEntry[]>([]);
   const [leaveCount, setLeaveCount] = useState(0);
   const [latestPay, setLatestPay] = useState("");
 
-  const [loading, setLoading] = useState(true);
-  const [detailsLoading, setDetailsLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedDashboard?.employee);
+  const [detailsLoading, setDetailsLoading] = useState((cachedDashboard?.records.length ?? 0) === 0);
   const [error, setError] = useState("");
   const [punching, setPunching] = useState(false);
   const [punchNote, setPunchNote] = useState("");
@@ -885,9 +889,11 @@ function EmployeeDashboard() {
           if (cancelled) {
             return;
           }
-          setRecords((Array.isArray(history) ? history : []).filter((row) => row?.attendanceDate).sort((a, b) =>
+          const savedHistory = (Array.isArray(history) ? history : []).filter((row) => row?.attendanceDate).sort((a, b) =>
             b.attendanceDate.localeCompare(a.attendanceDate),
-          ));
+          );
+          setRecords(savedHistory);
+          writeDashboardSnapshot(me, savedHistory);
           setAudit(Array.isArray(punches) ? punches : []);
           setLeaveCount(Array.isArray(leaves) ? leaves.length : 0);
           const pay = (Array.isArray(payroll) ? payroll : [])
@@ -898,7 +904,7 @@ function EmployeeDashboard() {
       })
       .catch((err) => {
         console.error(err);
-        if (!cancelled) {
+        if (!cancelled && !readDashboardSnapshot()?.employee) {
           setError(
             err instanceof Error
               ? err.message
@@ -965,7 +971,9 @@ function EmployeeDashboard() {
     try {
       await (kind === "out" ? checkOut(signedInEmployee.id) : checkIn(signedInEmployee.id));
       const history = await getEmployeeAttendance(signedInEmployee.id);
-      setRecords([...history].sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate)));
+      const savedHistory = [...history].sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
+      setRecords(savedHistory);
+      writeDashboardSnapshot(signedInEmployee, savedHistory);
       setPunchNote(
         kind === "out"
           ? "Lunch check-out saved. Working hours are paused."
@@ -1105,11 +1113,12 @@ function EmployeeDashboard() {
                     ) : monthDateKeys().slice().reverse().map((date) => {
                       const row = records.find((item) => item.attendanceDate?.slice(0, 10) === date);
                       const pairs = punchPairs(audit, date, row);
+                      const checkOut = shownCheckOut(row);
                       return (
                         <tr key={date}>
                           <td>{date}</td>
                           <td>{pairs.length > 0 ? pairs.map((pair) => pair.checkIn).join(", ") : "—"}</td>
-                          <td>{row?.checkInTime && !row.checkOutTime ? "Still in" : pairs.length > 0 ? pairs.map((pair) => pair.checkOut ?? "—").join(", ") : "—"}</td>
+                          <td>{!row?.checkInTime ? "—" : !checkOut ? "Still in" : pairs.length > 0 ? pairs.map((pair) => pair.checkOut ?? "23:00").join(", ") : formatClock(checkOut)}</td>
                           <td>{row?.checkInTime ? hoursLabel(clockedWorkMinutes(row)) : "No check-in"}</td>
                         </tr>
                       );

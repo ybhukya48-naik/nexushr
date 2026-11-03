@@ -12,8 +12,11 @@ import com.zidio.nexushr.repository.NotificationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,6 +68,42 @@ public class AttendanceInactivityService {
     @Transactional
     public void alertMissedLunchReturn() {
         // Lunch is a flexible hour chosen by the employee, not a 1:00–2:00 deadline.
+    }
+
+    /**
+     * The 11:00 PM job only runs while the server is awake. This closes any day
+     * that is still open after that deadline, including a late morning check-in.
+     */
+    @Scheduled(fixedDelay = 600_000, initialDelay = 20_000)
+    @Transactional
+    public void closeExpiredOpenSessions() {
+        LocalDateTime now = LocalDateTime.now(AttendanceService.COMPANY_ZONE);
+        for (AttendanceRecord record : attendanceRepository.findByCheckInTimeIsNotNullAndCheckOutTimeIsNull()) {
+            try {
+                LocalDate date = record.getAttendanceDate() != null
+                        ? record.getAttendanceDate()
+                        : record.getCheckInTime().toLocalDate();
+                LocalDateTime deadline = date.atTime(AttendanceRules.LOGOUT_DEADLINE);
+                if (now.isBefore(deadline)) {
+                    continue;
+                }
+                attendancePolicyService.automaticLogout(record);
+                attendanceRepository.save(record);
+                Employee employee = record.getEmployee();
+                if (employee == null || employee.getId() == null) {
+                    continue;
+                }
+                String marker = date + " automatic logout";
+                notify(
+                        employee,
+                        "Automatic logout",
+                        marker + ". You were logged out at 11:00 PM. The attendance record is kept and marked with a blue flag.",
+                        false);
+                notifyReportingManager(employee, marker, "was logged out automatically at 11:00 PM", false);
+            } catch (RuntimeException ex) {
+                log.warn("Could not close attendance left open past 11:00 PM for record {}", record.getId(), ex);
+            }
+        }
     }
 
     @Scheduled(cron = "0 */5 9-22 * * MON-SAT", zone = "Asia/Kolkata")
@@ -171,10 +210,14 @@ public class AttendanceInactivityService {
                 employee,
                 "Automatic logout",
                 marker + ". You were logged out at 11:00 PM. The attendance record is kept and marked with a blue flag.");
-        notifyReportingManager(employee, marker, "was logged out automatically at 11:00 PM");
+        notifyReportingManager(employee, marker, "was logged out automatically at 11:00 PM", true);
     }
 
     private void notifyReportingManager(Employee employee, String marker, String reason) {
+        notifyReportingManager(employee, marker, reason, true);
+    }
+
+    private void notifyReportingManager(Employee employee, String marker, String reason, boolean email) {
         Long managerId = employee.getReportingManagerId();
         if (managerId == null || managerId.equals(employee.getId())) {
             return;
@@ -198,11 +241,16 @@ public class AttendanceInactivityService {
                             + reason
                             + ". "
                             + marker
-                            + ".");
+                            + ".",
+                    email);
         });
     }
 
     private void notify(Employee employee, String title, String message) {
+        notify(employee, title, message, true);
+    }
+
+    private void notify(Employee employee, String title, String message, boolean email) {
         boolean alreadySent = notificationRepository
                 .existsByEmployeeIdAndNotificationTypeAndMessageContaining(
                         employee.getId(),
@@ -217,8 +265,28 @@ public class AttendanceInactivityService {
                 title,
                 message,
                 NotificationType.REMINDER,
-                hasEmail ? NotificationChannel.EMAIL : NotificationChannel.IN_APP,
+                email && hasEmail ? NotificationChannel.EMAIL : NotificationChannel.IN_APP,
                 employee.getEmail(),
                 null);
+    }
+}
+
+@Component
+class CloseExpiredAttendanceOnStartup implements ApplicationRunner {
+
+    private final AttendanceInactivityService attendanceInactivityService;
+
+    CloseExpiredAttendanceOnStartup(AttendanceInactivityService attendanceInactivityService) {
+        this.attendanceInactivityService = attendanceInactivityService;
+    }
+
+    @Override
+    public void run(ApplicationArguments args) {
+        try {
+            attendanceInactivityService.closeExpiredOpenSessions();
+        } catch (RuntimeException ex) {
+            LoggerFactory.getLogger(CloseExpiredAttendanceOnStartup.class)
+                    .warn("Could not close attendance left open past 11:00 PM", ex);
+        }
     }
 }

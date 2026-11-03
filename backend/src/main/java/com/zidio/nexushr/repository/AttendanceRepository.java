@@ -35,6 +35,9 @@ public interface AttendanceRepository
             Long employeeId
     );
 
+    @EntityGraph(attributePaths = {"employee", "employee.company"})
+    List<AttendanceRecord> findByCheckInTimeIsNotNullAndCheckOutTimeIsNull();
+
     List<AttendanceRecord> findByEmployee_IdAndAttendanceDateBetween(
             Long employeeId,
             LocalDate startDate,

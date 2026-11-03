@@ -1,0 +1,11 @@
+{
+  "name": "nexushr-keepalive",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-31",
+  "observability": {
+    "enabled": true
+  },
+  "triggers": {
+    "crons": ["*/10 * * * *"]
+  }
+}

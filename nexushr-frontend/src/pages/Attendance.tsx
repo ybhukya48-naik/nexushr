@@ -45,8 +45,38 @@ function normalizeAttendanceDate(value?: string) {
   return String(value ?? "").trim().slice(0, 10);
 }
 
+function logoutDeadlineMs(record?: { attendanceDate?: string; checkInTime?: string } | null) {
+  const dateKey = String(record?.attendanceDate || record?.checkInTime || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+    return null;
+  }
+  const deadline = new Date(`${dateKey}T23:00:00+05:30`);
+  return Number.isNaN(deadline.getTime()) ? null : deadline.getTime();
+}
+
+/** Checkout to show. After 11:00 PM the day is closed even if the punch was missed. */
+export function shownCheckOut(
+  record?: { checkInTime?: string; checkOutTime?: string; attendanceDate?: string } | null,
+  now = new Date(),
+) {
+  if (record?.checkOutTime) {
+    return record.checkOutTime;
+  }
+  if (!record?.checkInTime) {
+    return undefined;
+  }
+  const deadline = logoutDeadlineMs(record);
+  if (deadline != null && now.getTime() >= deadline) {
+    const dateKey = String(record.attendanceDate || record.checkInTime).slice(0, 10);
+    return `${dateKey}T23:00:00`;
+  }
+  return undefined;
+}
+
 export function clockedWorkMinutes(
-  record?: Pick<AttendanceRecord, "checkInTime" | "checkOutTime" | "breakMinutes" | "workMinutes"> | null,
+  record?: (Pick<AttendanceRecord, "checkInTime" | "checkOutTime" | "breakMinutes" | "workMinutes"> & {
+    attendanceDate?: string;
+  }) | null,
   now = new Date(),
 ) {
   if (!record?.checkInTime) {
@@ -56,7 +86,13 @@ export function clockedWorkMinutes(
   if (Number.isNaN(start.getTime())) {
     return Math.max(0, record.workMinutes ?? 0);
   }
-  const end = record.checkOutTime ? new Date(record.checkOutTime) : now;
+  const deadline = logoutDeadlineMs(record);
+  const pastLogout = !record.checkOutTime && deadline != null && now.getTime() >= deadline;
+  const end = record.checkOutTime
+    ? new Date(record.checkOutTime)
+    : pastLogout && deadline != null
+      ? new Date(deadline)
+      : now;
   if (Number.isNaN(end.getTime())) {
     return Math.max(0, record.workMinutes ?? 0);
   }
@@ -65,12 +101,44 @@ export function clockedWorkMinutes(
     0,
     Math.floor((end.getTime() - start.getTime()) / 60000) - breakMinutes,
   );
-  if (!record.checkOutTime) {
+  if (!record.checkOutTime && !pastLogout) {
     return checkedIn;
   }
   const lunchStillDue = Math.max(0, 60 - breakMinutes);
   const afterEightHours = Math.max(0, checkedIn + breakMinutes - 8 * 60);
   return Math.max(0, checkedIn - Math.min(lunchStillDue, afterEightHours));
+}
+
+const DASHBOARD_SNAPSHOT = "nexushr_dashboard_snapshot";
+
+export function readDashboardSnapshot(): { employee: EmployeeResponse; records: AttendanceRecord[] } | null {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(DASHBOARD_SNAPSHOT) || "null");
+    if (!parsed?.employee?.id || !Array.isArray(parsed.records)) {
+      return null;
+    }
+    return {
+      employee: parsed.employee as EmployeeResponse,
+      records: parsed.records.filter((row: AttendanceRecord) => row?.attendanceDate),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function writeDashboardSnapshot(employee: EmployeeResponse, records: AttendanceRecord[]) {
+  try {
+    sessionStorage.setItem(DASHBOARD_SNAPSHOT, JSON.stringify({
+      employee,
+      records: records.slice(0, 40),
+    }));
+  } catch {
+    // The page still works if the browser refuses the saved copy.
+  }
+}
+
+export function readMyAttendanceCache() {
+  return readDashboardSnapshot()?.records ?? [];
 }
 
 async function attendanceRequest<T>(
@@ -369,7 +437,13 @@ export default function Attendance() {
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const [attendanceLoaded, setAttendanceLoaded] = useState(false);
   const [selfie, setSelfie] = useState<File | null>(null);
-  const [history, setHistory] = useState<AttendanceRecord[]>([]);
+  const [history, setHistory] = useState<AttendanceRecord[]>(() => {
+    const role = (localStorage.getItem("nexushr_role") ?? "").trim().toUpperCase();
+    if (["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"].includes(role)) {
+      return [];
+    }
+    return readMyAttendanceCache();
+  });
   const [audit, setAudit] = useState<AttendanceAuditEntry[]>([]);
   const currentUsername = (
     localStorage.getItem("nexushr_user") ?? ""
@@ -406,6 +480,9 @@ export default function Attendance() {
   const historyEmployeeId = selectedEmployee || (currentEmployee ? String(currentEmployee.id) : "");
 
   useEffect(() => {
+    if (!isManagementRole) {
+      return;
+    }
     if (!historyEmployeeId) {
       setHistory([]);
       setAudit([]);
@@ -414,7 +491,7 @@ export default function Attendance() {
     const id = Number(historyEmployeeId);
     void getEmployeeAttendance(id).then(setHistory).catch(() => setHistory([]));
     void getAttendanceAudit(id).then(setAudit).catch(() => setAudit([]));
-  }, [historyEmployeeId, message]);
+  }, [historyEmployeeId, message, isManagementRole]);
 
   const companyEmployees = employees.filter(
     (employee) =>
@@ -520,6 +597,8 @@ export default function Attendance() {
         const me = await getCurrentEmployee();
 
         const employeeRecords = await getEmployeeAttendance(me.id);
+        writeDashboardSnapshot(me, employeeRecords);
+        setHistory(employeeRecords);
 
         console.log("[Attendance DEBUG] employee:", me.id, me.employeeCode);
         console.log("[Attendance DEBUG] today:", today);
@@ -1265,11 +1344,12 @@ export default function Attendance() {
             <tbody>
               {historyEmployeeId ? monthDateKeys().slice().reverse().map((date) => {
                 const row = history.find((item) => item.attendanceDate?.slice(0, 10) === date);
+                const checkOut = shownCheckOut(row, currentTime);
                 return (
                 <tr key={date}>
                   <td>{formatDate(date)}</td>
                   <td>{row ? formatTime(row.checkInTime) : "—"}</td>
-                  <td>{row?.checkInTime && !row.checkOutTime ? "Still in" : row ? formatTime(row.checkOutTime) : "—"}</td>
+                  <td>{checkOut ? formatTime(checkOut) : row?.checkInTime ? "Still in" : "—"}</td>
                   <td>{row?.checkInTime ? formatAsHours(clockedWorkMinutes(row, currentTime)) : "No check-in"}</td>
                   <td>
                     {[
