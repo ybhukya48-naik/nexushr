@@ -12,12 +12,10 @@ import {
 import {
   checkIn,
   checkOut,
-  getAttendanceAudit,
   getAttendanceByDate,
   getAttendanceRange,
   getEmployeeAttendance,
   getLeaves,
-  type AttendanceAuditEntry,
   clockedWorkMinutes,
   isCheckoutMissing,
   isWindowsComputer,
@@ -49,35 +47,6 @@ function todayIso() {
 function clock(value?: string) {
   const match = String(value ?? "").match(/(\d{2}):(\d{2})/);
   return match ? `${match[1]}:${match[2]}` : "—";
-}
-
-function punchPairs(entries: AttendanceAuditEntry[], employeeId: number, date: string, record?: AttendanceRecord) {
-  const pairs: Array<{ checkIn: string; checkOut?: string }> = [];
-  const relevant = asList<AttendanceAuditEntry>(entries)
-    .filter((entry) => entry.employeeId === employeeId
-      && (entry.attendanceDate ?? "").slice(0, 10) === date
-      && (entry.action === "CHECK_IN" || entry.action === "CHECK_OUT"))
-    .sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
-  for (const entry of relevant) {
-    const time = clock(entry.detail) === "—" ? clock(entry.createdAt) : clock(entry.detail);
-    if (entry.action === "CHECK_IN") {
-      pairs.push({ checkIn: time });
-    } else if (pairs.length > 0 && !pairs[pairs.length - 1].checkOut) {
-      pairs[pairs.length - 1].checkOut = time;
-    }
-  }
-  if (pairs.length === 0 && record?.checkInTime) {
-    pairs.push({
-      checkIn: clock(record.checkInTime),
-      checkOut: record.checkOutTime ? clock(record.checkOutTime) : undefined,
-    });
-  }
-  return pairs;
-}
-
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return (parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "");
 }
 
 function asList<T>(value: unknown): T[] {
@@ -118,17 +87,6 @@ function upcomingHolidays(extra: CompanyHoliday[], company: string): HolidayMark
     .slice(0, 3);
 }
 
-function monthCells(year: number, monthIndex: number) {
-  const first = new Date(year, monthIndex, 1);
-  const start = first.getDay();
-  const days = new Date(year, monthIndex + 1, 0).getDate();
-  const cells: Array<number | null> = Array.from({ length: start }, () => null);
-  for (let day = 1; day <= days; day += 1) {
-    cells.push(day);
-  }
-  return cells;
-}
-
 function displayDate(value: string) {
   const parsed = new Date(`${value.slice(0, 10)}T00:00:00`);
   if (Number.isNaN(parsed.getTime())) {
@@ -144,7 +102,6 @@ export default function Dashboard() {
   const [me, setMe] = useState<EmployeeResponse | null>(null);
   const [people, setPeople] = useState<EmployeeResponse[]>([]);
   const [todayRows, setTodayRows] = useState<AttendanceRecord[]>([]);
-  const [audit, setAudit] = useState<AttendanceAuditEntry[]>([]);
   const [week, setWeek] = useState<Array<{ label: string; present: number }>>([]);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [holidays, setHolidays] = useState<HolidayMark[]>([]);
@@ -222,14 +179,6 @@ export default function Dashboard() {
       })
       .catch(() => undefined);
 
-    getAttendanceAudit()
-      .catch(() => [] as AttendanceAuditEntry[])
-      .then((punches) => {
-        if (!cancelled) {
-          setAudit(asList<AttendanceAuditEntry>(punches));
-        }
-      });
-
     return () => {
       cancelled = true;
     };
@@ -299,10 +248,16 @@ export default function Dashboard() {
   const missingCheckOut = todayRows.filter((row) => isCheckoutMissing(row)).length;
   const windowsPunch = isWindowsComputer();
   const late = todayRows.filter((row) => row.lateWarning || (row.lateArrivalMinutes ?? 0) > 0).length;
+  const activePeople = people.filter((person) => person.active);
+  const onboardingCount = activePeople.filter((person) =>
+    person.lifecycleStatus === "PENDING_ONBOARDING" || person.lifecycleStatus === "PENDING_APPROVAL",
+  ).length;
+  const offboardingCount = people.filter((person) => person.lifecycleStatus === "OFFBOARDING").length;
+  const offboardedCount = people.filter((person) => person.lifecycleStatus === "OFFBOARDED").length;
+  const waiting = [...pending].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const idleWarnings = todayRows.filter((row) => row.yellowFlag).length;
   const maxPresent = Math.max(1, ...week.map((day) => day.present));
   const now = new Date();
-  const cells = monthCells(now.getFullYear(), now.getMonth());
-  const holidayDays = new Set(holidays.filter((holiday) => String(holiday.date ?? "").startsWith(today.slice(0, 7))).map((holiday) => Number(String(holiday.date).slice(8))));
   const displayName = me?.fullName || localStorage.getItem("nexushr_user") || "there";
   const lunchPerson = people.find((person) => String(person.id) === lunchEmployeeId);
   const lunchRecord = todayRows.find((row) => String(row.employee?.id) === lunchEmployeeId);
@@ -361,13 +316,13 @@ export default function Dashboard() {
     <div className="hr-home">
       <header className="hr-home-head">
         <div>
-          <p>Good day, {displayName}</p>
+          <p>Operations · {company === "GORLE" ? "Gorle Group" : "CYOND"} · as of {now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</p>
           <h2 title="A day is 9 hours from check-in: 8 hours of work and 1 flexible lunch hour. Three idle warnings cut half a day.">
-            Here is today for {company === "GORLE" ? "Gorle Group" : "CYOND"}.
+            Good day, {displayName}
           </h2>
         </div>
         <time dateTime={today}>
-          {now.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+          {now.toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}
         </time>
       </header>
 
@@ -377,7 +332,7 @@ export default function Dashboard() {
           <strong>{people.length || summary?.totalEmployees || 0}</strong>
         </button>
         <button type="button" onClick={() => navigate("/attendance")}>
-          <span>Present · as of {now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</span>
+          <span>Present</span>
           <strong>{present.length}</strong>
         </button>
         <button type="button" onClick={() => navigate("/attendance")}>
@@ -386,7 +341,7 @@ export default function Dashboard() {
         </button>
         <button type="button" onClick={viewAllToday}>
           <span>Not checked in</span>
-          <strong>{Math.max(0, people.filter((person) => person.active).length - present.length)}</strong>
+          <strong>{Math.max(0, activePeople.length - present.length)}</strong>
         </button>
         <button type="button" onClick={() => navigate("/leave")}>
           <span>On leave</span>
@@ -398,23 +353,23 @@ export default function Dashboard() {
         </button>
       </section>
 
-      <section className="hr-home-grid">
+      <section className="hr-split">
         <article className="hr-card">
           <div className="hr-card-title">
             <h3>Approvals waiting</h3>
             <button type="button" onClick={() => navigate("/leave")}>Open leave</button>
           </div>
-          {pending.length === 0 ? (
+          {waiting.length === 0 ? (
             <p className="hr-empty">No leave is waiting.</p>
           ) : (
             <ul className="hr-leaves">
-              {pending.slice(0, 4).map((leave) => (
+              {waiting.slice(0, 5).map((leave) => (
                 <li key={leave.id}>
                   <button type="button" onClick={() => navigate("/leave")}>
                     <strong>{leave.employee?.fullName || "Employee"}</strong>
                     <span>
-                      {leave.startDate} to {leave.endDate}
-                      {leave.endDate < today ? " · dates have passed" : ""}
+                      {displayDate(leave.startDate)} to {displayDate(leave.endDate)}
+                      {leave.endDate < today ? " · dates have passed" : " · Pending"}
                     </span>
                   </button>
                 </li>
@@ -427,11 +382,12 @@ export default function Dashboard() {
             <h3>Exceptions today</h3>
             <button type="button" onClick={viewAllToday}>View all</button>
           </div>
-          <div className="hr-alerts">
-            <button type="button" onClick={() => navigate("/attendance")}>{missingCheckIn} did not check in</button>
-            <button type="button" onClick={() => navigate("/attendance")}>{missingCheckOut} did not check out</button>
-            <button type="button" onClick={() => navigate("/attendance")}>{todayRows.filter((row) => row.yellowFlag).length} idle warnings</button>
-          </div>
+          <ul className="hr-leaves">
+            <li><button type="button" onClick={() => navigate("/attendance")}><strong>{missingCheckIn}</strong><span>No check-in after 11:00</span></button></li>
+            <li><button type="button" onClick={() => navigate("/attendance")}><strong>{missingCheckOut}</strong><span>Check-out missed</span></button></li>
+            <li><button type="button" onClick={() => navigate("/attendance")}><strong>{idleWarnings}</strong><span>Idle warnings</span></button></li>
+            <li><button type="button" onClick={() => navigate("/attendance")}><strong>{late}</strong><span>Late arrivals</span></button></li>
+          </ul>
         </article>
       </section>
 
@@ -479,11 +435,11 @@ export default function Dashboard() {
         {punchNote && <p className="hr-empty">{punchNote}</p>}
       </section>
 
-      <section className="hr-home-grid">
+      <section className="hr-ops">
         <article className="hr-card">
           <div className="hr-card-title">
-            <h3>This week</h3>
-            <button type="button" onClick={() => navigate("/attendance")}>Attendance</button>
+            <h3>Attendance this week</h3>
+            <button type="button" onClick={() => navigate("/attendance")}>Open attendance</button>
           </div>
           <div className="hr-bars" aria-label="Present employees for the last seven days">
             {week.map((day) => (
@@ -494,81 +450,36 @@ export default function Dashboard() {
               </button>
             ))}
           </div>
-          <div className="hr-alerts">
-            <button type="button" onClick={() => navigate("/attendance")}>{late} late arrivals</button>
-            <button type="button" onClick={() => navigate("/attendance")}>{missingCheckIn} did not check in</button>
-            <button type="button" onClick={() => navigate("/attendance")}>{missingCheckOut} did not check out</button>
-            <button type="button" onClick={() => navigate("/attendance")}>
-              {todayRows.filter((row) => row.yellowFlag).length} inactive warnings
-            </button>
-          </div>
         </article>
-
         <article className="hr-card">
           <div className="hr-card-title">
-            <h3>Today</h3>
-            <button type="button" onClick={viewAllToday}>View all</button>
+            <h3>Onboarding and exits</h3>
+            <button type="button" onClick={() => navigate("/employees?status=Onboarding")}>Open directory</button>
           </div>
-          {present.length === 0 ? (
-            <p className="hr-empty">No check-ins yet today.</p>
+          <ul className="hr-leaves">
+            <li><button type="button" onClick={() => navigate("/employees?status=Onboarding")}><strong>{onboardingCount}</strong><span>Joining</span></button></li>
+            <li><button type="button" onClick={() => navigate("/employees?status=Offboarding")}><strong>{offboardingCount}</strong><span>Leaving</span></button></li>
+            <li><button type="button" onClick={() => navigate("/employees?status=Offboarded")}><strong>{offboardedCount}</strong><span>Already left</span></button></li>
+          </ul>
+        </article>
+        <article className="hr-card">
+          <div className="hr-card-title">
+            <h3>Upcoming</h3>
+          </div>
+          {holidays.length === 0 ? (
+            <p className="hr-empty">No holidays are saved yet.</p>
           ) : (
-            <ul className="hr-people">
-              {present.slice(0, 6).map((row) => (
-                <li key={row.id}>
-                  <button type="button" onClick={() => openEmployeeMonth(row.employee?.id)}>
-                    <span>{initials(row.employee?.fullName || "Employee")}</span>
-                    <strong>{row.employee?.fullName || "Employee"}</strong>
-                    <em>
-                      {punchPairs(audit, row.employee?.id ?? 0, today, row).map((pair) =>
-                        `${pair.checkIn}–${pair.checkOut ?? "in"}`).join(", ")}
-                      {" · "}
-                      {Math.floor(clockedWorkMinutes(row) / 60)}h {clockedWorkMinutes(row) % 60}m
-                      {row.yellowFlag ? " · warning" : ""}
-                    </em>
-                  </button>
+            <ul className="hr-holidays">
+              {holidays.slice(0, 4).map((holiday) => (
+                <li key={holiday.date}>
+                  <strong>{holiday.name}</strong>
+                  <span>{displayDate(holiday.date)}</span>
                 </li>
               ))}
             </ul>
           )}
         </article>
-
-        <article className="hr-card hr-actions">
-          <h3>Shortcuts</h3>
-          <button type="button" onClick={() => navigate("/attendance")}>Attendance</button>
-          <button type="button" onClick={() => navigate("/leave")}>Leave</button>
-          <button type="button" onClick={() => navigate("/payroll")}>Payroll</button>
-          <button type="button" onClick={() => navigate("/employees?status=Active")}>Active</button>
-          <button type="button" onClick={() => navigate("/employees?status=Onboarding")}>Onboarding</button>
-          <button type="button" onClick={() => navigate("/employees?status=Offboarding")}>Offboarding</button>
-        </article>
       </section>
-
-      {(missingCheckIn > 0 || missingCheckOut > 0) && (
-        <section className="hr-card">
-          <div className="hr-card-title">
-            <h3>Missing check in or check out</h3>
-            <button type="button" onClick={viewAllToday}>View all</button>
-          </div>
-          <ul className="hr-leaves">
-            {missingCheckInDue && people.filter((employee) => employee.active && !todayRows.some((row) => row.employee?.id === employee.id && row.checkInTime)).slice(0, 6).map((employee) => (
-              <li key={employee.id}>
-                <button type="button" onClick={() => openEmployeeMonth(employee.id)}>
-                  <strong>{employee.fullName}</strong>
-                  <span>No check in yet</span>
-                </button>
-              </li>
-            ))}
-            {todayRows.filter((row) => isCheckoutMissing(row) && row.employee).slice(0, 6).map((row) => (
-              <li key={`out-${row.id}`}>
-                <button type="button" onClick={() => openEmployeeMonth(row.employee.id)}>
-                  <strong>{row.employee.fullName}</strong>
-                  <span>Checked in {clock(row.checkInTime)}. Check-out was missed. Automatic logout is at 11:00 PM.</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
 
       <section className="hr-card" id="employee-month">
         <div className="hr-card-title">
@@ -654,62 +565,6 @@ export default function Dashboard() {
         ) : null}
       </section>
 
-      <section className="hr-home-grid hr-home-lower">
-        <article className="hr-card">
-          <div className="hr-card-title">
-            <h3>Leave requests</h3>
-            <button type="button" onClick={() => navigate("/leave")}>View leave</button>
-          </div>
-          {leaves.length === 0 ? (
-            <p className="hr-empty">No leave requests yet.</p>
-          ) : (
-            <ul className="hr-leaves">
-              {leaves.slice(0, 4).map((leave) => (
-                <li key={`${leave.id ?? leave.startDate}-${leave.employee?.id ?? ""}`}>
-                  <button type="button" onClick={() => navigate("/leave")}>
-                    <strong>{leave.employee?.fullName || "Employee"}</strong>
-                    <span>{displayDate(leave.startDate)} to {displayDate(leave.endDate)}</span>
-                    <em>{leave.status}</em>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </article>
-
-        <article className="hr-card">
-          <div className="hr-card-title">
-            <h3>Upcoming holidays</h3>
-          </div>
-          <ul className="hr-holidays">
-            {holidays.map((holiday) => (
-              <li key={holiday.date}>
-                <strong>{holiday.name}</strong>
-                <span>{displayDate(holiday.date)}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="hr-calendar" aria-label="This month">
-            {["S", "M", "T", "W", "T", "F", "S"].map((label, index) => (
-              <span key={`${label}-${index}`} className="hr-cal-label">{label}</span>
-            ))}
-            {cells.map((day, index) => (
-              <span
-                key={`${day ?? "empty"}-${index}`}
-                className={
-                  day === now.getDate()
-                    ? "hr-cal-today"
-                    : day && holidayDays.has(day)
-                      ? "hr-cal-holiday"
-                      : undefined
-                }
-              >
-                {day ?? ""}
-              </span>
-            ))}
-          </div>
-        </article>
-      </section>
     </div>
   );
 }

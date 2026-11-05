@@ -1,6 +1,26 @@
 .hr-home {
   display: grid;
-  gap: 18px;
+  gap: 16px;
+  font-size: 14px;
+  color: #1d1633;
+}
+
+.hr-home .employees-table {
+  width: 100%;
+  font-size: 14px;
+}
+
+.hr-home .employees-table th {
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  color: #667085;
+}
+
+.hr-home .employees-table td {
+  font-size: 14px;
+  text-align: left;
+  vertical-align: middle;
 }
 
 .hr-home-head,
@@ -15,15 +35,27 @@
 .hr-card-title button,
 .hr-people em,
 .hr-leaves em,
-.hr-empty {
+.hr-empty,
+.hr-leaves span,
+.hr-holidays span {
   margin: 0;
   color: #667085;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
-.hr-home-head h2,
-.hr-card h3 {
+.hr-home-head h2 {
   margin: 4px 0 0;
+  font-size: 24px;
+  line-height: 1.25;
+  color: #1d1633;
+}
+
+.hr-card h3 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.3;
+  color: #1d1633;
 }
 
 .hr-home-head time {
@@ -45,7 +77,21 @@
 }
 
 .hr-kpis {
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.hr-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.hr-ops {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.85fr) minmax(0, 0.85fr);
+  gap: 14px;
+  align-items: stretch;
 }
 
 .hr-home-grid {
@@ -81,7 +127,8 @@
 .hr-kpis span,
 .hr-actions button {
   color: #667085;
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.3;
 }
 
 .hr-kpis strong {
@@ -89,6 +136,20 @@
   margin-top: 8px;
   color: #1d1633;
   font-size: 32px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.hr-lunch {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 360px) auto;
+  gap: 16px;
+  align-items: end;
+}
+
+.hr-lunch .hr-card-title,
+.hr-lunch .attendance-actions {
+  margin: 0;
 }
 
 .hr-card {
@@ -201,7 +262,15 @@
 }
 
 .hr-leaves button {
-  grid-template-columns: 1fr auto auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.hr-leaves strong {
+  font-size: 14px;
+  color: #1d1633;
 }
 
 .hr-people button > span {
@@ -269,7 +338,10 @@
 
 @media (max-width: 1200px) {
   .hr-home-grid,
-  .hr-home-lower {
+  .hr-home-lower,
+  .hr-split,
+  .hr-ops,
+  .hr-lunch {
     grid-template-columns: 1fr;
   }
 }
