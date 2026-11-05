@@ -387,6 +387,12 @@ export default function Employees() {
   ).length;
 
   const canSeeSalary = role === "HR" || role === "ADMIN" || role === "SUPER_ADMIN";
+  const [directoryView, setDirectoryView] = useState<"list" | "chart">("list");
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
+  const pageCount = Math.max(1, Math.ceil(filteredEmployees.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const pageRows = filteredEmployees.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   function updateForm(
     field: keyof EmployeeRequest,
@@ -561,15 +567,22 @@ export default function Employees() {
           }}
         >
           <span aria-hidden="true">+</span>
-          Add Employee
+          Add employee
         </button>
       </div>
 
+      <div className="ux-tabs">
+        <button type="button" className={directoryView === "list" ? "active" : ""} onClick={() => setDirectoryView("list")}>List</button>
+        <button type="button" className={directoryView === "chart" ? "active" : ""} onClick={() => setDirectoryView("chart")}>Org chart</button>
+      </div>
+
+      {directoryView === "chart" && (
       <OrgChart
         people={employees.filter((employee) =>
           isCompanyMatch(employee.companyCode, company),
         )}
       />
+      )}
 
       <div className="employee-summary-grid">
         <div className="employee-summary-card">
@@ -900,7 +913,7 @@ export default function Employees() {
                 </thead>
 
                 <tbody>
-                  {filteredEmployees.map((employee) => (
+                  {pageRows.map((employee) => (
                     <tr key={employee.id}>
                       <td>
                         <button
@@ -997,8 +1010,17 @@ export default function Employees() {
             </div>
 
             <div className="employees-footer">
-              Showing <strong>{filteredEmployees.length}</strong> of{" "}
-              <strong>{companyPeople.length}</strong> employees
+              Showing <strong>{filteredEmployees.length === 0 ? 0 : (safePage - 1) * pageSize + 1}</strong>
+              –
+              <strong>{Math.min(safePage * pageSize, filteredEmployees.length)}</strong> of{" "}
+              <strong>{filteredEmployees.length}</strong>
+              {pageCount > 1 && (
+                <>
+                  {" "}
+                  <button type="button" className="table-action" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}>Previous</button>
+                  <button type="button" className="table-action" disabled={safePage >= pageCount} onClick={() => setPage(safePage + 1)}>Next</button>
+                </>
+              )}
             </div>
           </>
         )}

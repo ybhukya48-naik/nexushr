@@ -245,6 +245,11 @@ export default function Performance() {
 
   return (
     <div className="performance-page">
+      <div className="ux-tabs">
+        <span className="active">Reviews</span>
+        <span>Hours</span>
+        <span>Feedback</span>
+      </div>
       <section className="performance-hero">
         <div>
           <p className="performance-eyebrow">{role === "EMPLOYEE" ? "My Reviews" : "Performance"}</p>
@@ -315,7 +320,7 @@ export default function Performance() {
             />
           </div>
 
-          <p>Live employee performance score</p>
+          <p>Share of expected hours. This is attendance, not a review score.</p>
         </div>
 
         <PerformanceStat

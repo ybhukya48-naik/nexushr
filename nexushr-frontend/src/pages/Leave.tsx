@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   getCurrentEmployee,
   getEmployees,
+  getHolidays,
+  type CompanyHoliday,
   type EmployeeResponse,
 } from "../api";
 import {
@@ -29,6 +31,8 @@ export default function Leave() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [tab, setTab] = useState<"mine" | "approvals">("mine");
+  const [holidays, setHolidays] = useState<CompanyHoliday[]>([]);
 
   const role = localStorage.getItem("nexushr_role") || "HR";
 
@@ -69,6 +73,7 @@ export default function Leave() {
     try {
       const leaveData = await getLeaves();
       setLeaves(leaveData);
+      setHolidays(await getHolidays().catch(() => []));
 
       if (isEmployee) {
         const me = await getCurrentEmployee();
@@ -196,22 +201,50 @@ export default function Leave() {
 
 
 
+  const pending = companyLeaves.filter((leave) => leave.status === "PENDING");
+  const shown = new Date(`${startDate || "2000-01-01"}T00:00:00`);
+  const end = new Date(`${endDate || startDate || "2000-01-01"}T00:00:00`);
+  let workingDays = 0;
+  if (startDate && endDate && end >= shown) {
+    for (let day = new Date(shown); day <= end; day.setDate(day.getDate() + 1)) {
+      const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+      const holiday = holidays.some((item) => item.holidayDate === key);
+      if (day.getDay() !== 0 && !holiday) {
+        workingDays += 1;
+      }
+    }
+  }
+
   return (
     <section className="leave-page">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">Leave</p>
-          <h2>{isEmployee ? "My Leave" : "Leave"}</h2>
-          <p>
-            {isEmployee
-              ? "Apply for leave and follow the status."
-              : "Approve or reject leave for this company."}
-          </p>
-        </div>
+      <div className="ux-tabs">
+        <button type="button" className={tab === "mine" ? "active" : ""} onClick={() => setTab("mine")}>
+          {isEmployee ? "My leave" : "Leave"}
+        </button>
+        <button type="button" className={tab === "approvals" ? "active" : ""} onClick={() => setTab("approvals")}>
+          Approvals ({pending.length})
+        </button>
+        <button type="button" className="ux-tabs-action" onClick={() => setTab("mine")}>
+          Apply leave
+        </button>
+      </div>
 
-        <div className="leave-header-badge">
-          {isEmployee ? "My Leave" : "Approvals"}
-        </div>
+      <div className="ux-balances">
+        <article>
+          <span>Days left</span>
+          <strong>{balance?.remainingDays ?? "—"}</strong>
+          <em>of {balance?.annualEntitlementDays ?? "—"}</em>
+        </article>
+        <article>
+          <span>Used</span>
+          <strong>{balance?.usedDays ?? 0}</strong>
+          <em>this year</em>
+        </article>
+        <article>
+          <span>Pending</span>
+          <strong>{pending.length}</strong>
+          <em>waiting</em>
+        </article>
       </div>
 
       {message && (
@@ -226,22 +259,17 @@ export default function Leave() {
         </div>
       )}
 
-      <div className="stats-grid">
-        <Stat title="Total Requests" value={companyLeaves.length} />
-        <Stat title="Pending" value={companyLeaves.filter((leave) => leave.status === "PENDING").length} />
-        <Stat title="Approved" value={companyLeaves.filter((leave) => leave.status === "APPROVED").length} />
-        {balance && (
-          <Stat title="Days left" value={balance.remainingDays} />
-        )}
-      </div>
-
-      {isEmployee && (
+      {tab === "mine" && (
       <section className="panel leave-request-panel">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">My Leave</p>
+            <p className="eyebrow">Apply leave</p>
             <h3>Apply leave</h3>
-            <p>One casual leave and one paid leave each month. Sundays and public holidays are not working days. The request goes to your reporting manager.</p>
+            <p>
+              {workingDays > 0
+                ? `${workingDays} working day${workingDays === 1 ? "" : "s"} (Sundays and holidays are not counted). Balance after this request is not reduced until it is approved.`
+                : "Choose the dates. Sundays and holidays are not counted. One casual leave and one paid leave each month."}
+            </p>
           </div>
         </div>
 
@@ -321,31 +349,11 @@ export default function Leave() {
       </section>
       )}
 
-      {balance && (
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Balance</p>
-              <h3>Days left</h3>
-            </div>
-          </div>
-
-          <div className="stats-grid">
-            <Stat
-              title="Annual Entitlement"
-              value={balance.annualEntitlementDays}
-            />
-            <Stat title="Used" value={balance.usedDays} />
-            <Stat title="Remaining" value={balance.remainingDays} />
-          </div>
-        </section>
-      )}
-
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">My requests</p>
-            <h3>Leave requests</h3>
+            <p className="eyebrow">{tab === "approvals" ? "Approvals" : "My requests"}</p>
+            <h3>{tab === "approvals" ? "Waiting for a decision" : "Leave requests"}</h3>
             <p>
               {companyLeaves.length === 0
                 ? "No leave requests yet. Apply leave to add one."
@@ -368,7 +376,7 @@ export default function Leave() {
             </thead>
 
             <tbody>
-              {companyLeaves.map((leave) => {
+              {(tab === "approvals" ? pending : companyLeaves).map((leave) => {
                 const days =
                   Math.floor(
                     (new Date(leave.endDate).getTime() -
@@ -454,7 +462,7 @@ export default function Leave() {
                 );
               })}
 
-              {companyLeaves.length === 0 && (
+              {(tab === "approvals" ? pending : companyLeaves).length === 0 && (
                 <tr>
                   <td colSpan={isEmployee ? 5 : 6}>
                     <div className="employee-empty-state">
@@ -471,15 +479,6 @@ export default function Leave() {
         </div>
       </section>
     </section>
-  );
-}
-
-function Stat({ title, value }: { title: string; value: number }) {
-  return (
-    <div className="stat-card">
-      <p>{title}</p>
-      <h3>{value}</h3>
-    </div>
   );
 }
 

@@ -535,6 +535,31 @@ export default function Payroll() {
       )}
 
       {isManagementRole && (
+        <div className="ux-steps" aria-label="Payroll steps">
+          <span>1 Attendance</span>
+          <span>2 Inputs</span>
+          <span>3 Calculate</span>
+          <span>4 Review</span>
+          <span>5 Payslips</span>
+        </div>
+      )}
+
+      <div className="ux-balances">
+        <article>
+          <span>Employees</span>
+          <strong>{companyEmployees.length}</strong>
+        </article>
+        <article>
+          <span>Payslips</span>
+          <strong>{companyRecords.length}</strong>
+        </article>
+        <article>
+          <span>Net pay</span>
+          <strong>{money(companyRecords.reduce((sum, record) => sum + Number(record.netSalary || 0), 0))}</strong>
+        </article>
+      </div>
+
+      {isManagementRole && (
         <div className="employees-panel">
           <div className="panel-header">
             <div>

@@ -1186,34 +1186,37 @@ export default function Attendance() {
         </div>
       )}
 
+      {(canPunch || isManagementRole) && (
+        <div className="ux-clock">
+          <div>
+            <span>{formatDate(date)} · {sessionOpen ? "Checked in" : "Not checked in"}</span>
+            <strong>
+              {String(Math.floor((actionEmployeeRecord ? clockedWorkMinutes(actionEmployeeRecord, currentTime) : 0) / 60)).padStart(2, "0")}
+              :
+              {String((actionEmployeeRecord ? clockedWorkMinutes(actionEmployeeRecord, currentTime) : 0) % 60).padStart(2, "0")}
+            </strong>
+            <em>{sessionOpen ? "Hours since check in, including the lunch hour until you start lunch." : "Check in to start the day."}</em>
+          </div>
+        </div>
+      )}
+
       {metrics && (
-        <div className="attendance-metrics-grid">
-          <article className="attendance-metric-card">
-            <div className="attendance-metric-icon">P</div>
+        <div className="ux-balances">
+          <article>
             <span>Present</span>
             <strong>{visibleMetrics.present.toLocaleString()}</strong>
-            <small>Checked in today</small>
           </article>
-
-          <article className="attendance-metric-card">
-            <div className="attendance-metric-icon"></div>
-            <span>Checked Out</span>
-            <strong>{visibleMetrics.checkedOut.toLocaleString()}</strong>
-            <small>Completed work sessions</small>
+          <article>
+            <span>Absent</span>
+            <strong>{Math.max(0, visibleMetrics.totalEmployees - visibleMetrics.present).toLocaleString()}</strong>
           </article>
-
-          <article className="attendance-metric-card">
-            <div className="attendance-metric-icon">L</div>
-            <span>Late Arrivals</span>
+          <article>
+            <span>Late</span>
             <strong>{visibleMetrics.late.toLocaleString()}</strong>
-            <small>Late attendance records</small>
           </article>
-
-          <article className="attendance-metric-card">
-            <div className="attendance-metric-icon">OT</div>
-            <span>Overtime</span>
-            <strong>{visibleMetrics.overtime.toLocaleString()}</strong>
-            <small>Records with overtime</small>
+          <article>
+            <span>Checked out</span>
+            <strong>{visibleMetrics.checkedOut.toLocaleString()}</strong>
           </article>
         </div>
       )}
