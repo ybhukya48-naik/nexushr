@@ -389,6 +389,7 @@ export default function Dashboard() {
       <section className="hr-card hr-lunch">
         <div className="hr-card-title">
           <h3>Lunch</h3>
+          <p className="hr-empty">Start lunch pauses hours. End lunch continues them.</p>
         </div>
         <label className="hr-lunch-pick">
           <span>Employee</span>
@@ -414,7 +415,7 @@ export default function Dashboard() {
             disabled={punching || !windowsPunch || !lunchOpen}
             onClick={() => void punchLunch("out")}
           >
-            Lunch Check Out
+            Start lunch
           </button>
           <button
             className="secondary-button"
@@ -422,10 +423,10 @@ export default function Dashboard() {
             disabled={punching || !windowsPunch || !lunchResume}
             onClick={() => void punchLunch("in")}
           >
-            Lunch Check In
+            End lunch
           </button>
         </div>
-        {!windowsPunch && <p className="hr-empty">Check-in and check-out work only on a Windows computer.</p>}
+        {!windowsPunch && <p className="hr-empty">Check in and check out work only on a Windows computer.</p>}
         {punchNote && <p className="hr-empty">{punchNote}</p>}
       </section>
 
@@ -496,7 +497,7 @@ export default function Dashboard() {
       {(missingCheckIn > 0 || missingCheckOut > 0) && (
         <section className="hr-card">
           <div className="hr-card-title">
-            <h3>Check-in and check-out missing</h3>
+            <h3>Missing check in or check out</h3>
             <button type="button" onClick={viewAllToday}>View all</button>
           </div>
           <ul className="hr-leaves">
@@ -504,7 +505,7 @@ export default function Dashboard() {
               <li key={employee.id}>
                 <button type="button" onClick={() => openEmployeeMonth(employee.id)}>
                   <strong>{employee.fullName}</strong>
-                  <span>Check-in is missing</span>
+                  <span>No check in yet</span>
                 </button>
               </li>
             ))}
@@ -526,7 +527,7 @@ export default function Dashboard() {
           {lunchPerson ? (
             <button type="button" onClick={viewAllToday}>View all</button>
           ) : (
-            <button type="button" onClick={() => navigate("/attendance")}>Open attendance</button>
+            <button type="button" onClick={() => navigate("/attendance")}>View attendance</button>
           )}
         </div>
         {lunchPerson ? (
@@ -608,7 +609,7 @@ export default function Dashboard() {
         <article className="hr-card">
           <div className="hr-card-title">
             <h3>Leave requests</h3>
-            <button type="button" onClick={() => navigate("/leave")}>Open leave</button>
+            <button type="button" onClick={() => navigate("/leave")}>View leave</button>
           </div>
           {leaves.length === 0 ? (
             <p className="hr-empty">No leave requests yet.</p>

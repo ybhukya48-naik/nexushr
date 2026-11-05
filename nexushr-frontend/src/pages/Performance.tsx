@@ -247,10 +247,10 @@ export default function Performance() {
     <div className="performance-page">
       <section className="performance-hero">
         <div>
-          <p className="performance-eyebrow">PERFORMANCE INTELLIGENCE</p>
-          <h2>Performance Overview</h2>
+          <p className="performance-eyebrow">{role === "EMPLOYEE" ? "My Reviews" : "Performance"}</p>
+          <h2>{role === "EMPLOYEE" ? "My Reviews" : "Performance"}</h2>
           <p className="performance-subtitle">
-            Live goals, reviews and employee performance insights.
+            Hours worked are shown separately from reviews.
           </p>
         </div>
 

@@ -201,16 +201,16 @@ export default function Leave() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">Leave</p>
-          <h2>Leave</h2>
+          <h2>{isEmployee ? "My Leave" : "Leave"}</h2>
           <p>
             {isEmployee
-              ? "Submit a leave request and follow its status."
-              : "Review leave requests for this company. Employees submit their own requests."}
+              ? "Apply for leave and follow the status."
+              : "Approve or reject leave for this company."}
           </p>
         </div>
 
         <div className="leave-header-badge">
-          {isEmployee ? "My Leave" : "HR Operations"}
+          {isEmployee ? "My Leave" : "Approvals"}
         </div>
       </div>
 
@@ -239,8 +239,8 @@ export default function Leave() {
       <section className="panel leave-request-panel">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">TIME OFF</p>
-            <h3>New Leave Request</h3>
+            <p className="eyebrow">My Leave</p>
+            <h3>Apply leave</h3>
             <p>One casual leave and one paid leave each month. Sundays and public holidays are not working days. The request goes to your reporting manager.</p>
           </div>
         </div>
@@ -314,7 +314,7 @@ export default function Leave() {
               type="submit"
               disabled={saving}
             >
-              {saving ? "Submitting..." : "Submit Request"}
+              {saving ? "Sending..." : "Apply leave"}
             </button>
           </div>
         </form>
@@ -325,8 +325,8 @@ export default function Leave() {
         <section className="panel">
           <div className="panel-header">
             <div>
-              <p className="eyebrow">LEAVE BALANCE</p>
-              <h3>Your Leave Balance</h3>
+              <p className="eyebrow">Balance</p>
+              <h3>Days left</h3>
             </div>
           </div>
 
@@ -344,11 +344,11 @@ export default function Leave() {
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">REQUEST HISTORY</p>
-            <h3>Leave Requests</h3>
+            <p className="eyebrow">My requests</p>
+            <h3>Leave requests</h3>
             <p>
               {companyLeaves.length === 0
-                ? "No requests yet."
+                ? "No leave requests yet. Apply leave to add one."
                 : `${companyLeaves.length} request${companyLeaves.length === 1 ? "" : "s"} recorded.`}
             </p>
           </div>
@@ -424,7 +424,7 @@ export default function Leave() {
                                 )
                               }
                             >
-                              Approve
+                              Approve leave
                             </button>
 
                             <button
@@ -437,7 +437,7 @@ export default function Leave() {
                                 )
                               }
                             >
-                              Reject
+                              Reject leave
                             </button>
                           </div>
                         ) : (

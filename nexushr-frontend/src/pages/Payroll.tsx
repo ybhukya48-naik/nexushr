@@ -514,7 +514,7 @@ export default function Payroll() {
       <div className="employees-header">
         <div>
           <p className="page-eyebrow">{selectedCompany === "GORLE" ? "Gorle Group" : selectedCompany === "CYOND" ? "CYOND" : selectedCompany}</p>
-          <h1>Payroll</h1>
+          <h1>{role === "EMPLOYEE" ? "My Pay" : "Payroll"}</h1>
           <p>
             Generate payroll, track salary payments and view employee
             payslips.
@@ -538,7 +538,7 @@ export default function Payroll() {
         <div className="employees-panel">
           <div className="panel-header">
             <div>
-              <p className="page-eyebrow">Generate Payroll</p>
+              <p className="page-eyebrow">Payroll</p>
             <h2>Create Salary Record</h2>
             <p>
               Payroll is generated using the employee base salary and
@@ -970,7 +970,7 @@ export default function Payroll() {
             className="primary-action"
             disabled={saving || payrollEmployees.length === 0}
           >
-            {saving ? "Generating..." : "Generate Payroll"}
+            {saving ? "Generating..." : "Generate payroll"}
           </button>
           </form>
         </div>
@@ -1053,7 +1053,7 @@ export default function Payroll() {
                         }
                         disabled={payslipLoading}
                       >
-                        Payslip
+                        View payslip
                       </button>
 
                       {isManagementRole && record.status !== "PAID" && (
@@ -1064,7 +1064,7 @@ export default function Payroll() {
                             void handleMarkPaid(record.id)
                           }
                         >
-                          Mark Paid
+                          Mark paid
                         </button>
                       )}
                     </td>
@@ -1095,7 +1095,7 @@ export default function Payroll() {
                 className="primary-action"
                 onClick={() => void handleDownloadPdf()}
               >
-                Download PDF
+                Download payslip
               </button>
 
               {isManagementRole && (
@@ -1105,7 +1105,7 @@ export default function Payroll() {
                   onClick={() => void handleEmailPayslip()}
                   disabled={emailingPayslip}
                 >
-                  {emailingPayslip ? "Emailing..." : "Email Payslip"}
+                  {emailingPayslip ? "Emailing..." : "Email payslip"}
                 </button>
               )}
 

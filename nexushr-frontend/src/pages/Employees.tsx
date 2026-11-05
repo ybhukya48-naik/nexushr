@@ -515,7 +515,7 @@ export default function Employees() {
       <section className="employees-page">
         <div className="employees-header">
           <div>
-            <p className="page-eyebrow">Employee Lifecycle</p>
+            <p className="page-eyebrow">Directory</p>
             <h1>Employees</h1>
             <p>Employee directory access is restricted to authorized HR users.</p>
           </div>
@@ -545,7 +545,7 @@ export default function Employees() {
     <section className="employees-page">
       <div className="employees-header">
         <div>
-          <p className="page-eyebrow">Employee Lifecycle</p>
+          <p className="page-eyebrow">Directory</p>
           <h1>Employees</h1>
           <p>
             People in the company selected in the sidebar.
@@ -1008,7 +1008,7 @@ export default function Employees() {
         <div className="employees-panel">
           <div className="employees-header">
             <div>
-              <p className="page-eyebrow">Employee Lifecycle</p>
+              <p className="page-eyebrow">Directory</p>
               <h2>Delete Employee</h2>
               <p>
                 Are you sure you want to delete{" "}

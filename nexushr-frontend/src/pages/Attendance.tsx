@@ -946,19 +946,19 @@ export default function Attendance() {
     <>
       <div className="page-heading attendance-heading">
         <div>
-          <p className="eyebrow">WORKFORCE OPERATIONS</p>
-          <h2>Attendance</h2>
+          <p className="eyebrow">{isManagementRole ? "Attendance" : "My Attendance"}</p>
+          <h2>{isManagementRole ? "Attendance" : "My Attendance"}</h2>
           <p>
             {canPunch || isManagementRole
-              ? "Lunch is the employee’s flexible hour. Select the employee, check in, then use Lunch Check Out and Lunch Check In. That gap is lunch, not a warning. Working hours pause, then continue."
-              : "View only. A day is 9 hours from check-in: 8 hours of work and 1 flexible lunch hour."}
+              ? "Check in when you arrive and check out when you leave. Start lunch to pause hours. End lunch to continue them. Lunch is not a warning."
+              : "View only. A day is 9 hours: 8 hours of work and 1 hour of lunch."}
           </p>
         </div>
 
         {(canPunch || isManagementRole) && (
         <div className="attendance-actions">
           {!officePunchAllowed && (
-            <p>Check-in and check-out work only on a Windows computer. A phone cannot punch. Signing out of the site does not check you out.</p>
+            <p>Check in and check out work only on a Windows computer. A phone cannot punch. Signing out of the site does not check you out.</p>
           )}
           {siteVisitor && (
             <label className="secondary-button">
@@ -1004,10 +1004,10 @@ export default function Attendance() {
             {loading
               ? "Checking..."
               : sessionOpen
-                ? `Checked In ${formatTime(actionEmployeeRecord?.checkInTime)}`
+                ? `Checked in ${formatTime(actionEmployeeRecord?.checkInTime)}`
                 : canResume
-                  ? "Check In Again"
-                  : "Check In"}
+                  ? "Check in again"
+                  : "Check in"}
           </button>
 
           <button
@@ -1045,10 +1045,10 @@ export default function Attendance() {
             {loading
               ? "Checking..."
               : sessionOpen
-                ? "Check Out"
+                ? "Check out"
                 : actionEmployeeRecord?.checkOutTime
-                  ? `Checked Out ${formatTime(actionEmployeeRecord.checkOutTime)}`
-                  : "Check Out"}
+                  ? `Checked out ${formatTime(actionEmployeeRecord.checkOutTime)}`
+                  : "Check out"}
           </button>
 
           <button
@@ -1058,7 +1058,7 @@ export default function Attendance() {
                 () => siteVisitor && canPunch
                   ? siteCheckOut(selfie as File)
                   : checkOut(actionEmployee?.id),
-                "Lunch check-out saved. Working hours are paused.",
+                "Lunch started. Working hours are paused.",
               )
             }
             disabled={
@@ -1080,7 +1080,7 @@ export default function Attendance() {
                   : "Check out for lunch. The system is inactive while you are away."
             }
           >
-            Lunch Check Out
+            Start lunch
           </button>
 
           <button
@@ -1090,7 +1090,7 @@ export default function Attendance() {
                 () => siteVisitor && canPunch
                   ? siteCheckIn(selfie as File)
                   : checkIn(actionEmployee?.id),
-                "Lunch check-in saved. Working hours continue.",
+                "Lunch ended. Working hours continue.",
               )
             }
             disabled={
@@ -1113,7 +1113,7 @@ export default function Attendance() {
                     : "Check in after lunch. Working hours continue."
             }
           >
-            Lunch Check In
+            End lunch
           </button>
         </div>
         )}
@@ -1122,8 +1122,8 @@ export default function Attendance() {
       <section className="panel attendance-toolbar-panel">
         <div className="attendance-toolbar-header">
           <div>
-            <p className="eyebrow">DAILY VIEW</p>
-            <h3>Attendance filters</h3>
+            <p className="eyebrow">Today</p>
+            <h3>Find a day</h3>
             <p>Choose a date and employee.</p>
           </div>
 
@@ -1221,8 +1221,8 @@ export default function Attendance() {
       <section className="panel attendance-records-panel">
         <div className="panel-header attendance-records-header">
           <div>
-            <p className="eyebrow">ATTENDANCE LOG</p>
-            <h3>Daily Attendance Records</h3>
+            <p className="eyebrow">Today</p>
+            <h3>Who is in today</h3>
             <p>
               {loading
                 ? "Loading attendance activity..."
@@ -1248,8 +1248,8 @@ export default function Attendance() {
               <tr>
                 <th>Employee</th>
                 <th>Date</th>
-                <th>Check In</th>
-                <th>Check Out</th>
+                <th>Check in</th>
+                <th>Check out</th>
                 <th>Work Hours</th>
                 <th>Break</th>
                 <th>Late</th>
@@ -1379,7 +1379,7 @@ export default function Attendance() {
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">HISTORY</p>
+            <p className="eyebrow">Last 30 days</p>
             <h3>{historyPerson ? `${historyPerson.fullName} · last 30 days` : "Last 30 days"}</h3>
             <p>
               {historyPerson
@@ -1435,7 +1435,7 @@ export default function Attendance() {
         <section className="panel">
           <div className="panel-header">
             <div>
-              <p className="eyebrow">HR AUDIT</p>
+              <p className="eyebrow">Audit</p>
               <h3>Who changed attendance</h3>
               <p>Check-in, check-out, and flags are recorded with the person who made the change.</p>
             </div>

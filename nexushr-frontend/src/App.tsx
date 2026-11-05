@@ -290,8 +290,21 @@ function AppRoutes() {
                 isActive ? "nav-link active" : "nav-link"
               }
             >
-              <span>{label === "AI Insights" ? "AI" : ""}</span>
-              {label}
+              {label === "Dashboard"
+                ? "Home"
+                : label === "Attendance"
+                  ? role === "EMPLOYEE" ? "My Attendance" : "Attendance"
+                  : label === "Leave"
+                    ? role === "EMPLOYEE" ? "My Leave" : "Leave"
+                    : label === "Payroll"
+                      ? role === "EMPLOYEE" ? "My Pay" : "Payroll"
+                      : label === "Performance"
+                        ? role === "EMPLOYEE" ? "My Reviews" : "Performance"
+                        : label === "AI Insights"
+                          ? "Reports"
+                          : label === "Admin"
+                            ? "Settings"
+                            : label}
             </NavLink>
           ))}
         </nav>
@@ -998,15 +1011,15 @@ function EmployeeDashboard() {
         <div className="dashboard-hero-copy">
 
           <p className="eyebrow">
-            MY DASHBOARD
+            Home
           </p>
 
           <h2>
-            Welcome, {employee.fullName}
+            Good day, {employee.fullName}
           </h2>
 
           <p>
-            Open attendance, leave, payroll, or your profile.
+            Check in, apply for leave, or open your payslip.
           </p>
 
         </div>
@@ -1042,9 +1055,9 @@ function EmployeeDashboard() {
             <section className="panel">
               <div className="panel-header">
                 <div>
-                  <p className="eyebrow">TODAY</p>
-                  <h3>Check-in, check-out, and working hours</h3>
-                  <p>After check-in, a day is 9 hours: 8 hours of work and 1 hour of lunch. Take that lunch hour at any time. Salary uses the 8 working hours. A later check-out adds to the morning. Chrome idle is a warning, and three warnings cut half a day. The warning does not erase hours already worked.</p>
+                  <p className="eyebrow">Today</p>
+                  <h3>Check in and check out</h3>
+                  <p>A day is 9 hours: 8 hours of work and 1 hour of lunch. Start lunch when you leave, and end lunch when you are back. That hour can be any time.</p>
                 </div>
                 <div className="attendance-actions">
                   <button
@@ -1053,7 +1066,7 @@ function EmployeeDashboard() {
                     disabled={punching || !isWindowsComputer() || !todayRecord?.checkInTime || Boolean(todayRecord?.checkOutTime)}
                     onClick={() => void punchLunch("out")}
                   >
-                    Lunch Check Out
+                    Start lunch
                   </button>
                   <button
                     className="secondary-button"
@@ -1061,12 +1074,12 @@ function EmployeeDashboard() {
                     disabled={punching || !isWindowsComputer() || !todayRecord?.checkOutTime}
                     onClick={() => void punchLunch("in")}
                   >
-                    Lunch Check In
+                    End lunch
                   </button>
                 </div>
               </div>
               {!isWindowsComputer() && (
-                <p>Check-in and check-out work only on a Windows computer. Signing out of the website does not check you out.</p>
+                <p>Check in and check out work only on a Windows computer. Signing out of the website does not check you out.</p>
               )}
               {punchNote && <p>{punchNote}</p>}
               {notices.length > 0 && (
@@ -1082,7 +1095,7 @@ function EmployeeDashboard() {
                 <ul className="dash-punches">
                   {pairs.map((pair, index) => (
                     <li key={`${pair.checkIn}-${index}`}>
-                      Check-in {pair.checkIn} · Check-out {pair.checkOut ?? "still in"}
+                      Check in {pair.checkIn} · Check out {pair.checkOut ?? "still in"}
                     </li>
                   ))}
                 </ul>
@@ -1140,23 +1153,23 @@ function EmployeeDashboard() {
 
       <div className="employee-action-grid">
         <article className="panel employee-action-card">
-          <p className="eyebrow">ATTENDANCE</p>
-          <h3>Open attendance</h3>
-          <p>Check in, check out, and review the same hours shown above.</p>
+          <p className="eyebrow">My Attendance</p>
+          <h3>Check in</h3>
+          <p>Check in, check out, and see the same hours shown above.</p>
           <button className="primary-button" type="button" onClick={() => navigate("/attendance")}>
-            Check in or check out
+            Check in
           </button>
         </article>
         <article className="panel employee-action-card">
-          <p className="eyebrow">LEAVE</p>
-          <h3>My requests</h3>
+          <p className="eyebrow">My Leave</p>
+          <h3>Apply leave</h3>
           <p>{leaveCount} leave request{leaveCount === 1 ? "" : "s"} on file.</p>
           <button className="primary-button" type="button" onClick={() => navigate("/leave")}>
-            Submit or view leave
+            Apply leave
           </button>
         </article>
         <article className="panel employee-action-card">
-          <p className="eyebrow">PAYROLL</p>
+          <p className="eyebrow">My Pay</p>
           <h3>Payslip</h3>
           <p>{latestPay}</p>
           <button className="primary-button" type="button" onClick={() => navigate("/payroll")}>
@@ -1164,9 +1177,9 @@ function EmployeeDashboard() {
           </button>
         </article>
         <article className="panel employee-action-card">
-          <p className="eyebrow">ALERTS</p>
+          <p className="eyebrow">Updates</p>
           <h3>Notifications</h3>
-          <p>Missing check-in or check-out is marked inactive and sent here.</p>
+          <p>A missed check in or check out is shown here.</p>
           <button className="primary-button" type="button" onClick={() => navigate("/notifications")}>
             Open notifications
           </button>
@@ -1253,15 +1266,15 @@ function AIInsights() {
         <div>
 
           <p className="eyebrow">
-            ARTIFICIAL INTELLIGENCE
+            Reports
           </p>
 
           <h2>
-            AI Workforce Intelligence
+            Reports
           </h2>
 
           <p>
-            Predictive insights to support better workforce decisions.
+            Headcount, attendance, and review counts for this company.
           </p>
 
         </div>

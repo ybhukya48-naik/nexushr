@@ -379,7 +379,7 @@ export default function Notifications() {
     return (
       <div className="page-heading">
         <div>
-          <p className="eyebrow">WORKFORCE COMMUNICATION</p>
+          <p className="eyebrow">Updates</p>
           <h2>Notifications</h2>
           <p>Loading notifications...</p>
         </div>
@@ -391,7 +391,7 @@ export default function Notifications() {
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">WORKFORCE COMMUNICATION</p>
+          <p className="eyebrow">Updates</p>
           <h2>Notifications</h2>
           <p>
             {employee
