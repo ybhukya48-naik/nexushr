@@ -188,8 +188,57 @@
 .hr-lunch {
   display: flex;
   flex-wrap: wrap;
-  align-items: end;
-  gap: 12px;
+  align-items: center;
+  gap: 16px;
+}
+
+.hr-timer {
+  min-width: 140px;
+}
+
+.hr-timer span,
+.hr-timer em {
+  display: block;
+  color: #667085;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.hr-timer strong {
+  display: block;
+  font-size: 28px;
+  letter-spacing: 1px;
+  color: #3b2f80;
+}
+
+.hr-view-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hr-view-tabs button {
+  border: 1px solid #d9d0f5;
+  background: #fff;
+  color: #3b2f80;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hr-view-tabs button.active {
+  background: #6941c6;
+  color: #fff;
+}
+
+.hr-date-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #667085;
 }
 
 .hr-lunch .hr-card-title,

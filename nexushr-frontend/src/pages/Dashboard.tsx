@@ -88,6 +88,34 @@ function upcomingHolidays(extra: CompanyHoliday[], company: string): HolidayMark
     .slice(0, 3);
 }
 
+function formatTimer(totalSeconds: number) {
+  const safe = Math.max(0, totalSeconds);
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = safe % 60;
+  return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function isoDate(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function spanDates(kind: "week" | "lastWeek") {
+  const today = new Date();
+  const weekday = today.getDay();
+  const mondayOffset = weekday === 0 ? 6 : weekday - 1;
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - mondayOffset);
+  if (kind === "lastWeek") {
+    start.setDate(start.getDate() - 7);
+  }
+  return Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + index);
+    return isoDate(date);
+  });
+}
+
 function displayDate(value?: string) {
   if (!value) {
     return "—";
@@ -117,6 +145,10 @@ export default function Dashboard() {
   const [punching, setPunching] = useState(false);
   const [punchNote, setPunchNote] = useState("");
   const [personHistory, setPersonHistory] = useState<AttendanceRecord[]>([]);
+  const [rangeRows, setRangeRows] = useState<AttendanceRecord[]>([]);
+  const [rosterView, setRosterView] = useState<"date" | "week" | "lastWeek" | "month">("date");
+  const [rosterDate, setRosterDate] = useState(todayIso);
+  const [clockNow, setClockNow] = useState(() => new Date());
 
   useEffect(() => {
     let cancelled = false;
@@ -173,6 +205,7 @@ export default function Dashboard() {
           bucket.push(row);
           byDate.set(key, bucket);
         }
+        setRangeRows(monthRows);
         setWeek(dates.slice(-7).map((date) => ({
           label: date.slice(8),
           present: (byDate.get(date) ?? []).filter((row) =>
@@ -216,6 +249,11 @@ export default function Dashboard() {
       cancelled = true;
     };
   }, [lunchEmployeeId, refreshTick]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   if (loading) {
     return (
@@ -263,15 +301,21 @@ export default function Dashboard() {
   const maxPresent = Math.max(1, ...week.map((day) => day.present));
   const now = new Date();
   const displayName = me?.fullName || localStorage.getItem("nexushr_user") || "there";
+  const myRecord = todayRows.find((row) => row.employee?.id === me?.id);
+  const selfOpen = Boolean(myRecord?.checkInTime && !myRecord?.checkOutTime);
+  const selfOut = Boolean(myRecord?.checkOutTime);
+  const lunchStarted = selfOut ? new Date(String(myRecord?.checkOutTime)).getTime() : 0;
+  const lunchSeconds = lunchStarted ? Math.max(0, Math.floor((clockNow.getTime() - lunchStarted) / 1000)) : 0;
+  const workSeconds = (() => {
+    if (!myRecord?.checkInTime) {
+      return 0;
+    }
+    const start = new Date(myRecord.checkInTime).getTime();
+    const end = myRecord.checkOutTime ? new Date(myRecord.checkOutTime).getTime() : clockNow.getTime();
+    const breakMs = (myRecord.breakMinutes ?? 0) * 60_000;
+    return Math.max(0, Math.floor((end - start - breakMs) / 1000));
+  })();
   const lunchPerson = people.find((person) => String(person.id) === lunchEmployeeId);
-  const lunchRecord = todayRows.find((row) => String(row.employee?.id) === lunchEmployeeId);
-  const lunchOpen = Boolean(
-    lunchPerson && !lunchPerson.siteVisitor && lunchRecord?.checkInTime && !lunchRecord.checkOutTime,
-  );
-  const lunchResume = Boolean(
-    lunchPerson && !lunchPerson.siteVisitor && lunchRecord?.checkOutTime,
-  );
-
   function viewAllToday() {
     setLunchEmployeeId("");
     setPunchNote("");
@@ -291,25 +335,21 @@ export default function Dashboard() {
     }, 0);
   }
 
-  async function punchLunch(kind: "out" | "in") {
-    if (!lunchPerson) {
+  async function punchSelf(kind: "out" | "in") {
+    if (!me) {
       return;
     }
     setPunching(true);
     setPunchNote("");
     try {
-      await (kind === "out" ? checkOut(lunchPerson.id) : checkIn(lunchPerson.id));
-      setPunchNote(
-        kind === "out"
-          ? "Lunch check-out saved. Working hours are paused."
-          : "Lunch check-in saved. Working hours continue.",
-      );
+      await (kind === "out" ? checkOut(me.id) : checkIn(me.id));
+      setPunchNote(kind === "out" ? "Checked out. The lunch hour can be any time." : "Checked in. Working hours continue.");
       setRefreshTick((value) => value + 1);
     } catch (err) {
       setPunchNote(
         err instanceof Error
           ? err.message.replace(/^Attendance API failed:\s*/i, "")
-          : "Lunch punch could not be saved.",
+          : "The punch could not be saved.",
       );
     } finally {
       setPunching(false);
@@ -455,40 +495,21 @@ export default function Dashboard() {
       </section>
 
       <section className="hr-card hr-lunch">
-        <strong>Lunch</strong>
-        <label className="hr-lunch-pick">
-          <span>Employee</span>
-          <select
-            value={lunchEmployeeId}
-            onChange={(event) => {
-              setLunchEmployeeId(event.target.value);
-              setPunchNote("");
-            }}
-          >
-            <option value="">Select an employee</option>
-            {people.filter((person) => person.active).map((person) => (
-              <option key={person.id} value={person.id}>
-                {person.fullName} - {person.employeeCode}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div>
+          <strong>Check in and check out</strong>
+          <p className="hr-empty">The lunch hour is flexible. Check out when you leave, and check in when you are back. It can be any hour.</p>
+        </div>
+        <div className="hr-timer" aria-live="polite">
+          <span>{selfOut ? "Lunch timer" : "Work timer"}</span>
+          <strong>{formatTimer(selfOut ? lunchSeconds : workSeconds)}</strong>
+          <em>{selfOut ? "1 hour is paid. Extra time stays a break." : "1 flexible hour"}</em>
+        </div>
         <div className="attendance-actions">
-          <button
-            className="secondary-button"
-            type="button"
-            disabled={punching || !windowsPunch || !lunchOpen}
-            onClick={() => void punchLunch("out")}
-          >
-            Start lunch
+          <button className="primary-button" type="button" disabled={punching || !windowsPunch || !me || selfOpen} onClick={() => void punchSelf("in")}>
+            Check in
           </button>
-          <button
-            className="secondary-button"
-            type="button"
-            disabled={punching || !windowsPunch || !lunchResume}
-            onClick={() => void punchLunch("in")}
-          >
-            End lunch
+          <button className="secondary-button" type="button" disabled={punching || !windowsPunch || !me || !selfOpen} onClick={() => void punchSelf("out")}>
+            Check out
           </button>
         </div>
         {!windowsPunch && <p className="hr-empty">Check in and check out work only on a Windows computer.</p>}
@@ -497,19 +518,32 @@ export default function Dashboard() {
 
       <section className="hr-card" id="employee-month">
         <div className="hr-card-title">
-          <h3>{lunchPerson ? `${lunchPerson.fullName} · last 30 days` : "All employees today"}</h3>
+          <h3>{lunchPerson ? `${lunchPerson.fullName} · last 30 days` : "All employees"}</h3>
           {lunchPerson ? (
             <button type="button" onClick={viewAllToday}>View all</button>
           ) : (
-            <button type="button" onClick={() => navigate("/attendance")}>View attendance</button>
+            <div className="hr-view-tabs">
+              <button type="button" className={rosterView === "date" ? "active" : ""} onClick={() => setRosterView("date")}>Date</button>
+              <button type="button" className={rosterView === "week" ? "active" : ""} onClick={() => setRosterView("week")}>Week</button>
+              <button type="button" className={rosterView === "lastWeek" ? "active" : ""} onClick={() => setRosterView("lastWeek")}>Last week</button>
+              <button type="button" className={rosterView === "month" ? "active" : ""} onClick={() => setRosterView("month")}>Month</button>
+            </div>
           )}
         </div>
         {lunchPerson ? (
-          <p className="hr-empty">Only {lunchPerson.fullName}'s check-in, check-out, and working hours. View all returns to everyone for today.</p>
+          <p className="hr-empty">Only {lunchPerson.fullName}'s check-in, check-out, and working hours. View all returns to everyone.</p>
         ) : (
-          <p className="hr-empty">{present.length} present today. Click a name to open that employee's month.</p>
+          <p className="hr-empty">
+            Click a name to open that person's month.
+          </p>
         )}
-        {!lunchPerson ? (
+        {!lunchPerson && rosterView === "date" && (
+          <label className="hr-date-pick">
+            Date
+            <input type="date" value={rosterDate} onChange={(event) => setRosterDate(event.target.value)} />
+          </label>
+        )}
+        {!lunchPerson && rosterView === "date" ? (
         <div className="hr-history-table">
           <table className="employees-table">
             <thead>
@@ -521,12 +555,12 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {people.filter((person) => person.active).length === 0 ? (
+              {activePeople.length === 0 ? (
                 <tr>
                   <td colSpan={4}>No employees for this company.</td>
                 </tr>
-              ) : people.filter((person) => person.active).map((person) => {
-                const row = todayRows.find((item) => item.employee?.id === person.id);
+              ) : activePeople.map((person) => {
+                const row = (rosterDate === today ? todayRows : rangeRows).find((item) => item.employee?.id === person.id && String(item.attendanceDate ?? "").slice(0, 10) === rosterDate);
                 const checkOut = shownCheckOut(row);
                 return (
                   <tr key={person.id}>
@@ -538,6 +572,59 @@ export default function Dashboard() {
                     <td>{row?.checkInTime ? clock(row.checkInTime) : "—"}</td>
                     <td>{checkOut ? clock(checkOut) : row?.checkInTime ? "Still in" : "—"}</td>
                     <td>{row?.checkInTime ? `${Math.floor(clockedWorkMinutes(row) / 60)}h ${clockedWorkMinutes(row) % 60}m` : "No check-in"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        ) : null}
+        {!lunchPerson && (rosterView === "week" || rosterView === "lastWeek") ? (
+        <div className="hr-history-table">
+          <table className="employees-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                {spanDates(rosterView).map((date) => <th key={date}>{displayDate(date).slice(0, 6)}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {activePeople.map((person) => (
+                <tr key={person.id}>
+                  <td>
+                    <button type="button" className="panel-link" onClick={() => openEmployeeMonth(person.id)}>{person.fullName}</button>
+                  </td>
+                  {spanDates(rosterView).map((date) => {
+                    const row = rangeRows.find((item) => item.employee?.id === person.id && String(item.attendanceDate ?? "").slice(0, 10) === date);
+                    return <td key={date}>{row?.checkInTime ? `${Math.floor(clockedWorkMinutes(row) / 60)}h ${clockedWorkMinutes(row) % 60}m` : "—"}</td>;
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        ) : null}
+        {!lunchPerson && rosterView === "month" ? (
+        <div className="hr-history-table">
+          <table className="employees-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Days present</th>
+                <th>Hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activePeople.map((person) => {
+                const rows = rangeRows.filter((item) => item.employee?.id === person.id && item.checkInTime);
+                const minutes = rows.reduce((sum, row) => sum + clockedWorkMinutes(row), 0);
+                return (
+                  <tr key={person.id}>
+                    <td>
+                      <button type="button" className="panel-link" onClick={() => openEmployeeMonth(person.id)}>{person.fullName}</button>
+                    </td>
+                    <td>{rows.length}</td>
+                    <td>{Math.floor(minutes / 60)}h {minutes % 60}m</td>
                   </tr>
                 );
               })}
