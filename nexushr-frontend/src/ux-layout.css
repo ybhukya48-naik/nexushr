@@ -21,7 +21,8 @@
   cursor: pointer;
 }
 
-.ux-tabs button.active {
+.ux-tabs button.active,
+.ux-tabs span.active {
   background: #6941c6;
   color: #fff;
 }
