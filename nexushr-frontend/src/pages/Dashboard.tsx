@@ -19,6 +19,8 @@ import {
   getLeaves,
   type AttendanceAuditEntry,
   clockedWorkMinutes,
+  isCheckoutMissing,
+  isWindowsComputer,
   monthDateKeys,
   shownCheckOut,
   type AttendanceRecord,
@@ -282,9 +284,8 @@ export default function Dashboard() {
     employee.active
     && !todayRows.some((row) => row.employee?.id === employee.id && row.checkInTime),
   ).length;
-  const missingCheckOut = todayRows.filter((row) =>
-    row.checkInTime && !row.checkOutTime && row.attendanceStatus !== "INACTIVE",
-  ).length;
+  const missingCheckOut = todayRows.filter((row) => isCheckoutMissing(row)).length;
+  const windowsPunch = isWindowsComputer();
   const late = todayRows.filter((row) => row.lateWarning || (row.lateArrivalMinutes ?? 0) > 0).length;
   const maxPresent = Math.max(1, ...week.map((day) => day.present));
   const now = new Date();
@@ -400,7 +401,7 @@ export default function Dashboard() {
           <button
             className="secondary-button"
             type="button"
-            disabled={punching || !lunchOpen}
+            disabled={punching || !windowsPunch || !lunchOpen}
             onClick={() => void punchLunch("out")}
           >
             Lunch Check Out
@@ -408,12 +409,13 @@ export default function Dashboard() {
           <button
             className="secondary-button"
             type="button"
-            disabled={punching || !lunchResume}
+            disabled={punching || !windowsPunch || !lunchResume}
             onClick={() => void punchLunch("in")}
           >
             Lunch Check In
           </button>
         </div>
+        {!windowsPunch && <p className="hr-empty">Check-in and check-out work only on a Windows computer.</p>}
         {punchNote && <p className="hr-empty">{punchNote}</p>}
       </section>
 
@@ -496,11 +498,11 @@ export default function Dashboard() {
                 </button>
               </li>
             ))}
-            {todayRows.filter((row) => row.checkInTime && !row.checkOutTime && row.employee).slice(0, 6).map((row) => (
+            {todayRows.filter((row) => isCheckoutMissing(row) && row.employee).slice(0, 6).map((row) => (
               <li key={`out-${row.id}`}>
                 <button type="button" onClick={() => openEmployeeMonth(row.employee.id)}>
                   <strong>{row.employee.fullName}</strong>
-                  <span>Checked in {clock(row.checkInTime)}. Check-out is missing.</span>
+                  <span>Checked in {clock(row.checkInTime)}. Check-out was missed. Automatic logout is at 11:00 PM.</span>
                 </button>
               </li>
             ))}

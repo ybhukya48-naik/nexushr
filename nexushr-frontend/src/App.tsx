@@ -34,6 +34,8 @@ import {
   sendAttendanceHeartbeat,
   type AttendanceAuditEntry,
   clockedWorkMinutes,
+  isCheckoutMissing,
+  isWindowsComputer,
   monthDateKeys,
   readDashboardSnapshot,
   shownCheckOut,
@@ -1023,8 +1025,11 @@ function EmployeeDashboard() {
         const workday = new Date().getDay() !== 0;
         const notices = [
           workday && !todayRecord?.checkInTime ? "Check-in is missing today." : "",
-          todayRecord?.checkInTime && !todayRecord.checkOutTime
-            ? "Check-out is missing. Working hours keep running until you check out."
+          todayRecord?.checkInTime && !todayRecord.checkOutTime && !isCheckoutMissing(todayRecord)
+            ? "You are still checked in. Signing out of the website does not check you out. If you do not check out, logout is automatic at 11:00 PM."
+            : "",
+          isCheckoutMissing(todayRecord)
+            ? "Check-out was missed. Automatic logout at 11:00 PM keeps the attendance record."
             : "",
           todayRecord?.yellowFlag
             ? "Desktop was inactive for more than 15 minutes. This is a warning."
@@ -1046,7 +1051,7 @@ function EmployeeDashboard() {
                   <button
                     className="secondary-button"
                     type="button"
-                    disabled={punching || !todayRecord?.checkInTime || Boolean(todayRecord?.checkOutTime)}
+                    disabled={punching || !isWindowsComputer() || !todayRecord?.checkInTime || Boolean(todayRecord?.checkOutTime)}
                     onClick={() => void punchLunch("out")}
                   >
                     Lunch Check Out
@@ -1054,13 +1059,16 @@ function EmployeeDashboard() {
                   <button
                     className="secondary-button"
                     type="button"
-                    disabled={punching || !todayRecord?.checkOutTime}
+                    disabled={punching || !isWindowsComputer() || !todayRecord?.checkOutTime}
                     onClick={() => void punchLunch("in")}
                   >
                     Lunch Check In
                   </button>
                 </div>
               </div>
+              {!isWindowsComputer() && (
+                <p>Check-in and check-out work only on a Windows computer. Signing out of the website does not check you out.</p>
+              )}
               {punchNote && <p>{punchNote}</p>}
               {notices.length > 0 && (
                 <ul className="dash-notices">

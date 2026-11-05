@@ -54,6 +54,33 @@ function logoutDeadlineMs(record?: { attendanceDate?: string; checkInTime?: stri
   return Number.isNaN(deadline.getTime()) ? null : deadline.getTime();
 }
 
+export function isWindowsComputer() {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+  const ua = navigator.userAgent || "";
+  if (/Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(ua)) {
+    return false;
+  }
+  const platform = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform;
+  if (platform) {
+    return platform === "Windows";
+  }
+  return /Windows NT/i.test(ua);
+}
+
+/** A missed check-out is only after 11:00 PM. Signing out of the site is not a check-out. */
+export function isCheckoutMissing(
+  record?: { checkInTime?: string; checkOutTime?: string; attendanceDate?: string } | null,
+  now = new Date(),
+) {
+  if (!record?.checkInTime || record.checkOutTime) {
+    return false;
+  }
+  const deadline = logoutDeadlineMs(record);
+  return deadline != null && now.getTime() >= deadline;
+}
+
 /** Checkout to show. After 11:00 PM the day is closed even if the punch was missed. */
 export function shownCheckOut(
   record?: { checkInTime?: string; checkOutTime?: string; attendanceDate?: string } | null,
@@ -477,6 +504,7 @@ export default function Attendance() {
   const isManagementRole = ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"].includes(currentRole);
   const canPunch = currentRole === "EMPLOYEE";
   const siteVisitor = Boolean(currentEmployee?.siteVisitor);
+  const officePunchAllowed = isWindowsComputer() || siteVisitor;
   const historyEmployeeId = isManagementRole
     ? selectedEmployee
     : (currentEmployee ? String(currentEmployee.id) : "");
@@ -929,6 +957,9 @@ export default function Attendance() {
 
         {(canPunch || isManagementRole) && (
         <div className="attendance-actions">
+          {!officePunchAllowed && (
+            <p>Check-in and check-out work only on a Windows computer. A phone cannot punch. Signing out of the site does not check you out.</p>
+          )}
           {siteVisitor && (
             <label className="secondary-button">
               Site selfie
@@ -952,6 +983,7 @@ export default function Attendance() {
               )
             }
             disabled={
+              !officePunchAllowed ||
               loading ||
               !attendanceLoaded ||
               !isToday ||
@@ -990,6 +1022,7 @@ export default function Attendance() {
               )
             }
             disabled={
+              !officePunchAllowed ||
               loading ||
               !attendanceLoaded ||
               !isToday ||
@@ -998,7 +1031,9 @@ export default function Attendance() {
               (siteVisitor && !selfie)
             }
             title={
-              !isToday
+              !officePunchAllowed
+                ? "Check-out works only on a Windows computer."
+                : !isToday
                 ? "Check-out is available only for today."
                 : !sessionOpen
                   ? "Check in before checking out."
@@ -1027,6 +1062,7 @@ export default function Attendance() {
               )
             }
             disabled={
+              !officePunchAllowed ||
               loading ||
               !attendanceLoaded ||
               !isToday ||
@@ -1035,7 +1071,9 @@ export default function Attendance() {
               (siteVisitor && canPunch && !selfie)
             }
             title={
-              !actionEmployee
+              !officePunchAllowed
+                ? "Lunch check-out works only on a Windows computer."
+                : !actionEmployee
                 ? "Select an employee, then check out for lunch."
                 : !sessionOpen
                   ? "Check in first. Lunch check-out pauses working hours."
@@ -1056,6 +1094,7 @@ export default function Attendance() {
               )
             }
             disabled={
+              !officePunchAllowed ||
               loading ||
               !attendanceLoaded ||
               !isToday ||

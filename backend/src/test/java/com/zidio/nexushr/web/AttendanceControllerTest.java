@@ -100,6 +100,16 @@ class AttendanceControllerTest {
 
     @Test
     @WithMockUser(username = "employee@example.com", roles = "EMPLOYEE")
+    void checkIn_fromPhone_isForbidden() throws Exception {
+        mockMvc.perform(
+                post("/api/v1/attendance/check-in")
+                        .header("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile")
+        )
+        .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "employee@example.com", roles = "EMPLOYEE")
     void biometricCheckIn_isAllowedForEmployee() throws Exception {
 
         AttendanceRecord record = new AttendanceRecord();

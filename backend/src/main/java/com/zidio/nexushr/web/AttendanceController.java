@@ -5,11 +5,14 @@ import com.zidio.nexushr.service.AttendanceService;
 import com.zidio.nexushr.web.dto.AttendanceImportResponse;
 import com.zidio.nexushr.web.dto.AttendanceMetricsResponse;
 import com.zidio.nexushr.web.dto.AttendanceMonthlySummaryResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -36,8 +39,10 @@ public class AttendanceController {
     @PreAuthorize("#employeeId == null || @authorizationService.isEmployeeSelfOrManagement(#employeeId, authentication)")
     public AttendanceRecord checkIn(
             @RequestParam(required = false) Long employeeId,
-            Authentication authentication) {
+            Authentication authentication,
+            HttpServletRequest request) {
 
+        requireWindowsComputer(request);
         Long targetEmployeeId = employeeId != null
                 ? employeeId
                 : attendanceService.findEmployeeIdByUsername(authentication.getName());
@@ -50,8 +55,10 @@ public class AttendanceController {
     @PreAuthorize("#employeeId == null || @authorizationService.isEmployeeSelfOrManagement(#employeeId, authentication)")
     public AttendanceRecord checkOut(
             @RequestParam(required = false) Long employeeId,
-            Authentication authentication) {
+            Authentication authentication,
+            HttpServletRequest request) {
 
+        requireWindowsComputer(request);
         Long targetEmployeeId = employeeId != null
                 ? employeeId
                 : attendanceService.findEmployeeIdByUsername(authentication.getName());
@@ -64,8 +71,10 @@ public class AttendanceController {
     @PreAuthorize("#employeeId == null || @authorizationService.isEmployeeSelfOrManagement(#employeeId, authentication)")
     public AttendanceRecord biometricCheckIn(
             @RequestParam(required = false) Long employeeId,
-            Authentication authentication) {
+            Authentication authentication,
+            HttpServletRequest request) {
 
+        requireWindowsComputer(request);
         Long targetEmployeeId = employeeId != null
                 ? employeeId
                 : attendanceService.findEmployeeIdByUsername(authentication.getName());
@@ -77,8 +86,10 @@ public class AttendanceController {
     @PreAuthorize("#employeeId == null || @authorizationService.isEmployeeSelfOrManagement(#employeeId, authentication)")
     public AttendanceRecord biometricCheckOut(
             @RequestParam(required = false) Long employeeId,
-            Authentication authentication) {
+            Authentication authentication,
+            HttpServletRequest request) {
 
+        requireWindowsComputer(request);
         Long targetEmployeeId = employeeId != null
                 ? employeeId
                 : attendanceService.findEmployeeIdByUsername(authentication.getName());
@@ -225,5 +236,13 @@ public class AttendanceController {
             @PathVariable Long employeeId) {
 
         return attendanceService.listByEmployee(employeeId);
+    }
+
+    private void requireWindowsComputer(HttpServletRequest request) {
+        if (!WindowsAttendanceClient.allowed(request.getHeader("User-Agent"))) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Check-in and check-out work only on a Windows computer.");
+        }
     }
 }
