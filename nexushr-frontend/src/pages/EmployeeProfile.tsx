@@ -77,6 +77,7 @@ export default function EmployeeProfile() {
   const location = useLocation();
   const { id } = useParams();
   const mine = location.pathname === "/profile";
+  const canSeePay = mine || ["HR", "ADMIN", "SUPER_ADMIN"].includes(localStorage.getItem("nexushr_role") || "");
   const employeeId = Number(id);
   const pictureInput = useRef<HTMLInputElement>(null);
 
@@ -416,47 +417,6 @@ export default function EmployeeProfile() {
         </div>
       </div>
 
-      <div className="employees-panel">
-        <div className="employees-header">
-          <div>
-            <p className="page-eyebrow">ATTENDANCE</p>
-            <h2>{employee.fullName} · last 30 days</h2>
-            <p>Only this employee's check-in, check-out, and working hours.</p>
-          </div>
-        </div>
-        <div className="employees-table-wrap">
-          <table className="employees-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Check in</th>
-                <th>Check out</th>
-                <th>Working hours</th>
-              </tr>
-            </thead>
-            <tbody>
-              {monthLoading ? (
-                <tr>
-                  <td colSpan={4}>Loading this month...</td>
-                </tr>
-              ) : monthDateKeys().slice().reverse().map((date) => {
-                const row = month.find((item) => item.attendanceDate?.slice(0, 10) === date);
-                const checkOut = shownCheckOut(row);
-                const minutes = row?.checkInTime ? clockedWorkMinutes(row) : 0;
-                return (
-                  <tr key={date}>
-                    <td>{date}</td>
-                    <td>{row?.checkInTime ? row.checkInTime.slice(11, 19) : "—"}</td>
-                    <td>{checkOut ? checkOut.slice(11, 19) : row?.checkInTime ? "Still in" : "—"}</td>
-                    <td>{row?.checkInTime ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : "No check-in"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
       {editing && form ? (
         <form
           className="employees-panel"
@@ -616,6 +576,7 @@ export default function EmployeeProfile() {
               />
             </label>
 
+            {canSeePay && (
             <label>
               Base Salary
               <input
@@ -631,6 +592,7 @@ export default function EmployeeProfile() {
                 }
               />
             </label>
+            )}
 
             <label>
               Active
@@ -722,21 +684,15 @@ export default function EmployeeProfile() {
               <input value={employee.joiningDate} readOnly />
             </label>
 
+            {canSeePay && (
             <label>
               Base Salary
               <input
-                value={employee.baseSalary.toLocaleString("en-IN")}
+                value={`\u20B9${employee.baseSalary.toLocaleString("en-IN")}`}
                 readOnly
               />
             </label>
-
-            <label>
-              Account Status
-              <input
-                value={employee.active ? "Active" : "Inactive"}
-                readOnly
-              />
-            </label>
+            )}
 
             <label>
               Lifecycle Status
@@ -750,6 +706,48 @@ export default function EmployeeProfile() {
       )}
 
       <div className="employees-panel">
+        <div className="employees-header">
+          <div>
+            <p className="page-eyebrow">ATTENDANCE</p>
+            <h2>{employee.fullName} · last 30 days</h2>
+            <p>Only this employee's check-in, check-out, and working hours.</p>
+          </div>
+        </div>
+        <div className="employees-table-wrap">
+          <table className="employees-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Check in</th>
+                <th>Check out</th>
+                <th>Working hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monthLoading ? (
+                <tr>
+                  <td colSpan={4}>Loading this month...</td>
+                </tr>
+              ) : monthDateKeys().slice().reverse().map((date) => {
+                const row = month.find((item) => item.attendanceDate?.slice(0, 10) === date);
+                const checkOut = shownCheckOut(row);
+                const minutes = row?.checkInTime ? clockedWorkMinutes(row) : 0;
+                const shown = new Date(`${date}T00:00:00`);
+                return (
+                  <tr key={date}>
+                    <td>{Number.isNaN(shown.getTime()) ? date : shown.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                    <td>{row?.checkInTime ? row.checkInTime.slice(11, 19) : "—"}</td>
+                    <td>{checkOut ? checkOut.slice(11, 19) : row?.checkInTime ? "Still in" : "—"}</td>
+                    <td>{row?.checkInTime ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : "No check-in"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="employees-panel">
         <div className="panel-header">
           <div>
             <p className="page-eyebrow">
@@ -757,9 +755,7 @@ export default function EmployeeProfile() {
             </p>
             <h2>Lifecycle Actions</h2>
             <p>
-              Onboarding, approval, transfer, promotion,
-              resignation and offboarding will be added in
-              the next F01 steps.
+              Status changes are kept on this employee record.
             </p>
           </div>
         </div>

@@ -363,23 +363,30 @@ export default function Employees() {
     });
   }, [employees, search, department, status, company]);
 
-  const activeCount = employees.filter(
+  const companyPeople = useMemo(
+    () => employees.filter((employee) => isCompanyMatch(employee.companyCode, company)),
+    [employees, company],
+  );
+
+  const activeCount = companyPeople.filter(
     (employee) => employee.lifecycleStatus === "ACTIVE",
   ).length;
 
-  const onboardingCount = employees.filter(
+  const onboardingCount = companyPeople.filter(
     (employee) =>
       employee.lifecycleStatus === "PENDING_ONBOARDING" ||
       employee.lifecycleStatus === "PENDING_APPROVAL",
   ).length;
 
-  const offboardingCount = employees.filter(
+  const offboardingCount = companyPeople.filter(
     (employee) => employee.lifecycleStatus === "OFFBOARDING",
   ).length;
 
-  const offboardedCount = employees.filter(
+  const offboardedCount = companyPeople.filter(
     (employee) => employee.lifecycleStatus === "OFFBOARDED",
   ).length;
+
+  const canSeeSalary = role === "HR" || role === "ADMIN" || role === "SUPER_ADMIN";
 
   function updateForm(
     field: keyof EmployeeRequest,
@@ -541,7 +548,7 @@ export default function Employees() {
           <p className="page-eyebrow">Employee Lifecycle</p>
           <h1>Employees</h1>
           <p>
-            Gorle and Cyond teams from the staff sheets. A person reports to the manager marked on the sheet. Gorle managers report to Sunil. Office staff report to the admin.
+            People in the company selected in the sidebar.
           </p>
         </div>
 
@@ -567,7 +574,7 @@ export default function Employees() {
       <div className="employee-summary-grid">
         <div className="employee-summary-card">
           <span>Total Employees</span>
-          <strong>{employees.length}</strong>
+          <strong>{companyPeople.length}</strong>
         </div>
 
         <button type="button" className="employee-summary-card" onClick={() => setStatus("Active")}>
@@ -852,7 +859,7 @@ export default function Employees() {
         {loading && (
           <div className="employee-empty-state">
             <strong>Loading employees...</strong>
-            <span>Fetching employee records from NexusHR.</span>
+            <span>Loading employee records.</span>
           </div>
         )}
 
@@ -887,7 +894,7 @@ export default function Employees() {
                     <th>Role</th>
                     <th>Joining Date</th>
                     <th>Status</th>
-                    <th>Salary</th>
+                    {canSeeSalary && <th>Salary</th>}
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -932,9 +939,11 @@ export default function Employees() {
                           )}
                         </span>
                       </td>
+                      {canSeeSalary && (
                       <td>
                         {`\u20B9`}{employee.baseSalary.toLocaleString("en-IN")}
                       </td>
+                      )}
                       <td>
                         <div className="employee-actions">
                           <button
@@ -973,7 +982,7 @@ export default function Employees() {
 
                   {filteredEmployees.length === 0 && (
                     <tr>
-                      <td colSpan={9}>
+                      <td colSpan={canSeeSalary ? 10 : 9}>
                         <div className="employee-empty-state">
                           <strong>No employees found</strong>
                           <span>
@@ -989,7 +998,7 @@ export default function Employees() {
 
             <div className="employees-footer">
               Showing <strong>{filteredEmployees.length}</strong> of{" "}
-              <strong>{employees.length}</strong> employees
+              <strong>{companyPeople.length}</strong> employees
             </div>
           </>
         )}

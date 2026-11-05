@@ -6899,3 +6899,25 @@ textarea {
   color: #0b1f4b;
   min-width: 180px;
 }
+
+.main-area,
+.content,
+.hr-home,
+.employees-page,
+.leave-page {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.attendance-employee-cell .panel-link,
+.employee-profile-link {
+  border: 0;
+  background: transparent;
+  color: #3b2f80;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  padding: 0;
+}

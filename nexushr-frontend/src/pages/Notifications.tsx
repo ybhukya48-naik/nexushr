@@ -150,8 +150,15 @@ export default function Notifications() {
             }
           }
 
-          setEmployee(null);
-          setNotifications([]);
+          try {
+            const me = await getCurrentEmployee();
+            setEmployee(me);
+            setSelectedEmployeeId(String(me.id));
+            await loadEmployeeNotifications(me.id);
+          } catch {
+            setEmployee(null);
+            setNotifications([]);
+          }
           return;
         }
 
@@ -398,7 +405,7 @@ export default function Notifications() {
           onClick={() => void loadNotifications(false)}
           disabled={refreshing}
         >
-          {refreshing ? "Refreshing..." : "Refresh"}
+          {refreshing ? "Loading..." : "Refresh"}
         </button>
       </div>
 

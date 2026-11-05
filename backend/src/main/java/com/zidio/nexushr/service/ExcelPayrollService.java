@@ -99,6 +99,11 @@ public class ExcelPayrollService {
 
     @Transactional
     public List<PayrollRecord> importPayroll(Path workbookPath, String payMonth) {
+        return importPayroll(workbookPath, payMonth, true);
+    }
+
+    @Transactional
+    public List<PayrollRecord> importPayroll(Path workbookPath, String payMonth, boolean emailPayslips) {
         if (workbookPath == null) {
             throw new IllegalArgumentException("Workbook cannot be null.");
         }
@@ -123,13 +128,21 @@ public class ExcelPayrollService {
             throw new IllegalStateException("Unable to read payroll Excel: " + ex.getMessage(), ex);
         }
 
-        return importSheets(sheets, payMonth);
+        return importSheets(sheets, payMonth, emailPayslips);
     }
 
     @Transactional
     public List<PayrollRecord> importSheets(
             List<CachedXlsx.XlsxSheet> sheets,
             String payMonth) {
+        return importSheets(sheets, payMonth, true);
+    }
+
+    @Transactional
+    public List<PayrollRecord> importSheets(
+            List<CachedXlsx.XlsxSheet> sheets,
+            String payMonth,
+            boolean emailPayslips) {
 
         if (sheets == null) {
             throw new IllegalArgumentException("Workbook cannot be null.");
@@ -222,8 +235,9 @@ public class ExcelPayrollService {
 
                         created.add(payroll);
 
-                        // Queue notification to be dispatched asynchronously
-                        notificationTasks.add(new SalaryNotificationTask(employee, payroll, payMonth));
+                        if (emailPayslips) {
+                            notificationTasks.add(new SalaryNotificationTask(employee, payroll, payMonth));
+                        }
 
                     } catch (Exception ex) {
                         log.warn("Error processing row {} in sheet {}: {}", rowIndex + 1, sheet.getName(), ex.getMessage());

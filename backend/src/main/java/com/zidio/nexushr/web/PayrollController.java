@@ -300,7 +300,8 @@ public class PayrollController {
     @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER')")
     public ResponseEntity<Map<String, Object>> importExcel(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("payMonth") String payMonth) {
+            @RequestParam("payMonth") String payMonth,
+            @RequestParam(name = "email", defaultValue = "false") boolean email) {
 
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Excel file is required");
@@ -332,7 +333,7 @@ public class PayrollController {
                 ));
             }
 
-            List<PayrollRecord> imported = excelPayrollService.importPayroll(tempPath, payMonth);
+            List<PayrollRecord> imported = excelPayrollService.importPayroll(tempPath, payMonth, email);
             ExcelPayrollService.SalaryEmailReport emails = excelPayrollService.lastEmailReport();
             List<Map<String, Object>> employees = new ArrayList<>();
             for (PayrollRecord record : imported) {
@@ -352,7 +353,9 @@ public class PayrollController {
             body.put("emailsSent", emails.sent());
             body.put("emailsFailed", emails.failed());
             body.put("emailErrors", emails.errors());
-            String emailNote = emails.failed() == 0
+            String emailNote = !email
+                    ? "Payslips were not emailed."
+                    : emails.failed() == 0
                     ? "Email sent to " + emails.sent() + " employee(s)."
                     : "Email sent to " + emails.sent() + " and failed for " + emails.failed()
                     + ". " + String.join("; ", emails.errors());

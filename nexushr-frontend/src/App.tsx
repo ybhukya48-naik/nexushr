@@ -308,7 +308,6 @@ function AppRoutes() {
       <main className="main-area">
         <header className="topbar">
           <div>
-            <p className="eyebrow">{workspaceName(workspace).toUpperCase()}</p>
             <h1>{workspaceName(workspace)}</h1>
           </div>
 
@@ -340,7 +339,7 @@ function AppRoutes() {
             </button>
 
             <button
-              className="primary-button"
+              className="secondary-button"
               onClick={handleLogout}
             >
               Logout
@@ -1124,7 +1123,7 @@ function EmployeeDashboard() {
                       const checkOut = shownCheckOut(row);
                       return (
                         <tr key={date}>
-                          <td>{date}</td>
+                          <td>{new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
                           <td>{pairs.length > 0 ? pairs.map((pair) => pair.checkIn).join(", ") : "—"}</td>
                           <td>{!row?.checkInTime ? "—" : !checkOut ? "Still in" : pairs.length > 0 ? pairs.map((pair) => pair.checkOut ?? "23:00").join(", ") : formatClock(checkOut)}</td>
                           <td>{row?.checkInTime ? hoursLabel(clockedWorkMinutes(row)) : "No check-in"}</td>
@@ -1275,9 +1274,7 @@ function AIInsights() {
           }
           disabled={loading}
         >
-          {loading
-            ? "Refreshing..."
-            : "Refresh"}
+          Refresh
         </button>
 
       </div>

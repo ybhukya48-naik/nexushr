@@ -200,12 +200,12 @@ export default function Leave() {
     <section className="leave-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">WORKFORCE OPERATIONS - F03</p>
-          <h2>Leave Management</h2>
+          <p className="eyebrow">Leave</p>
+          <h2>Leave</h2>
           <p>
             {isEmployee
               ? "Submit a leave request and follow its status."
-              : "Employee leave requests appear here. HR can review them and does not submit leave."}
+              : "Review leave requests for this company. Employees submit their own requests."}
           </p>
         </div>
 

@@ -45,11 +45,11 @@
 }
 
 .hr-kpis {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .hr-home-grid {
-  grid-template-columns: 1.3fr 1fr 0.7fr;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.7fr);
 }
 
 .hr-home-lower {
@@ -146,6 +146,13 @@
   gap: 6px;
 }
 
+.hr-bars em {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+  color: #3b2f80;
+}
+
 .hr-bars span {
   display: block;
   width: 100%;
@@ -238,6 +245,33 @@
 .hr-cal-holiday {
   background: #efe8ff;
   color: #6941c6;
+}
+
+.hr-actions {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.hr-actions button {
+  border: 1px solid #ece7fb;
+  background: #faf8ff;
+  color: #3b2f80;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 700;
+}
+
+.hr-home {
+  max-width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 1200px) {
+  .hr-home-grid,
+  .hr-home-lower {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 1000px) {

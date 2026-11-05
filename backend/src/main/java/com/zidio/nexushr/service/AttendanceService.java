@@ -512,7 +512,9 @@ public class AttendanceService {
         List<AttendanceRecord> records =
                 attendanceRepository.findByAttendanceDate(date);
 
-        long present = records.size();
+        long present = records.stream()
+                .filter(record -> record.getCheckInTime() != null)
+                .count();
 
         long checkedOut = records.stream()
                 .filter(record -> record.getCheckOutTime() != null)

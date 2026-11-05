@@ -129,6 +129,14 @@ function monthCells(year: number, monthIndex: number) {
   return cells;
 }
 
+function displayDate(value: string) {
+  const parsed = new Date(`${value.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const company = getWorkspaceCompany() ?? "CYOND";
@@ -350,7 +358,9 @@ export default function Dashboard() {
       <header className="hr-home-head">
         <div>
           <p>Good day, {displayName}</p>
-          <h2>Here is today for {company === "GORLE" ? "Gorle Group" : "CYOND"}.</h2>
+          <h2 title="A day is 9 hours from check-in: 8 hours of work and 1 flexible lunch hour. Three idle warnings cut half a day.">
+            Here is today for {company === "GORLE" ? "Gorle Group" : "CYOND"}.
+          </h2>
         </div>
         <time dateTime={today}>
           {now.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
@@ -363,7 +373,7 @@ export default function Dashboard() {
           <strong>{people.length || summary?.totalEmployees || 0}</strong>
         </button>
         <button type="button" onClick={() => navigate("/attendance")}>
-          <span>Present today</span>
+          <span>Present today · as of {now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</span>
           <strong>{present.length}</strong>
         </button>
         <button type="button" onClick={() => navigate("/leave")}>
@@ -428,6 +438,7 @@ export default function Dashboard() {
           <div className="hr-bars" aria-label="Present employees for the last seven days">
             {week.map((day) => (
               <button key={day.label} type="button" onClick={() => navigate("/attendance")}>
+                <em>{day.present}</em>
                 <span style={{ height: `${Math.max(8, (day.present / maxPresent) * 100)}%` }}></span>
                 <small>{day.label}</small>
               </button>
@@ -469,11 +480,10 @@ export default function Dashboard() {
               ))}
             </ul>
           )}
-          <p className="hr-empty">A day is 9 hours from check-in: 8 hours of work and 1 flexible lunch hour. Three idle warnings cut half a day.</p>
         </article>
 
         <article className="hr-card hr-actions">
-          <h3>Open</h3>
+          <h3>Shortcuts</h3>
           <button type="button" onClick={() => navigate("/attendance")}>Attendance</button>
           <button type="button" onClick={() => navigate("/leave")}>Leave</button>
           <button type="button" onClick={() => navigate("/payroll")}>Payroll</button>
@@ -581,7 +591,7 @@ export default function Dashboard() {
                 const checkOut = shownCheckOut(row);
                 return (
                   <tr key={date}>
-                    <td>{date}</td>
+                    <td>{displayDate(date)}</td>
                     <td>{row?.checkInTime ? clock(row.checkInTime) : "—"}</td>
                     <td>{checkOut ? clock(checkOut) : row?.checkInTime ? "Still in" : "—"}</td>
                     <td>{row?.checkInTime ? `${Math.floor(clockedWorkMinutes(row) / 60)}h ${clockedWorkMinutes(row) % 60}m` : "No check-in"}</td>
@@ -608,7 +618,7 @@ export default function Dashboard() {
                 <li key={`${leave.id ?? leave.startDate}-${leave.employee?.id ?? ""}`}>
                   <button type="button" onClick={() => navigate("/leave")}>
                     <strong>{leave.employee?.fullName || "Employee"}</strong>
-                    <span>{leave.startDate} to {leave.endDate}</span>
+                    <span>{displayDate(leave.startDate)} to {displayDate(leave.endDate)}</span>
                     <em>{leave.status}</em>
                   </button>
                 </li>

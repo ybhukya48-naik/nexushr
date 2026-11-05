@@ -590,7 +590,7 @@ export default function Attendance() {
     return {
       date,
       totalEmployees: employees.filter((employee) => employee.active === true).length,
-      present: attendanceRecords.length,
+      present: attendanceRecords.filter((record) => Boolean(record.checkInTime)).length,
       checkedOut: attendanceRecords.filter(
         (record) => Boolean(record.checkOutTime),
       ).length,
@@ -652,7 +652,7 @@ export default function Attendance() {
         const employeeMetrics: AttendanceMetrics = {
           date,
           totalEmployees: 1,
-          present: recordsForDate.length,
+          present: recordsForDate.filter((record) => Boolean(record.checkInTime)).length,
           checkedOut: recordsForDate.filter(
             (record) => Boolean(record.checkOutTime),
           ).length,
@@ -823,12 +823,12 @@ export default function Attendance() {
       String(record.employee.id) === selectedEmployee,
   );
 
-  const visibleMetrics: AttendanceMetrics = selectedEmployee
-    ? {
-        ...calculateFallbackMetrics(visibleRecords),
-        totalEmployees: visibleRecords.length > 0 ? 1 : 0,
-      }
-    : metrics ?? calculateFallbackMetrics(records);
+  const visibleMetrics: AttendanceMetrics = {
+    ...calculateFallbackMetrics(selectedEmployee ? visibleRecords : companyRecords),
+    totalEmployees: selectedEmployee
+      ? 1
+      : companyEmployees.filter((employee) => employee.active !== false).length,
+  };
 
   function formatTime(value?: string) {
     if (!value) {
@@ -1132,7 +1132,7 @@ export default function Attendance() {
             onClick={() => void load()}
             disabled={loading}
           >
-            {loading ? "Refreshing..." : " Refresh"}
+            {loading ? "Loading..." : "Refresh"}
           </button>
         </div>
 
@@ -1192,7 +1192,7 @@ export default function Attendance() {
             <div className="attendance-metric-icon">P</div>
             <span>Present</span>
             <strong>{visibleMetrics.present.toLocaleString()}</strong>
-            <small>Employees with attendance</small>
+            <small>Checked in today</small>
           </article>
 
           <article className="attendance-metric-card">
@@ -1274,8 +1274,8 @@ export default function Attendance() {
             <strong>{employee.fullName}</strong>
           )}
           <span>{employee.employeeCode}</span>
-          {record?.attendanceStatus === "INACTIVE" && (
-            <span className="attendance-inactive">Inactive</span>
+          {record?.attendanceStatus === "INACTIVE" && !record.checkInTime && (
+            <span className="attendance-inactive">No check-in</span>
           )}
           {record?.lateWarning && <span className="attendance-inactive">Late</span>}
           {record?.yellowFlag && <span className="attendance-inactive">Yellow</span>}
@@ -1321,7 +1321,7 @@ export default function Attendance() {
       </td>
 
       <td>
-        {record ? (
+        {record?.checkInTime ? (
           <span
             className={
               record.lateArrivalMinutes > 0
@@ -1334,7 +1334,7 @@ export default function Attendance() {
               : "On time"}
           </span>
         ) : (
-          <span className="attendance-value-normal">-</span>
+          <span className="attendance-value-normal">No check-in</span>
         )}
       </td>
 

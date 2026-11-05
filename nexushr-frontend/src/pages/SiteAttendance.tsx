@@ -86,7 +86,7 @@ export default function SiteAttendance() {
       const message = err instanceof Error ? err.message : "Login failed.";
       setError(
         message === "Failed to fetch"
-          ? "The NexusHR server is not reachable. Start it, then try again."
+          ? "The server is not reachable. Start it, then try again."
           : message,
       );
     } finally {
@@ -129,7 +129,7 @@ export default function SiteAttendance() {
   return (
     <main className="site-app">
       <section className="site-card">
-        <p>NexusHR site attendance</p>
+        <p>Site attendance</p>
         <h1>Check in with a selfie</h1>
         <p>
           This phone app is only for site staff. Check in and check out each need a photo.

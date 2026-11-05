@@ -97,6 +97,7 @@ export default function Payroll() {
   const [payslip, setPayslip] = useState<PayslipResponse | null>(null);
   const [payslipLoading, setPayslipLoading] = useState(false);
   const [emailingPayslip, setEmailingPayslip] = useState(false);
+  const [emailAfterImport, setEmailAfterImport] = useState(false);
 
   const companyEmployees = useMemo(
     () =>
@@ -131,6 +132,20 @@ export default function Payroll() {
             isCompanyMatch(record.employee.companyCode, selectedCompany)),
       ),
     [records, selectedCompany, payMonth],
+  );
+
+  const monthRows = useMemo(
+    () =>
+      (attendanceSummary?.employees ?? []).filter(
+        (row) =>
+          selectedCompany === "All Companies" ||
+          employees.some(
+            (employee) =>
+              employee.id === row.employeeId &&
+              isCompanyMatch(employee.companyCode, selectedCompany),
+          ),
+      ),
+    [attendanceSummary, employees, selectedCompany],
   );
 
   async function loadData() {
@@ -306,7 +321,7 @@ export default function Payroll() {
     setSalaryImportResult(null);
 
     try {
-      const result = await importPayrollExcel(payMonth, salaryFile);
+      const result = await importPayrollExcel(payMonth, salaryFile, emailAfterImport);
       setSalaryImportResult(result);
       setMessage(
         `✅ ${result.message} Attendance summary and payroll records updated.`
@@ -498,8 +513,8 @@ export default function Payroll() {
     <section className="employees-page">
       <div className="employees-header">
         <div>
-          <p className="page-eyebrow">F04 - Payroll</p>
-          <h1>Payroll Management</h1>
+          <p className="page-eyebrow">{selectedCompany === "GORLE" ? "Gorle Group" : selectedCompany === "CYOND" ? "CYOND" : selectedCompany}</p>
+          <h1>Payroll</h1>
           <p>
             Generate payroll, track salary payments and view employee
             payslips.
@@ -535,7 +550,7 @@ export default function Payroll() {
               onClick={() => void loadData()}
               disabled={loading}
             >
-              {loading ? "Refreshing..." : "Refresh Employees"}
+              {loading ? "Loading..." : "Refresh employees"}
             </button>
           </div>
         </div>
@@ -647,14 +662,33 @@ export default function Payroll() {
               />
             </label>
 
+            <label className="payroll-email-choice">
+              <input
+                type="checkbox"
+                checked={emailAfterImport}
+                onChange={(event) => setEmailAfterImport(event.target.checked)}
+              />
+              Email payslips after this import
+            </label>
+
             <button
               type="submit"
               className="primary-button"
               disabled={importingSalary}
+              onClick={(event) => {
+                if (
+                  emailAfterImport &&
+                  !window.confirm("Email payslips to every employee in this file?")
+                ) {
+                  event.preventDefault();
+                }
+              }}
             >
               {importingSalary
-                ? "Importing and emailing..."
-                : "Import salary and send email"}
+                ? "Importing..."
+                : emailAfterImport
+                  ? "Import salary and email payslips"
+                  : "Import salary"}
             </button>
 
             {salaryImportResult && (
@@ -719,15 +753,16 @@ export default function Payroll() {
           {attendanceSummary && (
             <div className="payroll-attendance-summary">
               <strong>
-                Attendance month summary ({attendanceSummary.payMonth})
+                Attendance month summary ({attendanceSummary.payMonth}
+                {selectedCompany === "All Companies" ? "" : ` · ${selectedCompany === "GORLE" ? "Gorle Group" : "CYOND"}`})
               </strong>
 
               <span>
-                {attendanceSummary.totalEmployees} employees, {(
-                  attendanceSummary.totalWorkedMinutes / 60
-                ).toFixed(1)} worked hours, {(
-                  attendanceSummary.totalShortfallMinutes / 60
-                ).toFixed(1)} shortfall hours.
+                {monthRows.length} employees, {monthRows
+                  .reduce((total, row) => total + row.workedHours, 0)
+                  .toFixed(1)} worked hours, {monthRows
+                  .reduce((total, row) => total + row.shortfallHours, 0)
+                  .toFixed(1)} shortfall hours.
               </span>
 
               <table>
@@ -737,7 +772,7 @@ export default function Payroll() {
                   </tr>
                 </thead>
                 <tbody>
-                  {attendanceSummary.employees.map((e) => (
+                  {monthRows.map((e) => (
                     <tr key={e.employeeId}>
                       <td>{e.employeeCode}</td><td>{e.fullName}</td>
                       <td>{e.workedHours.toFixed(1)}</td><td>{e.expectedHours.toFixed(1)}</td>

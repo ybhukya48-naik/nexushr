@@ -972,13 +972,14 @@ export function generatePayrollFromAttendance(
 export function importPayrollExcel(
   payMonth: string,
   file: File,
+  email = false,
 ) {
   const body = new FormData();
   body.append("file", file);
   body.append("payMonth", payMonth);
 
   return request<PayrollExcelImportResponse>(
-    `/payroll/import-excel`,
+    `/payroll/import-excel?email=${email ? "true" : "false"}`,
     {
       method: "POST",
       body,

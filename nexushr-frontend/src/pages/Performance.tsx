@@ -16,7 +16,7 @@ export default function Performance() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackRating, setFeedbackRating] = useState(3);
   const [feedbackComments, setFeedbackComments] = useState("");
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [feedbackSuccess, setFeedbackSuccess] = useState("");
@@ -173,7 +173,7 @@ export default function Performance() {
       setDashboard(refreshedDashboard);
       setSelectedEmployee(String(employeeId));
       setFeedbackComments("");
-      setFeedbackRating(5);
+      setFeedbackRating(3);
       setFeedbackSuccess(
         `Feedback submitted successfully for ${selected.fullName}.`,
       );
@@ -215,7 +215,7 @@ export default function Performance() {
       <div className="performance-page">
         <section className="performance-panel">
           <h3>Loading performance intelligence...</h3>
-          <p>Fetching live performance data from NexusHR.</p>
+          <p>Loading performance.</p>
         </section>
       </div>
     );
@@ -295,7 +295,7 @@ export default function Performance() {
       <section className="performance-stats">
         <div className="performance-stat-card featured">
           <div className="stat-card-top">
-            <span>Performance Score</span>
+            <span>Hours recorded</span>
           </div>
 
           <div className="score-row">
@@ -380,9 +380,9 @@ export default function Performance() {
 
           <PerformanceStat
             label="Shortfall"
-            value={`${scorecard?.shortfallHours ?? 0}`}
+            value={`${Math.max(0, Math.round(((scorecard?.expectedWorkHours ?? 0) - (scorecard?.workedHours ?? 0)) * 100) / 100)}`}
             suffix="h"
-            detail="Hours below expected"
+            detail={`Expected minus worked. Pay uses ${scorecard?.shortfallHours ?? 0} h after two leave days.`}
             icon="Shortfall"
           />
 
@@ -397,7 +397,7 @@ export default function Performance() {
 
         <div className="performance-hours-summary">
           <div>
-            <span>Attendance Performance</span>
+            <span>Share of expected hours</span>
             <strong>
               {scorecard?.averageScore ?? 0}/100
             </strong>
@@ -427,7 +427,7 @@ export default function Performance() {
           <div className="performance-panel-header">
             <div>
               <h3>Performance Reviews</h3>
-              <p>Live reviews stored in NexusHR.</p>
+              <p>Reviews saved for this employee.</p>
             </div>
           </div>
 
