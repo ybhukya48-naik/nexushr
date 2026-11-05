@@ -10,10 +10,8 @@ import {
 } from "../api";
 import {
   createLeave,
-  getLeaveBalance,
   getLeaves,
   updateLeaveStatus,
-  type LeaveBalance,
   type LeaveRequest,
 } from "./Attendance";
 
@@ -27,11 +25,12 @@ export default function Leave() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
-  const [balance, setBalance] = useState<LeaveBalance | null>(null);
+  const [leaveType, setLeaveType] = useState("CASUAL");
+  const [halfDay, setHalfDay] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [tab, setTab] = useState<"mine" | "approvals">("mine");
+  const [tab, setTab] = useState<"mine" | "approvals" | "holidays" | "policy">("mine");
   const [holidays, setHolidays] = useState<CompanyHoliday[]>([]);
 
   const role = localStorage.getItem("nexushr_role") || "HR";
@@ -82,12 +81,6 @@ export default function Leave() {
         setEmployees([me]);
         setSelectedCompany(me.companyCode || "CYOND");
 
-        try {
-          setBalance(await getLeaveBalance(me.id));
-        } catch {
-          // Balance is optional for rendering the page.
-        }
-
         return;
       }
 
@@ -106,21 +99,8 @@ export default function Leave() {
     void load();
   }, []);
 
-  async function selectEmployee(id: string) {
+  function selectEmployee(id: string) {
     setSelectedEmployee(id);
-    setBalance(null);
-
-    if (!id) return;
-
-    try {
-      setBalance(await getLeaveBalance(Number(id)));
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to load leave balance.",
-      );
-    }
   }
 
   async function submit(event: React.FormEvent) {
@@ -145,8 +125,10 @@ export default function Leave() {
       await createLeave(
         Number(selectedEmployee),
         startDate,
-        endDate,
+        halfDay ? startDate : endDate,
         reason.trim(),
+        leaveType,
+        halfDay,
       );
 
       setMessage("Leave request submitted successfully.");
@@ -156,13 +138,6 @@ export default function Leave() {
 
       await load();
 
-      if (selectedEmployee) {
-        try {
-          setBalance(await getLeaveBalance(Number(selectedEmployee)));
-        } catch {
-          // Ignore optional balance refresh errors.
-        }
-      }
     } catch (err) {
       setError(
         err instanceof Error
@@ -202,6 +177,27 @@ export default function Leave() {
 
 
   const pending = companyLeaves.filter((leave) => leave.status === "PENDING");
+  const balanceLeaves = companyLeaves.filter(
+    (leave) => !selectedEmployee || String(leave.employee?.id) === selectedEmployee,
+  );
+  function usedDays(type: string) {
+    return balanceLeaves
+      .filter((leave) => leave.status === "APPROVED" && (leave.leaveType || "EARNED") === type)
+      .reduce((sum, leave) => {
+        if (leave.halfDay && leave.startDate === leave.endDate) {
+          return sum + 0.5;
+        }
+        const from = new Date(`${leave.startDate}T00:00:00`);
+        const to = new Date(`${leave.endDate}T00:00:00`);
+        const days = Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
+        return sum + Math.max(0, days);
+      }, 0);
+  }
+  const leaveCards = [
+    ["Casual", usedDays("CASUAL"), 12],
+    ["Sick", usedDays("SICK"), 7],
+    ["Earned", usedDays("EARNED"), 15],
+  ] as const;
   const shown = new Date(`${startDate || "2000-01-01"}T00:00:00`);
   const end = new Date(`${endDate || startDate || "2000-01-01"}T00:00:00`);
   let workingDays = 0;
@@ -218,32 +214,30 @@ export default function Leave() {
   return (
     <section className="leave-page">
       <div className="ux-tabs">
-        <button type="button" className={tab === "mine" ? "active" : ""} onClick={() => setTab("mine")}>
-          {isEmployee ? "My leave" : "Leave"}
-        </button>
-        <button type="button" className={tab === "approvals" ? "active" : ""} onClick={() => setTab("approvals")}>
-          Approvals ({pending.length})
-        </button>
-        <button type="button" className="ux-tabs-action" onClick={() => setTab("mine")}>
-          Apply leave
-        </button>
+        <button type="button" className={tab === "mine" ? "active" : ""} onClick={() => setTab("mine")}>My leave</button>
+        <button type="button" className={tab === "approvals" ? "active" : ""} onClick={() => setTab("approvals")}>Approvals ({pending.length})</button>
+        <button type="button" className={tab === "holidays" ? "active" : ""} onClick={() => setTab("holidays")}>Holidays</button>
+        <button type="button" className={tab === "policy" ? "active" : ""} onClick={() => setTab("policy")}>Policy</button>
+        <button type="button" className="ux-tabs-action" onClick={() => setTab("mine")}>Apply leave</button>
       </div>
 
       <div className="ux-balances">
+        {leaveCards.map(([label, used, total]) => (
+          <article key={label}>
+            <span>{label}</span>
+            <strong>{Math.max(0, total - used)}</strong>
+            <em>of {total}</em>
+          </article>
+        ))}
         <article>
-          <span>Days left</span>
-          <strong>{balance?.remainingDays ?? "—"}</strong>
-          <em>of {balance?.annualEntitlementDays ?? "—"}</em>
+          <span>Comp-off</span>
+          <strong>{usedDays("COMP_OFF")}</strong>
+          <em>approved</em>
         </article>
         <article>
-          <span>Used</span>
-          <strong>{balance?.usedDays ?? 0}</strong>
-          <em>this year</em>
-        </article>
-        <article>
-          <span>Pending</span>
-          <strong>{pending.length}</strong>
-          <em>waiting</em>
+          <span>LOP taken</span>
+          <strong>{usedDays("LOP")}</strong>
+          <em>days</em>
         </article>
       </div>
 
@@ -259,6 +253,39 @@ export default function Leave() {
         </div>
       )}
 
+      {tab === "holidays" && (
+        <section className="panel">
+          <div className="panel-header">
+            <h3>Holidays</h3>
+            <p>Company holidays. These days are not counted as leave.</p>
+          </div>
+          {holidays.length === 0 ? (
+            <p>No holidays are saved yet.</p>
+          ) : (
+            <ul>
+              {holidays
+                .slice()
+                .sort((a, b) => a.holidayDate.localeCompare(b.holidayDate))
+                .map((holiday) => (
+                  <li key={holiday.id}>
+                    {new Date(`${holiday.holidayDate}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                    {" · "}
+                    {holiday.name}
+                  </li>
+                ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {tab === "policy" && (
+        <section className="panel">
+          <h3>Leave policy</h3>
+          <p>Casual 12 days. Sick 7 days. Earned 15 days. Comp-off is approved extra time. LOP is unpaid.</p>
+          <p>A request can be a full day or a half day. Sundays and listed holidays are not counted. The request waits until it is approved or rejected.</p>
+        </section>
+      )}
+
       {tab === "mine" && (
       <section className="panel leave-request-panel">
         <div className="panel-header">
@@ -266,9 +293,11 @@ export default function Leave() {
             <p className="eyebrow">Apply leave</p>
             <h3>Apply leave</h3>
             <p>
-              {workingDays > 0
-                ? `${workingDays} working day${workingDays === 1 ? "" : "s"} (Sundays and holidays are not counted). Balance after this request is not reduced until it is approved.`
-                : "Choose the dates. Sundays and holidays are not counted. One casual leave and one paid leave each month."}
+              {halfDay
+                ? "0.5 working day. Balance changes after this request is approved."
+                : workingDays > 0
+                ? `${workingDays} working day${workingDays === 1 ? "" : "s"}. Sundays and holidays are not counted. Balance changes after approval.`
+                : "Choose the type and the dates. Sundays and holidays are not counted."}
             </p>
           </div>
         </div>
@@ -291,7 +320,7 @@ export default function Leave() {
                 <select
                   value={selectedEmployee}
                   onChange={(event) =>
-                    void selectEmployee(event.target.value)
+                    selectEmployee(event.target.value)
                   }
                   required
                 >
@@ -303,6 +332,28 @@ export default function Leave() {
                   ))}
                 </select>
               )}
+            </label>
+
+            <label>
+              Type
+              <select value={leaveType} onChange={(event) => setLeaveType(event.target.value)}>
+                <option value="CASUAL">Casual · 12</option>
+                <option value="SICK">Sick · 7</option>
+                <option value="EARNED">Earned · 15</option>
+                <option value="COMP_OFF">Comp-off</option>
+                <option value="LOP">LOP</option>
+              </select>
+            </label>
+
+            <label>
+              Day
+              <select
+                value={halfDay ? "half" : "full"}
+                onChange={(event) => setHalfDay(event.target.value === "half")}
+              >
+                <option value="full">Full day</option>
+                <option value="half">Half day</option>
+              </select>
             </label>
 
             <label>
@@ -388,6 +439,7 @@ export default function Leave() {
                   <tr key={leave.id}>
                     <td>
                       <strong>{leave.employee?.fullName || "-"}</strong>
+                      <div>{leave.leaveType === "COMP_OFF" ? "Comp-off" : leave.leaveType === "LOP" ? "LOP" : leave.leaveType === "SICK" ? "Sick" : leave.leaveType === "CASUAL" ? "Casual" : "Earned"}{leave.halfDay ? " · half day" : ""}</div>
                     </td>
 
                     <td>

@@ -97,19 +97,9 @@ public class LeaveService {
             );
         }
 
-        long requestedDays = ChronoUnit.DAYS.between(
-                request.getStartDate(),
-                request.getEndDate()
-        ) + 1;
-
-        long usedDays = getApprovedLeaveDays(employee.getId());
-
-        if (usedDays + requestedDays > annualEntitlementDays) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Leave request exceeds the remaining annual leave balance"
-            );
-        }
+        String leaveType = normalizeLeaveType(request.getLeaveType());
+        request.setLeaveType(leaveType);
+        enforceLeavePolicy(employee.getId(), leaveType, countedDays(request));
 
         request.setEmployee(employee);
 
@@ -177,18 +167,11 @@ public class LeaveService {
         }
 
         if (status == LeaveStatus.APPROVED) {
-
-            long requestedDays = request.getDurationDays();
-            long usedDays = getApprovedLeaveDays(
-                    request.getEmployee().getId()
+            enforceLeavePolicy(
+                    request.getEmployee().getId(),
+                    normalizeLeaveType(request.getLeaveType()),
+                    countedDays(request)
             );
-
-            if (usedDays + requestedDays > annualEntitlementDays) {
-                throw new ResponseStatusException(
-                        HttpStatus.CONFLICT,
-                        "Approving this leave would exceed the annual leave balance"
-                );
-            }
         }
 
         request.setStatus(status);
@@ -226,6 +209,56 @@ public class LeaveService {
                 usedDays,
                 remainingDays
         );
+    }
+
+    private String normalizeLeaveType(String leaveType) {
+        if (leaveType == null || leaveType.isBlank()) {
+            return "";
+        }
+        return leaveType.trim().toUpperCase();
+    }
+
+    private double countedDays(LeaveRequest leave) {
+        double days = ChronoUnit.DAYS.between(leave.getStartDate(), leave.getEndDate()) + 1;
+        if (leave.isHalfDay() && leave.getStartDate().equals(leave.getEndDate())) {
+            return 0.5;
+        }
+        return days;
+    }
+
+    private void enforceLeavePolicy(Long employeeId, String leaveType, double requestedDays) {
+        Integer cap = switch (leaveType) {
+            case "CASUAL" -> 12;
+            case "SICK" -> 7;
+            case "EARNED" -> 15;
+            case "COMP_OFF", "LOP" -> 0;
+            default -> null;
+        };
+        if (cap == null) {
+            long usedDays = getApprovedLeaveDays(employeeId);
+            if (usedDays + requestedDays > annualEntitlementDays) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Leave request exceeds the remaining annual leave balance"
+                );
+            }
+            return;
+        }
+        if (cap == 0) {
+            return;
+        }
+        double used = leaveRequestRepository
+                .findByEmployee_IdAndStatus(employeeId, LeaveStatus.APPROVED)
+                .stream()
+                .filter(leave -> leaveType.equals(normalizeLeaveType(leave.getLeaveType())))
+                .mapToDouble(this::countedDays)
+                .sum();
+        if (used + requestedDays > cap) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "This request is more than the " + cap + " " + leaveType.toLowerCase() + " days in the policy"
+            );
+        }
     }
 
     private long getApprovedLeaveDays(Long employeeId) {

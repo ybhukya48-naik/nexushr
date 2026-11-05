@@ -394,6 +394,8 @@ export interface LeaveRequest {
   startDate: string;
   endDate: string;
   reason: string;
+  leaveType?: "CASUAL" | "SICK" | "EARNED" | "COMP_OFF" | "LOP" | string;
+  halfDay?: boolean;
   status: "PENDING" | "APPROVED" | "REJECTED";
 }
 
@@ -413,6 +415,8 @@ export async function createLeave(
   startDate: string,
   endDate: string,
   reason: string,
+  leaveType = "EARNED",
+  halfDay = false,
 ) {
   return attendanceRequest<LeaveRequest>("/leaves", {
     method: "POST",
@@ -421,6 +425,8 @@ export async function createLeave(
       startDate,
       endDate,
       reason,
+      leaveType,
+      halfDay,
     }),
   });
 }
@@ -1189,7 +1195,7 @@ export default function Attendance() {
       {(canPunch || isManagementRole) && (
         <div className="ux-clock">
           <div>
-            <span>{formatDate(date)} · {sessionOpen ? "Checked in" : "Not checked in"}</span>
+            <span>{formatDate(date)} · General shift 9:30–6:30 · {sessionOpen ? "Checked in" : "Not checked in"}</span>
             <strong>
               {String(Math.floor((actionEmployeeRecord ? clockedWorkMinutes(actionEmployeeRecord, currentTime) : 0) / 60)).padStart(2, "0")}
               :

@@ -387,12 +387,19 @@ export default function Employees() {
   ).length;
 
   const canSeeSalary = role === "HR" || role === "ADMIN" || role === "SUPER_ADMIN";
-  const [directoryView, setDirectoryView] = useState<"list" | "chart">("list");
+  const [directoryView, setDirectoryView] = useState<"list" | "chart" | "joiners">("list");
   const [page, setPage] = useState(1);
   const pageSize = 25;
-  const pageCount = Math.max(1, Math.ceil(filteredEmployees.length / pageSize));
+  const directoryRows = directoryView === "joiners"
+    ? filteredEmployees.filter((employee) =>
+        employee.lifecycleStatus === "PENDING_ONBOARDING"
+        || employee.lifecycleStatus === "PENDING_APPROVAL"
+        || employee.lifecycleStatus === "OFFBOARDING",
+      )
+    : filteredEmployees;
+  const pageCount = Math.max(1, Math.ceil(directoryRows.length / pageSize));
   const safePage = Math.min(page, pageCount);
-  const pageRows = filteredEmployees.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const pageRows = directoryRows.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   function updateForm(
     field: keyof EmployeeRequest,
@@ -574,6 +581,7 @@ export default function Employees() {
       <div className="ux-tabs">
         <button type="button" className={directoryView === "list" ? "active" : ""} onClick={() => setDirectoryView("list")}>List</button>
         <button type="button" className={directoryView === "chart" ? "active" : ""} onClick={() => setDirectoryView("chart")}>Org chart</button>
+        <button type="button" className={directoryView === "joiners" ? "active" : ""} onClick={() => { setDirectoryView("joiners"); setPage(1); }}>Joiners and exits</button>
       </div>
 
       {directoryView === "chart" && (
@@ -1010,10 +1018,10 @@ export default function Employees() {
             </div>
 
             <div className="employees-footer">
-              Showing <strong>{filteredEmployees.length === 0 ? 0 : (safePage - 1) * pageSize + 1}</strong>
+              Showing <strong>{directoryRows.length === 0 ? 0 : (safePage - 1) * pageSize + 1}</strong>
               –
-              <strong>{Math.min(safePage * pageSize, filteredEmployees.length)}</strong> of{" "}
-              <strong>{filteredEmployees.length}</strong>
+              <strong>{Math.min(safePage * pageSize, directoryRows.length)}</strong> of{" "}
+              <strong>{directoryRows.length}</strong>
               {pageCount > 1 && (
                 <>
                   {" "}

@@ -550,12 +550,20 @@ export default function Payroll() {
           <strong>{companyEmployees.length}</strong>
         </article>
         <article>
-          <span>Payslips</span>
-          <strong>{companyRecords.length}</strong>
+          <span>Gross</span>
+          <strong>{money(companyRecords.reduce((sum, record) => sum + Number(record.grossSalary || 0), 0))}</strong>
+        </article>
+        <article>
+          <span>Deductions</span>
+          <strong>{money(companyRecords.reduce((sum, record) => sum + Number(record.deductions || 0), 0))}</strong>
         </article>
         <article>
           <span>Net pay</span>
           <strong>{money(companyRecords.reduce((sum, record) => sum + Number(record.netSalary || 0), 0))}</strong>
+        </article>
+        <article>
+          <span>Flags</span>
+          <strong>{companyRecords.filter((record) => Number(record.deductions || 0) > 0).length}</strong>
         </article>
       </div>
 

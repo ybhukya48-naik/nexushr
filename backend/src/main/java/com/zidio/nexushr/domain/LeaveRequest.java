@@ -42,6 +42,12 @@ public class LeaveRequest {
     @Column(nullable = false, length = 500)
     private String reason;
 
+    @Column(name = "leave_type", length = 20)
+    private String leaveType;
+
+    @Column(name = "half_day", nullable = false)
+    private boolean halfDay = false;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private LeaveStatus status = LeaveStatus.PENDING;
@@ -93,6 +99,22 @@ public class LeaveRequest {
 
     public void setReason(String reason) {
         this.reason = reason;
+    }
+
+    public String getLeaveType() {
+        return leaveType;
+    }
+
+    public void setLeaveType(String leaveType) {
+        this.leaveType = leaveType;
+    }
+
+    public boolean isHalfDay() {
+        return halfDay;
+    }
+
+    public void setHalfDay(boolean halfDay) {
+        this.halfDay = halfDay;
     }
 
     public LeaveStatus getStatus() {
