@@ -472,6 +472,9 @@ public class SecurityConfig {
                     "MANAGER"
                 )
 
+                .requestMatchers(HttpMethod.GET, "/api/v1/admin/holidays")
+                .authenticated()
+
                 .requestMatchers("/api/v1/admin/**")
                 .hasRole("ADMIN")
 

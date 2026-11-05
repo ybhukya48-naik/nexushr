@@ -6296,6 +6296,57 @@ button.employee-summary-card {
   visibility: visible;
 }
 
+.bell-wrap {
+  position: relative;
+}
+
+.bell-menu {
+  position: absolute;
+  right: 0;
+  top: 48px;
+  width: 320px;
+  max-width: 80vw;
+  background: #fff;
+  border: 1px solid #ece7fb;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(16, 24, 40, 0.12);
+  z-index: 30;
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.bell-menu p,
+.bell-menu button {
+  margin: 0;
+  text-align: left;
+}
+
+.bell-menu button {
+  border: 0;
+  background: #faf8ff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+}
+
+.bell-menu strong {
+  color: #1d1633;
+}
+
+.bell-menu span {
+  color: #475467;
+  font-size: 13px;
+}
+
+.bell-menu .bell-all {
+  background: transparent;
+  color: #6941c6;
+  font-weight: 700;
+}
+
 .notification-button:hover {
   background: #f9fafb;
   border-color: #98a2b3;

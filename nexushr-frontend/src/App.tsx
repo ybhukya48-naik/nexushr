@@ -12,7 +12,9 @@ import {
 } from "react-router-dom";
 import {
   getCurrentEmployee,
+  getEmployeeNotifications,
   getEmployeePayroll,
+  getHolidays,
   getMyAttendanceStatus,
   register as apiRegister,
   login as apiLogin,
@@ -24,12 +26,14 @@ import {
   websiteSessionActive,
   type AiWorkforceDashboardResponse,
   type EmployeeResponse,
+  type NotificationResponse,
 } from "./api";
 import {
   checkIn,
   checkOut,
   getAttendanceAudit,
   getEmployeeAttendance,
+  getLeaveBalance,
   getLeaves,
   sendAttendanceHeartbeat,
   type AttendanceAuditEntry,
@@ -66,7 +70,7 @@ const SiteAttendance = lazy(() => import("./pages/SiteAttendance"));
 const navItems: ReadonlyArray<
   readonly [string, string, readonly string[]]
 > = [
-  ["Dashboard", "/", ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"]],
+  ["Dashboard", "/", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
   ["Employees", "/employees", ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"]],
   ["Attendance", "/attendance", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
   ["Leave", "/leave", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
@@ -74,6 +78,7 @@ const navItems: ReadonlyArray<
   ["Performance", "/performance", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
   ["AI Insights", "/ai", ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"]],
   ["Notifications", "/notifications", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
+  ["Profile", "/profile", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
   ["Admin", "/admin", ["ADMIN", "SUPER_ADMIN"]],
 ] as const;
 
@@ -106,6 +111,8 @@ function AppRoutes() {
   const [attendanceAlert, setAttendanceAlert] = useState("");
   const [me, setMe] = useState<EmployeeResponse | null>(null);
   const [myPhoto, setMyPhoto] = useState("");
+  const [bellOpen, setBellOpen] = useState(false);
+  const [bellItems, setBellItems] = useState<NotificationResponse[]>([]);
 
   useEffect(() => {
     const watch = window.setInterval(() => {
@@ -304,7 +311,9 @@ function AppRoutes() {
                           ? "Reports"
                           : label === "Admin"
                             ? "Settings"
-                            : label}
+                            : label === "Profile"
+                              ? "My Profile"
+                              : label}
             </NavLink>
           ))}
         </nav>
@@ -312,8 +321,8 @@ function AppRoutes() {
         <div className="sidebar-footer">
           <div className={attendanceAlert ? "status-dot status-dot-alert" : "status-dot"}></div>
           <div>
-            <strong>{attendanceAlert ? "Attendance inactive" : "System Online"}</strong>
-            <span>{attendanceAlert || "All services operational"}</span>
+            <strong>{attendanceAlert ? "Check in needed" : "Signed in"}</strong>
+            <span>{attendanceAlert || me?.fullName || "Your account is active"}</span>
           </div>
         </div>
       </aside>
@@ -325,13 +334,56 @@ function AppRoutes() {
           </div>
 
           <div className="user-area">
-            <button
-              className="notification-button"
-              onClick={() => navigate("/notifications")}
-              aria-label="Notifications"
-            >
-              <span aria-hidden="true">🔔</span>
-            </button>
+            <div className="bell-wrap">
+              <button
+                className="notification-button"
+                type="button"
+                onClick={() => {
+                  const next = !bellOpen;
+                  setBellOpen(next);
+                  if (next && me?.id) {
+                    void getEmployeeNotifications(me.id)
+                      .then((items) => setBellItems(Array.isArray(items) ? items.slice(0, 8) : []))
+                      .catch(() => setBellItems([]));
+                  }
+                }}
+                aria-label="Notifications"
+                aria-expanded={bellOpen}
+              >
+                <span aria-hidden="true">🔔</span>
+              </button>
+              {bellOpen && (
+                <div className="bell-menu">
+                  {bellItems.length === 0 ? (
+                    <p>No updates yet.</p>
+                  ) : (
+                    bellItems.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setBellOpen(false);
+                          navigate("/notifications");
+                        }}
+                      >
+                        <strong>{item.title}</strong>
+                        <span>{item.message}</span>
+                      </button>
+                    ))
+                  )}
+                  <button
+                    type="button"
+                    className="bell-all"
+                    onClick={() => {
+                      setBellOpen(false);
+                      navigate("/notifications");
+                    }}
+                  >
+                    See all updates
+                  </button>
+                </div>
+              )}
+            </div>
 
             <button
               type="button"
@@ -877,6 +929,8 @@ function EmployeeDashboard() {
   const [records, setRecords] = useState<AttendanceRecord[]>(cachedDashboard?.records ?? []);
   const [audit, setAudit] = useState<AttendanceAuditEntry[]>([]);
   const [leaveCount, setLeaveCount] = useState(0);
+  const [leaveDays, setLeaveDays] = useState<number | null>(null);
+  const [nextHoliday, setNextHoliday] = useState("None listed");
   const [latestPay, setLatestPay] = useState("");
 
   const [loading, setLoading] = useState(!cachedDashboard?.employee);
@@ -899,7 +953,9 @@ function EmployeeDashboard() {
           getAttendanceAudit(me.id).catch(() => []),
           getLeaves().catch(() => []),
           getEmployeePayroll(me.id).catch(() => []),
-        ]).then(([history, punches, leaves, payroll]) => {
+          getLeaveBalance(me.id).catch(() => null),
+          getHolidays().catch(() => []),
+        ]).then(([history, punches, leaves, payroll, balance, holidays]) => {
           if (cancelled) {
             return;
           }
@@ -910,6 +966,15 @@ function EmployeeDashboard() {
           writeDashboardSnapshot(me, savedHistory);
           setAudit(Array.isArray(punches) ? punches : []);
           setLeaveCount(Array.isArray(leaves) ? leaves.length : 0);
+          setLeaveDays(balance && typeof balance.remainingDays === "number" ? balance.remainingDays : null);
+          const upcoming = (Array.isArray(holidays) ? holidays : [])
+            .filter((holiday) => holiday?.holidayDate && holiday.holidayDate >= todayKey())
+            .sort((a, b) => a.holidayDate.localeCompare(b.holidayDate))[0];
+          setNextHoliday(
+            upcoming
+              ? `${new Date(`${upcoming.holidayDate}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })} · ${upcoming.name}`
+              : "None listed",
+          );
           const pay = (Array.isArray(payroll) ? payroll : [])
             .filter((item) => item?.payMonth)
             .sort((a, b) => b.payMonth.localeCompare(a.payMonth))[0];
@@ -990,8 +1055,8 @@ function EmployeeDashboard() {
       writeDashboardSnapshot(signedInEmployee, savedHistory);
       setPunchNote(
         kind === "out"
-          ? "Lunch check-out saved. Working hours are paused."
-          : "Lunch check-in saved. Working hours continue.",
+          ? "Lunch started. Working hours are paused."
+          : "Lunch ended. Working hours continue.",
       );
     } catch (err) {
       setPunchNote(
@@ -1020,6 +1085,11 @@ function EmployeeDashboard() {
 
           <p>
             Check in, apply for leave, or open your payslip.
+          </p>
+          <p>
+            Today {hoursLabel(clockedWorkMinutes(records.find((row) => row.attendanceDate.slice(0, 10) === todayKey())))}
+            {" · "}Days left {leaveDays ?? "—"}
+            {" · "}Next holiday {nextHoliday}
           </p>
 
         </div>
@@ -1297,7 +1367,7 @@ function AIInsights() {
         <section className="panel">
 
           <strong>
-            AI data unavailable
+            Reports are unavailable
           </strong>
 
           <p>
@@ -1311,81 +1381,41 @@ function AIInsights() {
       <div className="stats-grid">
 
         <Stat
-          title="High Attrition Risk"
-          value={
-            data
-              ? data.highAttritionRisk.toLocaleString()
-              : "0"
-          }
-          change="Requires attention"
+          title="Active employees"
+          value={data ? data.activeEmployees.toLocaleString() : "0"}
+          change={data ? `${data.inactiveEmployees} not active` : "Waiting for records"}
+          icon="A"
+        />
+
+        <Stat
+          title="Needs attention"
+          value={data ? data.highAttritionRisk.toLocaleString() : "0"}
+          change="From saved reviews"
           icon="!"
         />
 
         <Stat
-          title="Medium Attrition Risk"
-          value={
-            data
-              ? data.mediumAttritionRisk.toLocaleString()
-              : "0"
-          }
-          change="Monitor"
+          title="Watch closely"
+          value={data ? data.mediumAttritionRisk.toLocaleString() : "0"}
+          change="From saved reviews"
           icon="M"
         />
 
         <Stat
-          title="Avg Engagement"
-          value={
-            data
-              ? `${data.averageEngagementScore.toFixed(1)}%`
-              : "0"
-          }
-          change="Workforce-wide score"
+          title="Engagement"
+          value={data ? `${data.averageEngagementScore.toFixed(1)}%` : "0"}
+          change="From saved reviews"
           icon="E"
-        />
-
-        <Stat
-          title="Active Employees"
-          value={
-            data
-              ? data.activeEmployees.toLocaleString()
-              : "0"
-          }
-          change={
-            data
-              ? `${data.inactiveEmployees} inactive`
-              : "Workforce status"
-          }
-          icon="A"
         />
 
       </div>
 
-
-      <section className="panel">
-
-        <div className="panel-header">
-
-          <div>
-
-            <h3>
-              AI Data Freshness
-            </h3>
-
-            <p>
-              This page now shows only aggregated data generated from real employee records.
-            </p>
-
-          </div>
-
-        </div>
-
-        <div className="empty-state">
-          {data?.generatedAt
-            ? `Last generated at: ${data.generatedAt}`
-            : "AI data will appear after backend analytics runs."}
-        </div>
-
-      </section>
+      {(!data || (data.activeEmployees === 0 && data.highAttritionRisk === 0 && data.averageEngagementScore === 0)) && (
+        <section className="panel">
+          <h3>No reports yet</h3>
+          <p>Counts appear after attendance and reviews are saved.</p>
+        </section>
+      )}
     </>
   );
 }

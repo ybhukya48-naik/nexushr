@@ -231,7 +231,7 @@ export default function Leave() {
         <Stat title="Pending" value={companyLeaves.filter((leave) => leave.status === "PENDING").length} />
         <Stat title="Approved" value={companyLeaves.filter((leave) => leave.status === "APPROVED").length} />
         {balance && (
-          <Stat title="Days Remaining" value={balance.remainingDays} />
+          <Stat title="Days left" value={balance.remainingDays} />
         )}
       </div>
 
@@ -383,7 +383,12 @@ export default function Leave() {
                     </td>
 
                     <td>
-                      {leave.startDate} to {leave.endDate}
+                      {new Date(`${leave.startDate}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                      {" to "}
+                      {new Date(`${leave.endDate}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                      {leave.status === "PENDING" && leave.endDate < new Date().toISOString().slice(0, 10)
+                        ? " · dates have passed"
+                        : ""}
                     </td>
 
                     <td>{days}</td>
@@ -400,7 +405,7 @@ export default function Leave() {
                               : "employee-status-offboarding"
                         }`}
                       >
-                        {leave.status}
+                        {leave.status === "APPROVED" ? "Approved" : leave.status === "REJECTED" ? "Rejected" : "Pending"}
                       </span>
                     </td>
 
@@ -455,7 +460,7 @@ export default function Leave() {
                     <div className="employee-empty-state">
                       <strong>No leave requests yet</strong>
                       <span>
-                        Submit a request above to start your leave workflow.
+                        Apply leave to add one.
                       </span>
                     </div>
                   </td>
