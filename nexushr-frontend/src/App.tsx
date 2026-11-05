@@ -1164,9 +1164,9 @@ function EmployeeDashboard() {
           <>
             <section className="home-board">
               <article className="home-clock-card">
-                <span>Today · General shift 9:30–6:30</span>
+                <span>{new Date().toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short" })} · General shift 9:30–6:30</span>
                 <strong>{hoursLabel(clockedWorkMinutes(todayRecord))}</strong>
-                <em>worked</em>
+                <em>worked today</em>
                 <div className="attendance-actions">
                   <button className="primary-button" type="button" disabled={punching || !isWindowsComputer()} onClick={() => void punchDay()}>
                     {checkedIn ? "Check out" : "Check in"}
@@ -1178,6 +1178,10 @@ function EmployeeDashboard() {
                     End lunch
                   </button>
                 </div>
+              </article>
+              <article className="home-side">
+                <span>Pending on you</span>
+                {notices.length === 0 ? <em>Nothing is waiting.</em> : notices.map((notice) => <em key={notice}>{notice}</em>)}
               </article>
               <div className="home-tiles">
                 <article>
@@ -1203,7 +1207,7 @@ function EmployeeDashboard() {
                   <button type="button" onClick={() => navigate("/notifications")}>Open updates</button>
                 </article>
               </div>
-              <article>
+              <article className="home-wide">
                 <span>This week</span>
                 <div className="home-week">
                   {week.map((day) => (
@@ -1211,15 +1215,15 @@ function EmployeeDashboard() {
                   ))}
                 </div>
               </article>
-              <article>
+              <article className="home-wide">
                 <span>Next holiday</span>
                 <strong>{nextHoliday}</strong>
               </article>
-              <article>
+              <article className="home-wide">
                 <span>Announcements</span>
                 <em>No announcements yet.</em>
               </article>
-              <article>
+              <article className="home-wide">
                 <span>Celebrations</span>
                 <em>No birthdays or work anniversaries this week.</em>
               </article>

@@ -82,16 +82,16 @@
 
 .hr-split {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr);
-  gap: 14px;
-  align-items: stretch;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.75fr);
+  gap: 12px;
+  align-items: start;
 }
 
 .hr-ops {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.85fr) minmax(0, 0.85fr);
-  gap: 14px;
-  align-items: stretch;
+  gap: 12px;
+  align-items: start;
 }
 
 .hr-home-grid {
@@ -133,18 +133,63 @@
 
 .hr-kpis strong {
   display: block;
-  margin-top: 8px;
+  margin-top: 6px;
   color: #1d1633;
   font-size: 32px;
   line-height: 1;
   font-weight: 700;
 }
 
-.hr-lunch {
+.hr-kpis em {
+  display: block;
+  margin-top: 6px;
+  color: #667085;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.hr-approvals {
   display: grid;
-  grid-template-columns: auto minmax(220px, 360px) auto;
-  gap: 16px;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hr-approvals li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-top: 1px solid #f0ecfa;
+  font-size: 14px;
+}
+
+.hr-approvals button,
+.hr-exception-line button {
+  border: 1px solid #d9d0f5;
+  background: #fff;
+  color: #3b2f80;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hr-exception-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.hr-lunch {
+  display: flex;
+  flex-wrap: wrap;
   align-items: end;
+  gap: 12px;
 }
 
 .hr-lunch .hr-card-title,
@@ -192,8 +237,8 @@
   grid-template-columns: repeat(7, 1fr);
   gap: 8px;
   align-items: end;
-  height: 140px;
-  margin: 18px 0;
+  height: 96px;
+  margin: 12px 0 0;
 }
 
 .hr-bars button {

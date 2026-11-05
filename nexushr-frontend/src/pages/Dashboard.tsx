@@ -12,6 +12,7 @@ import {
 import {
   checkIn,
   checkOut,
+  updateLeaveStatus,
   getAttendanceByDate,
   getAttendanceRange,
   getEmployeeAttendance,
@@ -333,26 +334,32 @@ export default function Dashboard() {
         <button type="button" onClick={() => navigate("/employees")}>
           <span>Headcount</span>
           <strong>{people.length || summary?.totalEmployees || 0}</strong>
+          <em>{company === "GORLE" ? "Gorle Group" : "CYOND"}</em>
         </button>
         <button type="button" onClick={() => navigate("/attendance")}>
           <span>Present</span>
           <strong>{present.length}</strong>
+          <em>{people.length ? `${Math.round((present.length / people.length) * 100)}% of headcount` : "checked in"}</em>
         </button>
         <button type="button" onClick={() => navigate("/attendance")}>
           <span>On site</span>
           <strong>{todayRows.filter((row) => row.checkInTime && row.employee?.siteVisitor).length}</strong>
+          <em>site check-in</em>
         </button>
         <button type="button" onClick={viewAllToday}>
           <span>Not checked in</span>
           <strong>{Math.max(0, activePeople.length - present.length)}</strong>
+          <em>{missingCheckInDue ? "after 11:00" : "before 11:00"}</em>
         </button>
         <button type="button" onClick={() => navigate("/leave")}>
           <span>On leave</span>
           <strong>{onLeave.length}</strong>
+          <em>approved today</em>
         </button>
         <button type="button" onClick={() => navigate("/attendance")}>
           <span>Late</span>
           <strong>{late}</strong>
+          <em>after 10:15</em>
         </button>
       </section>
 
@@ -365,18 +372,25 @@ export default function Dashboard() {
           {waiting.length === 0 ? (
             <p className="hr-empty">No leave is waiting.</p>
           ) : (
-            <ul className="hr-leaves">
-              {waiting.slice(0, 5).map((leave) => (
-                <li key={leave.id}>
-                  <button type="button" onClick={() => navigate("/leave")}>
-                    <strong>{leave.employee?.fullName || "Employee"}</strong>
+            <ul className="hr-approvals">
+              {waiting.slice(0, 4).map((leave) => {
+                const started = leave.startDate ? new Date(`${leave.startDate.slice(0, 10)}T00:00:00`) : null;
+                const waited = started ? Math.max(0, Math.round((Date.now() - started.getTime()) / 86400000)) : 0;
+                return (
+                  <li key={leave.id}>
                     <span>
-                      {displayDate(leave.startDate)} to {displayDate(leave.endDate)}
-                      {leave.endDate < today ? " · dates have passed" : " · Pending"}
+                      Leave · {leave.employee?.fullName || "Employee"} · {displayDate(leave.startDate)} to {displayDate(leave.endDate)}
+                      {waited > 0 ? ` · waiting ${waited} day${waited === 1 ? "" : "s"}` : ""}
                     </span>
-                  </button>
-                </li>
-              ))}
+                    <button type="button" onClick={() => void updateLeaveStatus(leave.id!, "APPROVED").then(() => setRefreshTick((value) => value + 1))}>Approve</button>
+                    <button type="button" onClick={() => {
+                      if (window.confirm("Reject this leave request?")) {
+                        void updateLeaveStatus(leave.id!, "REJECTED").then(() => setRefreshTick((value) => value + 1));
+                      }
+                    }}>Reject</button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </article>
@@ -385,20 +399,63 @@ export default function Dashboard() {
             <h3>Exceptions today</h3>
             <button type="button" onClick={viewAllToday}>View all</button>
           </div>
-          <ul className="hr-leaves">
-            <li><button type="button" onClick={() => navigate("/attendance")}><strong>{missingCheckIn}</strong><span>No check-in after 11:00</span></button></li>
-            <li><button type="button" onClick={() => navigate("/attendance")}><strong>{missingCheckOut}</strong><span>Check-out missed</span></button></li>
-            <li><button type="button" onClick={() => navigate("/attendance")}><strong>{idleWarnings}</strong><span>Idle warnings</span></button></li>
-            <li><button type="button" onClick={() => navigate("/attendance")}><strong>{late}</strong><span>Late arrivals</span></button></li>
-          </ul>
+          <p className="hr-exception-line">
+            <button type="button" onClick={() => navigate("/attendance")}>No check-in {missingCheckIn}</button>
+            <button type="button" onClick={() => navigate("/attendance")}>Check-out missed {missingCheckOut}</button>
+            <button type="button" onClick={() => navigate("/attendance")}>Idle warnings {idleWarnings}</button>
+            <button type="button" onClick={() => navigate("/attendance")}>Late {late}</button>
+          </p>
+        </article>
+      </section>
+
+      <section className="hr-ops">
+        <article className="hr-card">
+          <div className="hr-card-title">
+            <h3>Attendance this week</h3>
+            <button type="button" onClick={() => navigate("/attendance")}>Open attendance</button>
+          </div>
+          <div className="hr-bars" aria-label="Present employees for the last seven days">
+            {week.map((day) => (
+              <button key={day.label} type="button" onClick={() => navigate("/attendance")}>
+                <em>{day.present}</em>
+                <span style={{ height: `${Math.max(8, (day.present / maxPresent) * 100)}%` }}></span>
+                <small>{day.label}</small>
+              </button>
+            ))}
+          </div>
+        </article>
+        <article className="hr-card">
+          <div className="hr-card-title">
+            <h3>Onboarding and exits</h3>
+            <button type="button" onClick={() => navigate("/employees?status=Onboarding")}>Open directory</button>
+          </div>
+          <p className="hr-exception-line">
+            <button type="button" onClick={() => navigate("/employees?status=Onboarding")}>Joining {onboardingCount}</button>
+            <button type="button" onClick={() => navigate("/employees?status=Offboarding")}>Leaving {offboardingCount}</button>
+            <button type="button" onClick={() => navigate("/employees?status=Offboarded")}>Already left {offboardedCount}</button>
+          </p>
+        </article>
+        <article className="hr-card">
+          <div className="hr-card-title">
+            <h3>Upcoming</h3>
+          </div>
+          {holidays.length === 0 ? (
+            <p className="hr-empty">No holidays are saved yet.</p>
+          ) : (
+            <ul className="hr-holidays">
+              {holidays.slice(0, 4).map((holiday) => (
+                <li key={holiday.date}>
+                  <strong>{holiday.name}</strong>
+                  <span>{displayDate(holiday.date)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </article>
       </section>
 
       <section className="hr-card hr-lunch">
-        <div className="hr-card-title">
-          <h3>Lunch</h3>
-          <p className="hr-empty">Start lunch pauses hours. End lunch continues them.</p>
-        </div>
+        <strong>Lunch</strong>
         <label className="hr-lunch-pick">
           <span>Employee</span>
           <select
@@ -436,52 +493,6 @@ export default function Dashboard() {
         </div>
         {!windowsPunch && <p className="hr-empty">Check in and check out work only on a Windows computer.</p>}
         {punchNote && <p className="hr-empty">{punchNote}</p>}
-      </section>
-
-      <section className="hr-ops">
-        <article className="hr-card">
-          <div className="hr-card-title">
-            <h3>Attendance this week</h3>
-            <button type="button" onClick={() => navigate("/attendance")}>Open attendance</button>
-          </div>
-          <div className="hr-bars" aria-label="Present employees for the last seven days">
-            {week.map((day) => (
-              <button key={day.label} type="button" onClick={() => navigate("/attendance")}>
-                <em>{day.present}</em>
-                <span style={{ height: `${Math.max(8, (day.present / maxPresent) * 100)}%` }}></span>
-                <small>{day.label}</small>
-              </button>
-            ))}
-          </div>
-        </article>
-        <article className="hr-card">
-          <div className="hr-card-title">
-            <h3>Onboarding and exits</h3>
-            <button type="button" onClick={() => navigate("/employees?status=Onboarding")}>Open directory</button>
-          </div>
-          <ul className="hr-leaves">
-            <li><button type="button" onClick={() => navigate("/employees?status=Onboarding")}><strong>{onboardingCount}</strong><span>Joining</span></button></li>
-            <li><button type="button" onClick={() => navigate("/employees?status=Offboarding")}><strong>{offboardingCount}</strong><span>Leaving</span></button></li>
-            <li><button type="button" onClick={() => navigate("/employees?status=Offboarded")}><strong>{offboardedCount}</strong><span>Already left</span></button></li>
-          </ul>
-        </article>
-        <article className="hr-card">
-          <div className="hr-card-title">
-            <h3>Upcoming</h3>
-          </div>
-          {holidays.length === 0 ? (
-            <p className="hr-empty">No holidays are saved yet.</p>
-          ) : (
-            <ul className="hr-holidays">
-              {holidays.slice(0, 4).map((holiday) => (
-                <li key={holiday.date}>
-                  <strong>{holiday.name}</strong>
-                  <span>{displayDate(holiday.date)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </article>
       </section>
 
       <section className="hr-card" id="employee-month">
