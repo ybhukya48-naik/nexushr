@@ -414,6 +414,7 @@ function AppRoutes() {
         </header>
 
         <section className="content" key={workspace}>
+          <PageGuard>
           <Suspense
             fallback={
               <div className="page-loading">
@@ -450,6 +451,7 @@ function AppRoutes() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>
+          </PageGuard>
         </section>
       </main>
     </div>
@@ -899,7 +901,7 @@ function punchPairs(entries: AttendanceAuditEntry[], date: string, record?: Atte
   const relevant = entries
     .filter((entry) => (entry.attendanceDate ?? "").slice(0, 10) === date
       && (entry.action === "CHECK_IN" || entry.action === "CHECK_OUT"))
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    .sort((a, b) => String(a.createdAt ?? "").localeCompare(String(b.createdAt ?? "")));
   for (const entry of relevant) {
     const time = formatClock(entry.detail) === "—" ? formatClock(entry.createdAt) : formatClock(entry.detail);
     if (entry.action === "CHECK_IN") {
@@ -1042,13 +1044,19 @@ function EmployeeDashboard() {
   }
 
   if (!employee) {
-    return null;
+    return (
+      <section className="panel">
+        <h2>Home</h2>
+        <p>Your details did not load. Reload the page to open Home again.</p>
+        <button className="primary-button" type="button" onClick={() => window.location.reload()}>Reload</button>
+      </section>
+    );
   }
 
   const signedInEmployee = employee;
 
   async function punchDay() {
-    const todayRecord = records.find((row) => row.attendanceDate.slice(0, 10) === todayKey());
+    const todayRecord = records.find((row) => String(row.attendanceDate ?? "").slice(0, 10) === todayKey());
     const open = Boolean(todayRecord?.checkInTime && !todayRecord?.checkOutTime);
     setPunching(true);
     setPunchNote("");
@@ -1115,10 +1123,10 @@ function EmployeeDashboard() {
 
       {(() => {
         const today = todayKey();
-        const todayRecord = records.find((row) => row.attendanceDate.slice(0, 10) === today);
+        const todayRecord = records.find((row) => String(row.attendanceDate ?? "").slice(0, 10) === today);
         const pairs = punchPairs(audit, today, todayRecord);
         const month = today.slice(0, 7);
-        const monthRows = records.filter((row) => row.attendanceDate.startsWith(month));
+        const monthRows = records.filter((row) => String(row.attendanceDate ?? "").startsWith(month));
         const monthMinutes = monthRows.reduce((sum, row) => sum + clockedWorkMinutes(row), 0);
         const warnings = monthRows.filter((row) => row.yellowFlag).length;
         const halfDay = warnings >= 3 ? Math.round(Number(employee.baseSalary || 0) / 26 / 2) : 0;
@@ -1139,16 +1147,17 @@ function EmployeeDashboard() {
             : "",
         ].filter(Boolean);
         const monthStamp = today.slice(0, 7);
-        const casualUsed = myLeaves.filter((leave) =>
+        const savedLeaves = myLeaves.filter((leave) => leave && leave.startDate);
+        const casualUsed = savedLeaves.filter((leave) =>
           (leave.status === "APPROVED" || leave.status === "PENDING")
           && leave.leaveType === "CASUAL"
           && leave.startDate.startsWith(monthStamp),
         ).length;
-        const sickTaken = myLeaves.filter((leave) => leave.status === "APPROVED" && leave.leaveType === "SICK").length;
-        const compOff = myLeaves.filter((leave) => leave.status === "APPROVED" && leave.leaveType === "COMP_OFF").length;
+        const sickTaken = savedLeaves.filter((leave) => leave.status === "APPROVED" && leave.leaveType === "SICK").length;
+        const compOff = savedLeaves.filter((leave) => leave.status === "APPROVED" && leave.leaveType === "COMP_OFF").length;
         const week = monthDateKeys(7).map((date) => ({
           label: new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", { weekday: "short" }),
-          present: records.some((row) => row.attendanceDate.slice(0, 10) === date && row.checkInTime),
+          present: records.some((row) => String(row.attendanceDate ?? "").slice(0, 10) === date && row.checkInTime),
         }));
         const checkedIn = Boolean(todayRecord?.checkInTime && !todayRecord?.checkOutTime);
         return (

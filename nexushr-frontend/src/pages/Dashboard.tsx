@@ -87,7 +87,10 @@ function upcomingHolidays(extra: CompanyHoliday[], company: string): HolidayMark
     .slice(0, 3);
 }
 
-function displayDate(value: string) {
+function displayDate(value?: string) {
+  if (!value) {
+    return "—";
+  }
   const parsed = new Date(`${value.slice(0, 10)}T00:00:00`);
   if (Number.isNaN(parsed.getTime())) {
     return value;
@@ -234,7 +237,7 @@ export default function Dashboard() {
   const today = todayIso();
   const present = todayRows.filter((row) => row.checkInTime && row.attendanceStatus !== "INACTIVE");
   const onLeave = leaves.filter((leave) =>
-    leave.status === "APPROVED" && leave.startDate <= today && leave.endDate >= today,
+    leave.status === "APPROVED" && String(leave.startDate ?? "") <= today && String(leave.endDate ?? "") >= today,
   );
   const pending = leaves.filter((leave) => leave.status === "PENDING");
   const nowForMissing = new Date();
@@ -254,7 +257,7 @@ export default function Dashboard() {
   ).length;
   const offboardingCount = people.filter((person) => person.lifecycleStatus === "OFFBOARDING").length;
   const offboardedCount = people.filter((person) => person.lifecycleStatus === "OFFBOARDED").length;
-  const waiting = [...pending].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const waiting = [...pending].sort((a, b) => String(a.startDate ?? "").localeCompare(String(b.startDate ?? "")));
   const idleWarnings = todayRows.filter((row) => row.yellowFlag).length;
   const maxPresent = Math.max(1, ...week.map((day) => day.present));
   const now = new Date();
