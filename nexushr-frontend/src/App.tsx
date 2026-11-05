@@ -37,6 +37,7 @@ import {
   getLeaves,
   sendAttendanceHeartbeat,
   type AttendanceAuditEntry,
+  type LeaveRequest,
   clockedWorkMinutes,
   isCheckoutMissing,
   isWindowsComputer,
@@ -929,6 +930,7 @@ function EmployeeDashboard() {
   const [records, setRecords] = useState<AttendanceRecord[]>(cachedDashboard?.records ?? []);
   const [audit, setAudit] = useState<AttendanceAuditEntry[]>([]);
   const [leaveCount, setLeaveCount] = useState(0);
+  const [myLeaves, setMyLeaves] = useState<LeaveRequest[]>([]);
   const [leaveDays, setLeaveDays] = useState<number | null>(null);
   const [nextHoliday, setNextHoliday] = useState("None listed");
   const [latestPay, setLatestPay] = useState("");
@@ -966,6 +968,7 @@ function EmployeeDashboard() {
           writeDashboardSnapshot(me, savedHistory);
           setAudit(Array.isArray(punches) ? punches : []);
           setLeaveCount(Array.isArray(leaves) ? leaves.length : 0);
+          setMyLeaves(Array.isArray(leaves) ? leaves : []);
           setLeaveDays(balance && typeof balance.remainingDays === "number" ? balance.remainingDays : null);
           const upcoming = (Array.isArray(holidays) ? holidays : [])
             .filter((holiday) => holiday?.holidayDate && holiday.holidayDate >= todayKey())
@@ -1044,6 +1047,29 @@ function EmployeeDashboard() {
 
   const signedInEmployee = employee;
 
+  async function punchDay() {
+    const todayRecord = records.find((row) => row.attendanceDate.slice(0, 10) === todayKey());
+    const open = Boolean(todayRecord?.checkInTime && !todayRecord?.checkOutTime);
+    setPunching(true);
+    setPunchNote("");
+    try {
+      await (open ? checkOut(signedInEmployee.id) : checkIn(signedInEmployee.id));
+      const history = await getEmployeeAttendance(signedInEmployee.id);
+      const savedHistory = [...history].sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
+      setRecords(savedHistory);
+      writeDashboardSnapshot(signedInEmployee, savedHistory);
+      setPunchNote(open ? "Checked out." : "Checked in.");
+    } catch (err) {
+      setPunchNote(
+        err instanceof Error
+          ? err.message.replace(/^Attendance API failed:\s*/i, "")
+          : "Check-in could not be saved.",
+      );
+    } finally {
+      setPunching(false);
+    }
+  }
+
   async function punchLunch(kind: "out" | "in") {
     setPunching(true);
     setPunchNote("");
@@ -1075,19 +1101,11 @@ function EmployeeDashboard() {
       <div className="dashboard-hero">
         <div className="dashboard-hero-copy">
 
-          <p className="eyebrow">
-            Home
-          </p>
-
-          <h2>
-            Good day, {employee.fullName}
-          </h2>
-
+          <p className="eyebrow">Home</p>
+          <h2>Good day, {employee.fullName}</h2>
           <p>
-            Check in, apply for leave, or open your payslip.
-          </p>
-          <p>
-            Today {hoursLabel(clockedWorkMinutes(records.find((row) => row.attendanceDate.slice(0, 10) === todayKey())))}
+            {new Date().toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short" })}
+            {" · "}General shift 9:30–6:30
             {" · "}Days left {leaveDays ?? "—"}
             {" · "}Next holiday {nextHoliday}
           </p>
@@ -1120,32 +1138,89 @@ function EmployeeDashboard() {
             ? `3 inactivity warnings this month. A half day, ₹${halfDay.toLocaleString("en-IN")}, is cut from salary.`
             : "",
         ].filter(Boolean);
+        const monthStamp = today.slice(0, 7);
+        const casualUsed = myLeaves.filter((leave) =>
+          (leave.status === "APPROVED" || leave.status === "PENDING")
+          && leave.leaveType === "CASUAL"
+          && leave.startDate.startsWith(monthStamp),
+        ).length;
+        const sickTaken = myLeaves.filter((leave) => leave.status === "APPROVED" && leave.leaveType === "SICK").length;
+        const compOff = myLeaves.filter((leave) => leave.status === "APPROVED" && leave.leaveType === "COMP_OFF").length;
+        const week = monthDateKeys(7).map((date) => ({
+          label: new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", { weekday: "short" }),
+          present: records.some((row) => row.attendanceDate.slice(0, 10) === date && row.checkInTime),
+        }));
+        const checkedIn = Boolean(todayRecord?.checkInTime && !todayRecord?.checkOutTime);
         return (
           <>
+            <section className="home-board">
+              <article className="home-clock-card">
+                <span>Today · General shift 9:30–6:30</span>
+                <strong>{hoursLabel(clockedWorkMinutes(todayRecord))}</strong>
+                <em>worked</em>
+                <div className="attendance-actions">
+                  <button className="primary-button" type="button" disabled={punching || !isWindowsComputer()} onClick={() => void punchDay()}>
+                    {checkedIn ? "Check out" : "Check in"}
+                  </button>
+                  <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !todayRecord?.checkInTime || Boolean(todayRecord?.checkOutTime)} onClick={() => void punchLunch("out")}>
+                    Start lunch
+                  </button>
+                  <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !todayRecord?.checkOutTime} onClick={() => void punchLunch("in")}>
+                    End lunch
+                  </button>
+                </div>
+              </article>
+              <div className="home-tiles">
+                <article>
+                  <span>Casual leave</span>
+                  <strong>{Math.max(0, 1 - casualUsed)}</strong>
+                  <em>left this month</em>
+                </article>
+                <article>
+                  <span>Sick leave</span>
+                  <strong>{sickTaken}</strong>
+                  <em>taken</em>
+                </article>
+                <article>
+                  <span>Comp-off</span>
+                  <strong>{compOff}</strong>
+                  <em>approved</em>
+                </article>
+                <article className="home-actions">
+                  <span>Quick actions</span>
+                  <button type="button" onClick={() => navigate("/leave")}>Apply leave ({leaveCount})</button>
+                  <button type="button" onClick={() => navigate("/payroll")}>Payslip{latestPay ? ` · ${latestPay}` : ""}</button>
+                  <button type="button" onClick={() => navigate("/attendance")}>My attendance</button>
+                  <button type="button" onClick={() => navigate("/notifications")}>Open updates</button>
+                </article>
+              </div>
+              <article>
+                <span>This week</span>
+                <div className="home-week">
+                  {week.map((day) => (
+                    <i key={day.label} className={day.present ? "in" : ""} title={day.label}>{day.label.slice(0, 1)}</i>
+                  ))}
+                </div>
+              </article>
+              <article>
+                <span>Next holiday</span>
+                <strong>{nextHoliday}</strong>
+              </article>
+              <article>
+                <span>Announcements</span>
+                <em>No announcements yet.</em>
+              </article>
+              <article>
+                <span>Celebrations</span>
+                <em>No birthdays or work anniversaries this week.</em>
+              </article>
+            </section>
             <section className="panel">
               <div className="panel-header">
                 <div>
                   <p className="eyebrow">Today</p>
                   <h3>Check in and check out</h3>
-                  <p>A day is 9 hours: 8 hours of work and 1 hour of lunch. Start lunch when you leave, and end lunch when you are back. That hour can be any time.</p>
-                </div>
-                <div className="attendance-actions">
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    disabled={punching || !isWindowsComputer() || !todayRecord?.checkInTime || Boolean(todayRecord?.checkOutTime)}
-                    onClick={() => void punchLunch("out")}
-                  >
-                    Start lunch
-                  </button>
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    disabled={punching || !isWindowsComputer() || !todayRecord?.checkOutTime}
-                    onClick={() => void punchLunch("in")}
-                  >
-                    End lunch
-                  </button>
+                  <p>A day is 9 hours: 8 hours of work and 1 hour of lunch. Start lunch when you leave, and end lunch when you are back.</p>
                 </div>
               </div>
               {!isWindowsComputer() && (
@@ -1220,54 +1295,6 @@ function EmployeeDashboard() {
           </>
         );
       })()}
-
-      <div className="employee-action-grid">
-        <article className="panel employee-action-card">
-          <p className="eyebrow">My Attendance</p>
-          <h3>Check in</h3>
-          <p>Check in, check out, and see the same hours shown above.</p>
-          <button className="primary-button" type="button" onClick={() => navigate("/attendance")}>
-            Check in
-          </button>
-        </article>
-        <article className="panel employee-action-card">
-          <p className="eyebrow">My Leave</p>
-          <h3>Apply leave</h3>
-          <p>{leaveCount} leave request{leaveCount === 1 ? "" : "s"} on file.</p>
-          <button className="primary-button" type="button" onClick={() => navigate("/leave")}>
-            Apply leave
-          </button>
-        </article>
-        <article className="panel employee-action-card">
-          <p className="eyebrow">My Pay</p>
-          <h3>Payslip</h3>
-          <p>{latestPay}</p>
-          <button className="primary-button" type="button" onClick={() => navigate("/payroll")}>
-            View payslip
-          </button>
-        </article>
-        <article className="panel employee-action-card">
-          <p className="eyebrow">Updates</p>
-          <h3>Notifications</h3>
-          <p>A missed check in or check out is shown here.</p>
-          <button className="primary-button" type="button" onClick={() => navigate("/notifications")}>
-            Open notifications
-          </button>
-        </article>
-      </div>
-
-      <section className="panel">
-        <div className="panel-header">
-          <div>
-            <p className="eyebrow">PROFILE</p>
-            <h3>{employee.designation || "Employee"}</h3>
-            <p>Your details, designation, and profile picture are on your profile.</p>
-          </div>
-          <button className="primary-button" type="button" onClick={() => navigate("/profile")}>
-            Open profile
-          </button>
-        </div>
-      </section>
 
     </div>
   );

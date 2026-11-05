@@ -373,21 +373,66 @@ export default function Dashboard() {
 
       <section className="hr-kpis">
         <button type="button" onClick={() => navigate("/employees")}>
-          <span>Total employees</span>
+          <span>Headcount</span>
           <strong>{people.length || summary?.totalEmployees || 0}</strong>
         </button>
         <button type="button" onClick={() => navigate("/attendance")}>
-          <span>Present today · as of {now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</span>
+          <span>Present · as of {now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</span>
           <strong>{present.length}</strong>
+        </button>
+        <button type="button" onClick={() => navigate("/attendance")}>
+          <span>On site</span>
+          <strong>{todayRows.filter((row) => row.checkInTime && row.employee?.siteVisitor).length}</strong>
+        </button>
+        <button type="button" onClick={viewAllToday}>
+          <span>Not checked in</span>
+          <strong>{Math.max(0, people.filter((person) => person.active).length - present.length)}</strong>
         </button>
         <button type="button" onClick={() => navigate("/leave")}>
           <span>On leave</span>
           <strong>{onLeave.length}</strong>
         </button>
-        <button type="button" onClick={() => navigate("/leave")}>
-          <span>Pending requests</span>
-          <strong>{pending.length || summary?.pendingLeaveRequests || 0}</strong>
+        <button type="button" onClick={() => navigate("/attendance")}>
+          <span>Late</span>
+          <strong>{late}</strong>
         </button>
+      </section>
+
+      <section className="hr-home-grid">
+        <article className="hr-card">
+          <div className="hr-card-title">
+            <h3>Approvals waiting</h3>
+            <button type="button" onClick={() => navigate("/leave")}>Open leave</button>
+          </div>
+          {pending.length === 0 ? (
+            <p className="hr-empty">No leave is waiting.</p>
+          ) : (
+            <ul className="hr-leaves">
+              {pending.slice(0, 4).map((leave) => (
+                <li key={leave.id}>
+                  <button type="button" onClick={() => navigate("/leave")}>
+                    <strong>{leave.employee?.fullName || "Employee"}</strong>
+                    <span>
+                      {leave.startDate} to {leave.endDate}
+                      {leave.endDate < today ? " · dates have passed" : ""}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+        <article className="hr-card">
+          <div className="hr-card-title">
+            <h3>Exceptions today</h3>
+            <button type="button" onClick={viewAllToday}>View all</button>
+          </div>
+          <div className="hr-alerts">
+            <button type="button" onClick={() => navigate("/attendance")}>{missingCheckIn} did not check in</button>
+            <button type="button" onClick={() => navigate("/attendance")}>{missingCheckOut} did not check out</button>
+            <button type="button" onClick={() => navigate("/attendance")}>{todayRows.filter((row) => row.yellowFlag).length} idle warnings</button>
+          </div>
+        </article>
       </section>
 
       <section className="hr-card hr-lunch">

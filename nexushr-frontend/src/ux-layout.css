@@ -122,6 +122,86 @@
   border-bottom: 1px solid #ece7fb;
 }
 
+.home-board {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.home-clock-card,
+.home-board article {
+  border: 1px solid #d9d0f5;
+  border-radius: 14px;
+  background: #f7f4ff;
+  padding: 16px;
+}
+
+.home-clock-card {
+  grid-column: 1 / -1;
+  background: #fff;
+}
+
+.home-clock-card span,
+.home-board article span,
+.home-board article em {
+  display: block;
+  color: #667085;
+  font-style: normal;
+}
+
+.home-clock-card strong,
+.home-board article strong {
+  display: block;
+  margin: 6px 0;
+  font-size: 32px;
+  color: #3b2f80;
+}
+
+.home-tiles {
+  display: contents;
+}
+
+.home-actions button {
+  display: inline-block;
+  margin: 6px 6px 0 0;
+  border: 1px solid #d9d0f5;
+  border-radius: 999px;
+  background: #fff;
+  color: #3b2f80;
+  font-weight: 700;
+  padding: 6px 10px;
+}
+
+.home-week {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.home-week i {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #ece7fb;
+  color: #3b2f80;
+  font-style: normal;
+  font-size: 12px;
+  display: grid;
+  place-items: center;
+}
+
+.home-week i.in {
+  background: #6941c6;
+  color: #fff;
+}
+
+@media (max-width: 800px) {
+  .home-board {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 800px) {
   .ux-steps {
     grid-template-columns: 1fr;

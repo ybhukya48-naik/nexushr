@@ -33,7 +33,7 @@ export default function Leave() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [tab, setTab] = useState<"mine" | "approvals" | "holidays" | "policy">("mine");
+  const [tab, setTab] = useState<"mine" | "calendar" | "approvals" | "holidays" | "policy">("mine");
   const [holidays, setHolidays] = useState<CompanyHoliday[]>([]);
 
   const role = localStorage.getItem("nexushr_role") || "HR";
@@ -172,6 +172,9 @@ export default function Leave() {
   ) {
     setMessage("");
     setError("");
+    if (status === "REJECTED" && !window.confirm("Reject this leave request?")) {
+      return;
+    }
 
     try {
       await updateLeaveStatus(id, status);
@@ -229,10 +232,30 @@ export default function Leave() {
     }
   }
 
+  function typeName(value?: string) {
+    if (value === "CASUAL") return "Casual";
+    if (value === "SICK") return "Sick";
+    if (value === "COMP_OFF") return "Comp-off";
+    if (value === "LOP") return "LOP";
+    return "Earned";
+  }
+
+  function taken(type: string) {
+    return balanceLeaves
+      .filter((leave) => leave.status === "APPROVED" && (leave.leaveType || "EARNED") === type)
+      .reduce((sum, leave) => sum + (leave.halfDay && leave.startDate === leave.endDate ? 0.5 : 1), 0);
+  }
+
+  const teamOff = companyLeaves.filter((leave) =>
+    leave.status === "APPROVED"
+    && (leave.startDate.startsWith(monthKey) || leave.endDate.startsWith(monthKey)),
+  );
+
   return (
     <section className="leave-page">
       <div className="ux-tabs">
         <button type="button" className={tab === "mine" ? "active" : ""} onClick={() => setTab("mine")}>My leave</button>
+        <button type="button" className={tab === "calendar" ? "active" : ""} onClick={() => setTab("calendar")}>Team calendar</button>
         <button type="button" className={tab === "approvals" ? "active" : ""} onClick={() => setTab("approvals")}>Approvals ({pending.length})</button>
         <button type="button" className={tab === "holidays" ? "active" : ""} onClick={() => setTab("holidays")}>Holidays</button>
         <button type="button" className={tab === "policy" ? "active" : ""} onClick={() => setTab("policy")}>Policy</button>
@@ -241,24 +264,29 @@ export default function Leave() {
 
       <div className="ux-balances">
         <article>
-          <span>Days left</span>
-          <strong>{balance?.remainingDays ?? "—"}</strong>
-          <em>of {balance?.annualEntitlementDays ?? "—"}</em>
+          <span>Casual</span>
+          <strong>{Math.max(0, 1 - casualThisMonth)}</strong>
+          <em>of 1 this month</em>
         </article>
         <article>
-          <span>Used</span>
-          <strong>{balance?.usedDays ?? 0}</strong>
-          <em>approved days</em>
+          <span>Sick</span>
+          <strong>{taken("SICK")}</strong>
+          <em>taken</em>
         </article>
         <article>
-          <span>Casual this month</span>
-          <strong>{casualThisMonth}</strong>
-          <em>of 1</em>
+          <span>Earned</span>
+          <strong>{Math.max(0, 1 - paidThisMonth)}</strong>
+          <em>of 1 this month · {balance?.remainingDays ?? "—"} left this year</em>
         </article>
         <article>
-          <span>Paid this month</span>
-          <strong>{paidThisMonth}</strong>
-          <em>of 1</em>
+          <span>Comp-off</span>
+          <strong>{taken("COMP_OFF")}</strong>
+          <em>approved</em>
+        </article>
+        <article>
+          <span>LOP taken</span>
+          <strong>{taken("LOP")}</strong>
+          <em>days</em>
         </article>
       </div>
 
@@ -272,6 +300,24 @@ export default function Leave() {
         <div className="payroll-error" role="alert">
           {error}
         </div>
+      )}
+
+      {tab === "calendar" && (
+        <section className="panel">
+          <h3>Team calendar</h3>
+          <p>Approved leave this month.</p>
+          {teamOff.length === 0 ? (
+            <p>Nobody is on approved leave this month.</p>
+          ) : (
+            <ul>
+              {teamOff.map((leave) => (
+                <li key={leave.id}>
+                  {leave.employee?.fullName || "Employee"} · {typeName(leave.leaveType)} · {leave.startDate} to {leave.endDate}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
 
       {tab === "holidays" && (
