@@ -86,9 +86,22 @@
 
 .ux-clock strong {
   display: block;
-  font-size: 36px;
+  font-size: 48px;
+  line-height: 1;
   letter-spacing: 1px;
   color: #3b2f80;
+}
+
+.ux-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.ux-stack {
+  display: grid;
+  gap: 12px;
 }
 
 .ux-apply {
@@ -200,6 +213,12 @@
 .home-week i.in {
   background: #6941c6;
   color: #fff;
+}
+
+@media (max-width: 900px) {
+  .ux-split {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 900px) {

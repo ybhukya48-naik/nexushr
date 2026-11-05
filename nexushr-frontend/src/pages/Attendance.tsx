@@ -1245,6 +1245,14 @@ export default function Attendance() {
             <strong>{visibleMetrics.late.toLocaleString()}</strong>
           </article>
           <article>
+            <span>Missing out</span>
+            <strong>{Math.max(0, visibleMetrics.totalEmployees - visibleMetrics.present).toLocaleString()}</strong>
+          </article>
+          <article>
+            <span>On site</span>
+            <strong>{companyRecords.filter((row) => row.checkInTime && row.employee?.siteVisitor).length}</strong>
+          </article>
+          <article>
             <span>Checked out</span>
             <strong>{visibleMetrics.checkedOut.toLocaleString()}</strong>
           </article>

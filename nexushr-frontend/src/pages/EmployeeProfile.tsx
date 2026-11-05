@@ -93,6 +93,7 @@ export default function EmployeeProfile() {
   const [form, setForm] = useState<EmployeeRequest | null>(null);
   const [month, setMonth] = useState<AttendanceRecord[]>([]);
   const [monthLoading, setMonthLoading] = useState(true);
+  const [profileTab, setProfileTab] = useState("overview");
 
   useEffect(() => {
     if (!mine && (!Number.isInteger(employeeId) || employeeId <= 0)) {
@@ -417,6 +418,19 @@ export default function EmployeeProfile() {
         </div>
       </div>
 
+      <div className="ux-tabs">
+        {["Overview", "Personal", "Job", "Attendance", "Leave", "Pay", "Documents", "Performance"].map((label) => (
+          <button
+            key={label}
+            type="button"
+            className={profileTab === label.toLowerCase() ? "active" : ""}
+            onClick={() => setProfileTab(label.toLowerCase())}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {editing && form ? (
         <form
           className="employees-panel"
@@ -617,7 +631,7 @@ export default function EmployeeProfile() {
             {saving ? "Saving..." : "Save Employee"}
           </button>
         </form>
-      ) : (
+      ) : (profileTab === "overview" || profileTab === "personal" || profileTab === "job") ? (
         <div className="employees-panel">
           <div className="panel-header">
             <div>
@@ -703,8 +717,9 @@ export default function EmployeeProfile() {
             </label>
           </div>
         </div>
-      )}
+      ) : null}
 
+      {profileTab === "attendance" && (
       <div className="employees-panel">
         <div className="employees-header">
           <div>
@@ -746,20 +761,35 @@ export default function EmployeeProfile() {
           </table>
         </div>
       </div>
+      )}
 
+      {(profileTab === "leave" || profileTab === "pay" || profileTab === "documents" || profileTab === "performance") && (
+        <div className="employees-panel">
+          <h2>{profileTab === "leave" ? "Leave" : profileTab === "pay" ? "Pay" : profileTab === "documents" ? "Documents" : "Performance"}</h2>
+          <p>
+            {profileTab === "leave" && "Leave requests for this person are on the Leave page."}
+            {profileTab === "pay" && (canSeePay ? `Base salary ₹${employee.baseSalary.toLocaleString("en-IN")}. Payslips are on the Payroll page.` : "Pay is visible to HR and on your own profile.")}
+            {profileTab === "documents" && "No documents are saved on this record yet."}
+            {profileTab === "performance" && "Reviews and hours are on the Performance page."}
+          </p>
+        </div>
+      )}
+
+      {profileTab === "overview" && (
       <div className="employees-panel">
         <div className="panel-header">
           <div>
             <p className="page-eyebrow">
               Lifecycle
             </p>
-            <h2>Lifecycle Actions</h2>
+            <h2>Lifecycle</h2>
             <p>
               Status changes are kept on this employee record.
             </p>
           </div>
         </div>
       </div>
+      )}
     </section>
   );
 }

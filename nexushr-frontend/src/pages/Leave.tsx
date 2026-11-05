@@ -353,6 +353,8 @@ export default function Leave() {
         </section>
       )}
 
+      {(tab === "mine" || tab === "approvals") && (
+      <div className={tab === "mine" ? "ux-split" : "ux-stack"}>
       {tab === "mine" && (
       <section className="panel leave-request-panel">
         <div className="panel-header">
@@ -594,6 +596,8 @@ export default function Leave() {
           </table>
         </div>
       </section>
+      </div>
+      )}
     </section>
   );
 }
