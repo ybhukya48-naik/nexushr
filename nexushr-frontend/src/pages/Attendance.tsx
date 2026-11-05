@@ -468,6 +468,7 @@ export default function Attendance() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [rowFilter, setRowFilter] = useState("All");
   const [attendanceLoaded, setAttendanceLoaded] = useState(false);
   const [selfie, setSelfie] = useState<File | null>(null);
   const [history, setHistory] = useState<AttendanceRecord[]>(() => {
@@ -588,6 +589,19 @@ export default function Attendance() {
         (record) => String(record.employee.id) === String(employee.id),
       ),
     }));
+
+  const visibleRows = attendanceRows.filter(({ record }) => {
+    if (rowFilter === "Present") {
+      return Boolean(record?.checkInTime);
+    }
+    if (rowFilter === "Late") {
+      return (record?.lateArrivalMinutes ?? 0) > 0;
+    }
+    if (rowFilter === "No check-in") {
+      return !record?.checkInTime;
+    }
+    return true;
+  });
 
 
   function calculateFallbackMetrics(
@@ -1171,6 +1185,16 @@ export default function Attendance() {
             </select>
           </label>
 
+          <label>
+            <span>Status</span>
+            <select value={rowFilter} onChange={(event) => setRowFilter(event.target.value)}>
+              <option>All</option>
+              <option>Present</option>
+              <option>Late</option>
+              <option>No check-in</option>
+            </select>
+          </label>
+
           <div className="attendance-selected-date">
             <span>Viewing</span>
             <strong>{formatDate(date)}</strong>
@@ -1267,7 +1291,7 @@ export default function Attendance() {
             </thead>
 
             <tbody>
-  {attendanceRows.map(({ employee, record }) => (
+  {visibleRows.map(({ employee, record }) => (
     <tr key={employee.id}>
       <td>
         <div className="attendance-employee-cell">
@@ -1367,7 +1391,7 @@ export default function Attendance() {
     </tr>
   ))}
 
-  {!loading && attendanceRows.length === 0 && (
+  {!loading && visibleRows.length === 0 && (
     <tr>
       <td colSpan={8}>
         <div className="attendance-empty">

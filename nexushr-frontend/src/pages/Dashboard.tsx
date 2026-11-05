@@ -288,10 +288,14 @@ export default function Dashboard() {
     leave.status === "APPROVED" && leave.startDate <= today && leave.endDate >= today,
   );
   const pending = leaves.filter((leave) => leave.status === "PENDING");
-  const missingCheckIn = people.filter((employee) =>
-    employee.active
-    && !todayRows.some((row) => row.employee?.id === employee.id && row.checkInTime),
-  ).length;
+  const nowForMissing = new Date();
+  const missingCheckInDue = nowForMissing.getHours() > 11 || (nowForMissing.getHours() === 11 && nowForMissing.getMinutes() >= 0);
+  const missingCheckIn = missingCheckInDue
+    ? people.filter((employee) =>
+        employee.active
+        && !todayRows.some((row) => row.employee?.id === employee.id && row.checkInTime),
+      ).length
+    : 0;
   const missingCheckOut = todayRows.filter((row) => isCheckoutMissing(row)).length;
   const windowsPunch = isWindowsComputer();
   const late = todayRows.filter((row) => row.lateWarning || (row.lateArrivalMinutes ?? 0) > 0).length;
@@ -501,7 +505,7 @@ export default function Dashboard() {
             <button type="button" onClick={viewAllToday}>View all</button>
           </div>
           <ul className="hr-leaves">
-            {people.filter((employee) => employee.active && !todayRows.some((row) => row.employee?.id === employee.id && row.checkInTime)).slice(0, 6).map((employee) => (
+            {missingCheckInDue && people.filter((employee) => employee.active && !todayRows.some((row) => row.employee?.id === employee.id && row.checkInTime)).slice(0, 6).map((employee) => (
               <li key={employee.id}>
                 <button type="button" onClick={() => openEmployeeMonth(employee.id)}>
                   <strong>{employee.fullName}</strong>
@@ -636,7 +640,7 @@ export default function Dashboard() {
             {holidays.map((holiday) => (
               <li key={holiday.date}>
                 <strong>{holiday.name}</strong>
-                <span>{holiday.date}</span>
+                <span>{displayDate(holiday.date)}</span>
               </li>
             ))}
           </ul>

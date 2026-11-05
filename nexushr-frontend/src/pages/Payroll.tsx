@@ -601,7 +601,7 @@ export default function Payroll() {
               onClick={() => void handleGenerateFromHours()}
               disabled={generatingFromHours}
             >
-              {generatingFromHours ? "Generating..." : "Generate payroll"}
+              {generatingFromHours ? "Calculating..." : "Calculate pay from attendance"}
             </button>
           </div>
 
@@ -1003,7 +1003,7 @@ export default function Payroll() {
             className="primary-action"
             disabled={saving || payrollEmployees.length === 0}
           >
-            {saving ? "Generating..." : "Generate payroll"}
+            {saving ? "Saving..." : "Save this salary record"}
           </button>
           </form>
         </div>

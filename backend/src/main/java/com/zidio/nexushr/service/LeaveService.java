@@ -97,9 +97,8 @@ public class LeaveService {
             );
         }
 
-        String leaveType = normalizeLeaveType(request.getLeaveType());
-        request.setLeaveType(leaveType);
-        enforceLeavePolicy(employee.getId(), leaveType, countedDays(request));
+        request.setLeaveType(normalizeLeaveType(request.getLeaveType()));
+        enforceLeavePolicy(employee.getId(), request);
 
         request.setEmployee(employee);
 
@@ -167,11 +166,7 @@ public class LeaveService {
         }
 
         if (status == LeaveStatus.APPROVED) {
-            enforceLeavePolicy(
-                    request.getEmployee().getId(),
-                    normalizeLeaveType(request.getLeaveType()),
-                    countedDays(request)
-            );
+            enforceLeavePolicy(request.getEmployee().getId(), request);
         }
 
         request.setStatus(status);
@@ -218,45 +213,34 @@ public class LeaveService {
         return leaveType.trim().toUpperCase();
     }
 
-    private double countedDays(LeaveRequest leave) {
-        double days = ChronoUnit.DAYS.between(leave.getStartDate(), leave.getEndDate()) + 1;
-        if (leave.isHalfDay() && leave.getStartDate().equals(leave.getEndDate())) {
-            return 0.5;
-        }
-        return days;
-    }
-
-    private void enforceLeavePolicy(Long employeeId, String leaveType, double requestedDays) {
-        Integer cap = switch (leaveType) {
-            case "CASUAL" -> 12;
-            case "SICK" -> 7;
-            case "EARNED" -> 15;
-            case "COMP_OFF", "LOP" -> 0;
-            default -> null;
-        };
-        if (cap == null) {
-            long usedDays = getApprovedLeaveDays(employeeId);
-            if (usedDays + requestedDays > annualEntitlementDays) {
-                throw new ResponseStatusException(
-                        HttpStatus.CONFLICT,
-                        "Leave request exceeds the remaining annual leave balance"
-                );
-            }
-            return;
-        }
-        if (cap == 0) {
-            return;
-        }
-        double used = leaveRequestRepository
-                .findByEmployee_IdAndStatus(employeeId, LeaveStatus.APPROVED)
-                .stream()
-                .filter(leave -> leaveType.equals(normalizeLeaveType(leave.getLeaveType())))
-                .mapToDouble(this::countedDays)
-                .sum();
-        if (used + requestedDays > cap) {
+    private void enforceLeavePolicy(Long employeeId, LeaveRequest request) {
+        long requestedDays = ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
+        long usedDays = getApprovedLeaveDays(employeeId);
+        if (usedDays + requestedDays > annualEntitlementDays) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "This request is more than the " + cap + " " + leaveType.toLowerCase() + " days in the policy"
+                    "Leave request exceeds the remaining annual leave balance"
+            );
+        }
+        String type = normalizeLeaveType(request.getLeaveType());
+        if (!"CASUAL".equals(type) && !"EARNED".equals(type)) {
+            return;
+        }
+        LocalDate monthStart = request.getStartDate().withDayOfMonth(1);
+        LocalDate monthEnd = monthStart.plusMonths(1).minusDays(1);
+        boolean alreadyUsed = leaveRequestRepository
+                .findByEmployee_IdOrderByStartDateDesc(employeeId)
+                .stream()
+                .filter(leave -> leave.getId() == null || request.getId() == null || !leave.getId().equals(request.getId()))
+                .filter(leave -> leave.getStatus() == LeaveStatus.APPROVED || leave.getStatus() == LeaveStatus.PENDING)
+                .filter(leave -> type.equals(normalizeLeaveType(leave.getLeaveType())))
+                .anyMatch(leave -> !leave.getEndDate().isBefore(monthStart) && !leave.getStartDate().isAfter(monthEnd));
+        if (alreadyUsed) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "CASUAL".equals(type)
+                            ? "One casual leave is allowed each month"
+                            : "One paid leave is allowed each month"
             );
         }
     }

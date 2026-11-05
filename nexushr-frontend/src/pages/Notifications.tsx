@@ -576,36 +576,6 @@ export default function Notifications() {
         </section>
       )}
 
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-icon">N</div>
-          <p>Total Notifications</p>
-          <h3>{notifications.length}</h3>
-          <span>Live from Cyond</span>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon">!</div>
-          <p>Unread</p>
-          <h3>{unreadCount}</h3>
-          <span>Requires attention</span>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon">OK</div>
-          <p>Read</p>
-          <h3>{notifications.length - unreadCount}</h3>
-          <span>Already reviewed</span>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon">U</div>
-          <p>Employee</p>
-          <h3>{employee?.employeeCode || "-"}</h3>
-          <span>{employee?.designation || "Employee profile"}</span>
-        </div>
-      </div>
-
       <section className="panel">
         <div className="panel-header">
           <div>
