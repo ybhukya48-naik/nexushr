@@ -1344,9 +1344,6 @@ export default function Attendance() {
             <strong>{employee.fullName}</strong>
           )}
           <span>{employee.employeeCode}</span>
-          {record?.attendanceStatus === "INACTIVE" && !record.checkInTime && (
-            <span className="attendance-inactive">No check-in</span>
-          )}
           {record?.lateWarning && <span className="attendance-inactive">Late</span>}
           {record?.yellowFlag && <span className="attendance-inactive">Yellow</span>}
           {record?.redFlag && <span className="attendance-inactive">Red</span>}
@@ -1358,31 +1355,31 @@ export default function Attendance() {
       <td>{formatDate(date)}</td>
 
       <td>
-        <span className="attendance-time">
-          {record ? formatTime(record.checkInTime) : "-"}
-        </span>
+        {record?.checkInTime ? (
+          <span className="attendance-time">{formatTime(record.checkInTime)}</span>
+        ) : (
+          "—"
+        )}
       </td>
 
       <td>
-        <span className="attendance-time">
-          {record?.checkOutTime
-            ? formatTime(record.checkOutTime)
-            : record?.checkInTime
-              ? "In progress"
-              : "-"}
-        </span>
+        {record?.checkOutTime ? (
+          <span className="attendance-time">{formatTime(record.checkOutTime)}</span>
+        ) : record?.checkInTime ? (
+          <span className="attendance-time">In progress</span>
+        ) : (
+          "—"
+        )}
         {record?.checkInTime && !record.checkOutTime && (
           <span>Working</span>
         )}
       </td>
 
       <td>
-        {record ? (
-          <span className="attendance-work-duration">
-            {workAndBreak(record).work}
-          </span>
+        {record?.checkInTime ? (
+          <span className="attendance-work-duration">{workAndBreak(record).work}</span>
         ) : (
-          "-"
+          "—"
         )}
       </td>
 

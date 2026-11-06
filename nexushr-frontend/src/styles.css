@@ -7047,6 +7047,44 @@ textarea {
   font-size: 12px;
 }
 
+.employees-page .employees-table th:first-child,
+.employees-page .employees-table td:first-child,
+.attendance-table th:first-child,
+.attendance-table td:first-child {
+  width: 24%;
+}
+
+.employees-page .employees-table th:last-child,
+.employees-page .employees-table td:last-child {
+  width: 108px;
+}
+
+.employees-page .employees-table td,
+.attendance-table td {
+  overflow: hidden;
+}
+
+.employees-page .employee-name-cell {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.employees-page .employee-name-cell > div:last-child,
+.employees-page .employee-name-cell strong,
+.attendance-employee-cell,
+.attendance-employee-cell strong {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.attendance-employee-cell {
+  width: 100%;
+}
+
 .leave-page .ux-split {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
