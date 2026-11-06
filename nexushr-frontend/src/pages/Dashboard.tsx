@@ -167,6 +167,7 @@ export default function Dashboard() {
   const [clockNow, setClockNow] = useState(() => new Date());
   const [payrollRows, setPayrollRows] = useState<PayrollRecord[]>([]);
   const [payslipId, setPayslipId] = useState("");
+  const [exceptionOpen, setExceptionOpen] = useState<"" | "checkin" | "checkout" | "lunch">("");
   const [payslipBusy, setPayslipBusy] = useState<"" | "download" | "email">("");
   const [payslipNote, setPayslipNote] = useState("");
 
@@ -526,58 +527,85 @@ export default function Dashboard() {
             <h3>Exceptions today</h3>
             <button type="button" onClick={viewAllToday}>View all</button>
           </div>
-          <div className="hr-miss-lists">
-            <div>
-              <strong>No check-in {!missingCheckInDue ? "" : `(${missedCheckInPeople.length})`}</strong>
-              {!missingCheckInDue ? (
-                <p className="hr-empty">Shown after 11:00.</p>
-              ) : missedCheckInPeople.length === 0 ? (
-                <p className="hr-empty">Nobody missed check-in.</p>
-              ) : (
-                <ul>
-                  {missedCheckInPeople.map((person) => (
-                    <li key={person.id}>
-                      <button type="button" onClick={() => openEmployeeMonth(person.id)}>{person.fullName}</button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div>
-              <strong>{checkoutMissedDue ? "Check-out missed" : "Not checked out"} ({missedCheckOutPeople.length})</strong>
-              {missedCheckOutPeople.length === 0 ? (
-                <p className="hr-empty">{checkoutMissedDue ? "Nobody missed check-out." : "Everyone who checked in has checked out."}</p>
-              ) : (
-                <ul>
-                  {missedCheckOutPeople.map((row) => (
-                    <li key={row.employee?.id ?? row.id}>
-                      <button type="button" onClick={() => openEmployeeMonth(row.employee?.id)}>{row.employee?.fullName || "Employee"}</button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div>
-              <strong>No lunch login ({noLunchLogin.length})</strong>
-              {noLunchLogin.length === 0 ? (
-                <p className="hr-empty">Everyone who checked in has logged back from lunch.</p>
-              ) : (
-                <ul>
-                  {noLunchLogin.map((row) => (
-                    <li key={`lunch-${row.employee?.id ?? row.id}`}>
-                      <button type="button" onClick={() => openEmployeeMonth(row.employee?.id)}>{row.employee?.fullName || "Employee"}</button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
+          <p className="hr-exception-line">
+            <button type="button" className={exceptionOpen === "checkin" ? "active" : ""} onClick={() => setExceptionOpen((open) => open === "checkin" ? "" : "checkin")}>
+              No check-in {missingCheckInDue ? missedCheckInPeople.length : ""}
+            </button>
+            <button type="button" className={exceptionOpen === "checkout" ? "active" : ""} onClick={() => setExceptionOpen((open) => open === "checkout" ? "" : "checkout")}>
+              {checkoutMissedDue ? "Check-out missed" : "Not checked out"} {missedCheckOutPeople.length}
+            </button>
+            <button type="button" className={exceptionOpen === "lunch" ? "active" : ""} onClick={() => setExceptionOpen((open) => open === "lunch" ? "" : "lunch")}>
+              No lunch login {noLunchLogin.length}
+            </button>
+          </p>
           <p className="hr-exception-line">
             <button type="button" onClick={() => navigate("/attendance")}>Idle warnings {idleWarnings}</button>
             <button type="button" onClick={() => navigate("/attendance")}>Late {late}</button>
           </p>
         </article>
       </section>
+
+      {exceptionOpen === "checkin" && (
+        <section className="hr-card hr-exception-people" id="exception-people">
+          <div className="hr-card-title">
+            <h3>No check-in</h3>
+            <button type="button" onClick={() => setExceptionOpen("")}>Close</button>
+          </div>
+          {!missingCheckInDue ? (
+            <p className="hr-empty">Shown after 11:00.</p>
+          ) : missedCheckInPeople.length === 0 ? (
+            <p className="hr-empty">Nobody missed check-in.</p>
+          ) : (
+            <ul>
+              {missedCheckInPeople.map((person) => (
+                <li key={person.id}>
+                  <button type="button" onClick={() => openEmployeeMonth(person.id)}>{person.fullName}</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {exceptionOpen === "checkout" && (
+        <section className="hr-card hr-exception-people" id="exception-people">
+          <div className="hr-card-title">
+            <h3>{checkoutMissedDue ? "Check-out missed" : "Not checked out"}</h3>
+            <button type="button" onClick={() => setExceptionOpen("")}>Close</button>
+          </div>
+          {missedCheckOutPeople.length === 0 ? (
+            <p className="hr-empty">{checkoutMissedDue ? "Nobody missed check-out." : "Everyone who checked in has checked out."}</p>
+          ) : (
+            <ul>
+              {missedCheckOutPeople.map((row) => (
+                <li key={row.employee?.id ?? row.id}>
+                  <button type="button" onClick={() => openEmployeeMonth(row.employee?.id)}>{row.employee?.fullName || "Employee"}</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {exceptionOpen === "lunch" && (
+        <section className="hr-card hr-exception-people" id="exception-people">
+          <div className="hr-card-title">
+            <h3>No lunch login</h3>
+            <button type="button" onClick={() => setExceptionOpen("")}>Close</button>
+          </div>
+          {noLunchLogin.length === 0 ? (
+            <p className="hr-empty">Everyone who checked in has logged back from lunch.</p>
+          ) : (
+            <ul>
+              {noLunchLogin.map((row) => (
+                <li key={`lunch-${row.employee?.id ?? row.id}`}>
+                  <button type="button" onClick={() => openEmployeeMonth(row.employee?.id)}>{row.employee?.fullName || "Employee"}</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <section className="hr-ops">
         <article className="hr-card">

@@ -178,6 +178,35 @@
   font-weight: 700;
 }
 
+.hr-exception-line button.active {
+  background: #6941c6;
+  color: #fff;
+  border-color: #6941c6;
+}
+
+.hr-exception-people {
+  margin-bottom: 16px;
+}
+
+.hr-exception-people ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hr-exception-people ul button {
+  border: 0;
+  background: transparent;
+  color: #3b2f80;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: underline;
+  padding: 0;
+}
+
 .hr-exception-line {
   display: flex;
   flex-wrap: wrap;
