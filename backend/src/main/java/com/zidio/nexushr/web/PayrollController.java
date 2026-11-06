@@ -127,12 +127,7 @@ public class PayrollController {
         String payMonth =
                 payroll.getPayMonth();
 
-        String filename =
-                "CYOND-Payslip-"
-                        + employeeCode
-                        + "-"
-                        + payMonth
-                        + ".pdf";
+        String filename = payslipFileName(payroll, employeeCode, payMonth);
 
         return ResponseEntity.ok()
                 .header(
@@ -177,46 +172,46 @@ public class PayrollController {
         String payMonth =
                 payroll.getPayMonth();
 
-        String filename =
-                "CYOND-Payslip-"
-                        + employeeCode
-                        + "-"
-                        + payMonth
-                        + ".pdf";
+        String filename = payslipFileName(payroll, employeeCode, payMonth);
 
         String employeeName =
                 payroll.getEmployee().getFullName();
 
+        String companyName = companyLabel(payroll);
+
         String subject =
-                "Cyond Payslip - " + payMonth;
+                companyName + " Payslip - " + payMonth;
 
         String html =
                 "<div style=\"font-family:Arial,sans-serif;line-height:1.6;\">"
-                        + "<h2>Cyond HR - Payslip</h2>"
+                        + "<h2>" + escapeHtml(companyName) + " Payslip</h2>"
                         + "<p>Hello "
-                        + employeeName
+                        + escapeHtml(employeeName)
                         + ",</p>"
-                        + "<p>Your payslip for <strong>"
-                        + payMonth
-                        + "</strong> is attached to this email.</p>"
+                        + "<p>Your "
+                        + escapeHtml(companyName)
+                        + " payslip for <strong>"
+                        + escapeHtml(payMonth)
+                        + "</strong> is attached. This email is only for you.</p>"
                         + "<p>Employee Code: <strong>"
-                        + employeeCode
+                        + escapeHtml(employeeCode)
                         + "</strong></p>"
-                        + "<p>Regards,<br>Cyond HR</p>"
+                        + "<p>Regards,<br>"
+                        + escapeHtml(companyName)
+                        + " HR</p>"
                         + "</div>";
 
         try {
-            String resendId =
-                    resendEmailService.sendHtmlEmailWithPdf(
-                            employeeEmail,
-                            subject,
-                            html,
-                            pdf,
-                            filename
-                    );
+            resendEmailService.sendHtmlEmailWithPdf(
+                    employeeEmail,
+                    subject,
+                    html,
+                    pdf,
+                    filename
+            );
 
             return ResponseEntity.ok(
-                    "Payslip emailed successfully. Resend ID: " + resendId
+                    "Payslip emailed to this employee only."
             );
 
         } catch (HttpClientErrorException.Forbidden ex) {
@@ -373,6 +368,55 @@ public class PayrollController {
                 }
             }
         }
+    }
+
+    private String payslipFileName(
+            PayrollRecord payroll,
+            String employeeCode,
+            String payMonth) {
+
+        String code = "CYOND";
+        if (payroll.getEmployee() != null
+                && payroll.getEmployee().getCompany() != null
+                && payroll.getEmployee().getCompany().getCode() != null
+                && !payroll.getEmployee().getCompany().getCode().isBlank()) {
+            code = payroll.getEmployee().getCompany().getCode().trim();
+        }
+
+        String safeCode = code.replaceAll("[^A-Za-z0-9]+", "");
+        String safeEmployee = employeeCode == null
+                ? "employee"
+                : employeeCode.replaceAll("[^A-Za-z0-9-]+", "");
+        String safeMonth = payMonth == null
+                ? "month"
+                : payMonth.replaceAll("[^A-Za-z0-9-]+", "");
+
+        return safeCode + "-Payslip-" + safeEmployee + "-" + safeMonth + ".pdf";
+    }
+
+    private String companyLabel(PayrollRecord payroll) {
+        if (payroll.getEmployee() != null
+                && payroll.getEmployee().getCompany() != null) {
+            String name = payroll.getEmployee().getCompany().getName();
+            if (name != null && !name.isBlank()) {
+                return name.trim();
+            }
+            String code = payroll.getEmployee().getCompany().getCode();
+            if (code != null && code.equalsIgnoreCase("GORLE")) {
+                return "Gorle Group";
+            }
+        }
+        return "CYOND";
+    }
+
+    private static String escapeHtml(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
     }
 }
 

@@ -76,7 +76,7 @@ export default function Payroll() {
 
   const [payslip, setPayslip] = useState<PayslipResponse | null>(null);
   const [payslipLoading, setPayslipLoading] = useState(false);
-  const [emailingPayslip, setEmailingPayslip] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   const companyEmployees = useMemo(
     () =>
@@ -303,60 +303,56 @@ export default function Payroll() {
     }
   }
 
-  async function handleDownloadPdf() {
-    if (!payslip) {
-      return;
-    }
-
+  async function handleDownloadPdf(target: {
+    payrollId: number;
+    employeeCode: string;
+    payMonth: string;
+    companyCode?: string;
+  }) {
+    setDownloadingId(target.payrollId);
     setError("");
+    setMessage("");
 
     try {
-      const pdf = await downloadPayslipPdf(payslip.payrollId);
+      const pdf = await downloadPayslipPdf(target.payrollId);
 
       const url = window.URL.createObjectURL(pdf);
       const link = document.createElement("a");
 
       link.href = url;
-      const companyPrefix = (payslip.companyCode || "CYOND")
+      const companyPrefix = (target.companyCode || "CYOND")
         .trim()
-        .replace(/[^A-Za-z0-9]+/g, "-");
+        .replace(/[^A-Za-z0-9]+/g, "");
 
       link.download =
-        `${companyPrefix}-Payslip-${payslip.employeeCode}-${payslip.payMonth}.pdf`;
+        `${companyPrefix}-Payslip-${target.employeeCode}-${target.payMonth}.pdf`;
 
       document.body.appendChild(link);
       link.click();
       link.remove();
 
       window.URL.revokeObjectURL(url);
+
+      try {
+        await emailPayslip(target.payrollId);
+        setMessage(
+          "Payslip downloaded. A copy was emailed only to this employee.",
+        );
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? `Payslip downloaded, but the email was not sent. ${err.message}`
+            : "Payslip downloaded, but the email was not sent.",
+        );
+      }
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : "Unable to download payslip PDF.",
       );
-    }
-  }
-  async function handleEmailPayslip() {
-    if (!payslip) {
-      return;
-    }
-
-    setEmailingPayslip(true);
-    setError("");
-
-    try {
-      const result = await emailPayslip(payslip.payrollId);
-
-      setMessage(result);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to email payslip.",
-      );
     } finally {
-      setEmailingPayslip(false);
+      setDownloadingId(null);
     }
   }
 
@@ -660,11 +656,11 @@ export default function Payroll() {
         ) : companyRecords.length === 0 ? (
           <div className="employee-empty-state">
             <strong>No payroll records for {payMonth}</strong>
-            <span>Import the salary Excel or generate a payroll record for this month.</span>
+            <span>Calculate pay from attendance for this month.</span>
           </div>
         ) : (
           <div className="table-wrapper">
-            <table className="employees-table">
+            <table className="employees-table payroll-records">
               <thead>
                 <tr>
                   <th>Employee</th>
@@ -710,6 +706,25 @@ export default function Payroll() {
                     </td>
 
                     <td>
+                      <div className="payroll-row-actions">
+                      <button
+                        type="button"
+                        className="primary-action"
+                        onClick={() =>
+                          void handleDownloadPdf({
+                            payrollId: record.id,
+                            employeeCode: record.employee.employeeCode,
+                            payMonth: record.payMonth,
+                            companyCode: record.employee.companyCode,
+                          })
+                        }
+                        disabled={downloadingId === record.id}
+                      >
+                        {downloadingId === record.id
+                          ? "Sending..."
+                          : "Download payslip"}
+                      </button>
+
                       <button
                         type="button"
                         className="table-action"
@@ -732,6 +747,7 @@ export default function Payroll() {
                           Mark paid
                         </button>
                       )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -750,7 +766,7 @@ export default function Payroll() {
                 {payslip.employeeName} - {payslip.payMonth}
               </h2>
               <p>
-                {payslip.employeeCode} - Status: {payslip.status}
+                {payslip.companyName || payslip.companyCode} · {payslip.employeeCode} · Status: {payslip.status}
               </p>
             </div>
 
@@ -758,21 +774,20 @@ export default function Payroll() {
               <button
                 type="button"
                 className="primary-action"
-                onClick={() => void handleDownloadPdf()}
+                onClick={() =>
+                  void handleDownloadPdf({
+                    payrollId: payslip.payrollId,
+                    employeeCode: payslip.employeeCode,
+                    payMonth: payslip.payMonth,
+                    companyCode: payslip.companyCode,
+                  })
+                }
+                disabled={downloadingId === payslip.payrollId}
               >
-                Download payslip
+                {downloadingId === payslip.payrollId
+                  ? "Sending..."
+                  : "Download payslip"}
               </button>
-
-              {isManagementRole && (
-                <button
-                  type="button"
-                  className="table-action"
-                  onClick={() => void handleEmailPayslip()}
-                  disabled={emailingPayslip}
-                >
-                  {emailingPayslip ? "Emailing..." : "Email payslip"}
-                </button>
-              )}
 
               <button
                 type="button"

@@ -7059,6 +7059,19 @@ textarea {
   width: 108px;
 }
 
+.employees-page .payroll-records th:last-child,
+.employees-page .payroll-records td:last-child {
+  width: 168px;
+  overflow: visible;
+}
+
+.payroll-row-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
 .employees-page .employees-table td,
 .attendance-table td {
   overflow: hidden;

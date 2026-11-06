@@ -167,27 +167,24 @@ public class PayrollPdfService {
             String normalizedLogoPath = companyLogoPath;
 
             if (normalizedLogoPath == null || normalizedLogoPath.isBlank()) {
-                normalizedLogoPath = "/images/cyond-logo.jpeg";
+                normalizedLogoPath = logoForCompany(companyCode);
             }
 
             if (!normalizedLogoPath.startsWith("/")) {
                 normalizedLogoPath = "/" + normalizedLogoPath;
             }
 
-            try (InputStream logoStream =
-                         getClass().getResourceAsStream(
-                                 normalizedLogoPath
-                         )) {
+            byte[] logoBytes = readLogo(normalizedLogoPath);
+            if (logoBytes == null) {
+                logoBytes = readLogo(logoForCompany(companyCode));
+            }
+            if (logoBytes == null) {
+                throw new IllegalStateException(
+                        "Company logo not found: " + logoForCompany(companyCode)
+                );
+            }
 
-                if (logoStream == null) {
-                    throw new IllegalStateException(
-                            "Company logo not found: " + normalizedLogoPath
-                    );
-                }
-
-                byte[] logoBytes =
-                        logoStream.readAllBytes();
-
+            {
                 com.lowagie.text.Image logo =
                         com.lowagie.text.Image.getInstance(
                                 logoBytes
@@ -861,6 +858,28 @@ public class PayrollPdfService {
         return value == null
                 ? ""
                 : value;
+    }
+
+    private static String logoForCompany(String companyCode) {
+        if (companyCode != null && companyCode.equalsIgnoreCase("GORLE")) {
+            return "/images/gorle-group-logo.jpeg";
+        }
+        return "/images/cyond-logo.jpeg";
+    }
+
+    private byte[] readLogo(String path) {
+        if (path == null || path.isBlank()) {
+            return null;
+        }
+        String normalized = path.startsWith("/") ? path : "/" + path;
+        try (InputStream logoStream = getClass().getResourceAsStream(normalized)) {
+            if (logoStream == null) {
+                return null;
+            }
+            return logoStream.readAllBytes();
+        } catch (java.io.IOException ex) {
+            return null;
+        }
     }
 }
 
