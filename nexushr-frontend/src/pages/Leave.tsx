@@ -509,12 +509,14 @@ export default function Leave() {
                     </td>
 
                     <td>
-                      {new Date(`${leave.startDate}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                      {" to "}
-                      {new Date(`${leave.endDate}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                      {leave.status === "PENDING" && leave.endDate < new Date().toISOString().slice(0, 10)
-                        ? " · dates have passed"
-                        : ""}
+                      <span>
+                        {new Date(`${leave.startDate}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                        {" to "}
+                        {new Date(`${leave.endDate}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                      </span>
+                      {leave.status === "PENDING" && leave.endDate < new Date().toISOString().slice(0, 10) && (
+                        <span>Dates passed</span>
+                      )}
                     </td>
 
                     <td>{days}</td>

@@ -6968,6 +6968,108 @@ textarea {
   max-width: 100%;
 }
 
+.employees-page .employees-header h1,
+.leave-page .page-heading h2,
+.attendance-heading h2 {
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.employees-page .employee-summary-card > strong,
+.leave-page .ux-balances strong,
+.attendance-page .ux-balances strong,
+.ux-balances strong {
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.employees-page .employees-table-wrapper,
+.employees-page .table-wrapper,
+.leave-page .employees-table-wrap,
+.attendance-table-wrap,
+.month-history {
+  overflow-x: hidden;
+}
+
+.employees-page .employees-table,
+.leave-page .employees-table,
+.attendance-table,
+.month-history .employees-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.employees-page .employees-table thead th,
+.leave-page .employees-table thead th,
+.attendance-table thead th,
+.month-history .employees-table thead th {
+  padding: 10px 8px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  white-space: normal;
+}
+
+.employees-page .employees-table tbody td,
+.leave-page .employees-table tbody td,
+.attendance-table tbody td,
+.month-history .employees-table tbody td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #eaecf0;
+  font-size: 13px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.employees-page .employees-table tbody tr:last-child td,
+.leave-page .employees-table tbody tr:last-child td,
+.attendance-table tbody tr:last-child td,
+.month-history .employees-table tbody tr:last-child td {
+  border-bottom: 1px solid #eaecf0;
+}
+
+.employees-page .employees-table tbody td:first-child strong,
+.leave-page .employees-table tbody td:first-child strong {
+  font-size: 13px;
+}
+
+.employees-page .employees-table tbody td:nth-child(2),
+.employees-page .employees-table tbody td:nth-child(3),
+.employees-page .employees-table tbody td:nth-child(5),
+.employee-name-cell {
+  min-width: 0;
+  white-space: normal;
+}
+
+.employees-page .employees-table .table-action {
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.leave-page .ux-split {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.leave-request-panel .employee-filters {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.leave-request-panel .employee-filters label:first-child,
+.leave-request-panel .employee-filters label:nth-child(6) {
+  grid-column: 1 / -1;
+}
+
+.leave-request-panel .employee-filters .primary-button {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.leave-page .employees-table tbody td span {
+  display: block;
+  font-size: 13px;
+}
+
 .attendance-employee-cell .panel-link,
 .employee-profile-link {
   border: 0;

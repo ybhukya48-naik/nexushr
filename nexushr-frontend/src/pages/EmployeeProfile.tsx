@@ -695,7 +695,12 @@ export default function EmployeeProfile() {
 
             <label>
               Joining Date
-              <input value={employee.joiningDate} readOnly />
+              <input
+                value={employee.joiningDate
+                  ? new Date(`${employee.joiningDate.slice(0, 10)}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                  : ""}
+                readOnly
+              />
             </label>
 
             {canSeePay && (

@@ -26,10 +26,29 @@
   justify-content: flex-end;
 }
 
+.profile-hero {
+  align-items: center;
+}
+
 .profile-identity {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.employees-page .employees-panel .employee-filters {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.employees-page .employees-panel .employee-filters label {
+  font-size: 13px;
+}
+
+.employees-page .employees-panel .employee-filters input,
+.employees-page .employees-panel .employee-filters select {
+  min-height: 40px;
+  font-size: 14px;
 }
 
 .profile-picture {
@@ -62,9 +81,9 @@
 
 .employees-header h1 {
   margin: 4px 0 6px;
-  font-size: clamp(28px, 3vw, 36px);
-  line-height: 1.15;
-  letter-spacing: -0.025em;
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 .employees-header h1 + p,
@@ -168,6 +187,11 @@
   z-index: 1;
   color: #172033;
   font-size: 18px;
+  line-height: 1.3;
+}
+
+.employee-summary-card strong .employee-status {
+  width: auto;
 }
 
 /* Status badges */
