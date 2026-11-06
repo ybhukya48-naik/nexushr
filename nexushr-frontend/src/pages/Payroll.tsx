@@ -354,11 +354,7 @@ export default function Payroll() {
 
     try {
       await emailPayslip(payrollId);
-      setMessage(
-        isManagementRole
-          ? "Payslip emailed only to this employee."
-          : "Payslip emailed to you.",
-      );
+      setMessage("Payslip emailed only to this employee.");
     } catch (err) {
       setError(
         err instanceof Error
@@ -379,7 +375,7 @@ export default function Payroll() {
           <h1>{role === "EMPLOYEE" ? "My Pay" : "Payroll"}</h1>
           <p>
             {role === "EMPLOYEE"
-              ? "Download your payslip, or email that same payslip to yourself."
+              ? "Download your payslip."
               : "Download a payslip, or email that payslip to the employee."}
           </p>
         </div>
@@ -659,7 +655,7 @@ export default function Payroll() {
             <h2>Salary Records</h2>
             <p>
               {role === "EMPLOYEE"
-                ? "Your salary records. Download a payslip, or email it to yourself."
+                ? "Your salary records. Download a payslip here."
                 : "Generated payroll records and payment status."}
             </p>
           </div>
@@ -684,21 +680,6 @@ export default function Payroll() {
                 disabled={downloadingId !== null}
               >
                 {downloadingId !== null ? "Downloading..." : "Download payslip"}
-              </button>
-              <button
-                type="button"
-                className="table-action"
-                onClick={() => {
-                  const latest = [...records].sort((a, b) => b.payMonth.localeCompare(a.payMonth))[0];
-                  if (!latest) {
-                    setError("No payslip yet. It appears after pay is calculated.");
-                    return;
-                  }
-                  void handleEmailPayslip(latest.id);
-                }}
-                disabled={emailingId !== null}
-              >
-                {emailingId !== null ? "Emailing..." : "Email payslip"}
               </button>
             </div>
           )}
@@ -789,16 +770,18 @@ export default function Payroll() {
                           : "Download payslip"}
                       </button>
 
-                      <button
-                        type="button"
-                        className="table-action"
-                        onClick={() => void handleEmailPayslip(record.id)}
-                        disabled={emailingId === record.id}
-                      >
-                        {emailingId === record.id
-                          ? "Emailing..."
-                          : "Email payslip"}
-                      </button>
+                      {isManagementRole && (
+                        <button
+                          type="button"
+                          className="table-action"
+                          onClick={() => void handleEmailPayslip(record.id)}
+                          disabled={emailingId === record.id}
+                        >
+                          {emailingId === record.id
+                            ? "Emailing..."
+                            : "Email payslip"}
+                        </button>
+                      )}
 
                       <button
                         type="button"
@@ -864,16 +847,18 @@ export default function Payroll() {
                   : "Download payslip"}
               </button>
 
-              <button
-                type="button"
-                className="table-action"
-                onClick={() => void handleEmailPayslip(payslip.payrollId)}
-                disabled={emailingId === payslip.payrollId}
-              >
-                {emailingId === payslip.payrollId
-                  ? "Emailing..."
-                  : "Email payslip"}
-              </button>
+              {isManagementRole && (
+                <button
+                  type="button"
+                  className="table-action"
+                  onClick={() => void handleEmailPayslip(payslip.payrollId)}
+                  disabled={emailingId === payslip.payrollId}
+                >
+                  {emailingId === payslip.payrollId
+                    ? "Emailing..."
+                    : "Email payslip"}
+                </button>
+              )}
 
               <button
                 type="button"

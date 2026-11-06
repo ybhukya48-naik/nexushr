@@ -14,7 +14,6 @@ import {
   getCurrentEmployee,
   getEmployeeNotifications,
   downloadPayslipPdf,
-  emailPayslip,
   getEmployeePayroll,
   getHolidays,
   type PayrollRecord,
@@ -1101,20 +1100,6 @@ function EmployeeDashboard() {
     }
   }
 
-  async function emailMyPayslip() {
-    if (!latestPay) {
-      setPayslipNote("No payslip yet. It appears after pay is calculated.");
-      return;
-    }
-    setPayslipNote("");
-    try {
-      await emailPayslip(latestPay.id);
-      setPayslipNote("Payslip emailed to you.");
-    } catch (err) {
-      setPayslipNote(err instanceof Error ? err.message : "Unable to email payslip.");
-    }
-  }
-
   async function punchLunch(kind: "out" | "in") {
     setPunching(true);
     setPunchNote("");
@@ -1243,7 +1228,6 @@ function EmployeeDashboard() {
                   <span>Quick actions</span>
                   <button type="button" onClick={() => navigate("/leave")}>Apply leave ({leaveCount})</button>
                   <button type="button" onClick={() => void downloadMyPayslip()}>Download payslip</button>
-                  <button type="button" onClick={() => void emailMyPayslip()}>Email payslip</button>
                   {payslipNote && <em>{payslipNote}</em>}
                   <button type="button" onClick={() => navigate("/attendance")}>My attendance</button>
                   <button type="button" onClick={() => navigate("/notifications")}>Open updates</button>

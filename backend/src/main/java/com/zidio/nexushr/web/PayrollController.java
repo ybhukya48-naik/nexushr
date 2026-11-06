@@ -139,9 +139,7 @@ public class PayrollController {
     }
 
     @PostMapping("/{id}/payslip/email")
-    @PreAuthorize(
-            "@authorizationService.canAccessPayroll(#id, authentication)"
-    )
+    @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER')")
     public ResponseEntity<String> emailPayslip(
             @PathVariable Long id) {
 
