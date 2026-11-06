@@ -275,7 +275,9 @@ public class AuthController {
                         new AuthDtos.LoginResponse(
                                 token,
                                 demoRole,
-                                normalizedUsername
+                                normalizedUsername,
+                                false,
+                                true
                         )
                 );
             }
@@ -310,7 +312,10 @@ public class AuthController {
                 }
 
                 String token = jwtTokenService.generate(email, Map.of("role", role));
-                return ResponseEntity.ok(new AuthDtos.LoginResponse(token, role, name));
+                Employee signedIn = employeeRepository.findByEmailIgnoreCase(email).orElse(null);
+                boolean mustChange = signedIn != null && signedIn.isPasswordChangeRequired();
+                boolean profileDone = signedIn == null || signedIn.isProfileCompleted();
+                return ResponseEntity.ok(new AuthDtos.LoginResponse(token, role, name, mustChange, profileDone));
             }
 
             String message = rows.isEmpty()

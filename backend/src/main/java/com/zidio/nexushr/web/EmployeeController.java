@@ -14,6 +14,7 @@ import com.zidio.nexushr.web.dto.EmployeeResponse;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/employees")
@@ -55,6 +56,51 @@ public class EmployeeController {
 
         return EmployeeResponse.from(
                 employeeService.findById(employeeId)
+        );
+    }
+
+    @PostMapping("/me/password")
+    public EmployeeResponse changeOwnPassword(
+            @RequestBody Map<String, String> body,
+            Authentication authentication) {
+        Long employeeId = requireSelf(authentication);
+        String password = body == null ? null : body.get("password");
+        try {
+            return EmployeeResponse.from(employeeService.changeOwnPassword(employeeId, password));
+        } catch (IllegalArgumentException ex) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    ex.getMessage()
+            );
+        }
+    }
+
+    @PostMapping("/me/profile")
+    public EmployeeResponse completeOwnProfile(
+            @RequestBody Map<String, String> body,
+            Authentication authentication) {
+        Long employeeId = requireSelf(authentication);
+        String fullName = body == null ? null : body.get("fullName");
+        String phone = body == null ? null : body.get("phone");
+        try {
+            return EmployeeResponse.from(employeeService.completeOwnProfile(employeeId, fullName, phone));
+        } catch (IllegalArgumentException ex) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    ex.getMessage()
+            );
+        }
+    }
+
+    @PostMapping("/{id}/reset-password")
+    public Map<String, String> resetPassword(
+            @PathVariable Long id,
+            Authentication authentication) {
+        requireHr(authentication);
+        String temporary = employeeService.resetToDefaultPassword(id);
+        return Map.of(
+                "message", "Password reset. The employee must set a new password at the next sign-in.",
+                "temporaryPassword", temporary
         );
     }
 

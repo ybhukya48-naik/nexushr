@@ -5,7 +5,10 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import type { FormEvent } from "react";
 import {
   createEmployee,
+  defaultEmployeePassword,
+  employeeEmailDomain,
   getEmployees,
+  resetEmployeePassword,
   updateEmployee,
   deleteEmployee,
   type EmployeeRequest,
@@ -262,6 +265,7 @@ export default function Employees() {
   const [form, setForm] = useState<EmployeeRequest>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [resetNotice, setResetNotice] = useState("");
   const [role] = useState(getStoredRole);
 
   const managementAccess = canManageEmployees(role);
@@ -463,6 +467,23 @@ export default function Employees() {
     setShowDeleteConfirm(true);
   }
 
+  async function handleResetPassword(employee: EmployeeResponse) {
+    if (!canEditDeleteEmployees) {
+      return;
+    }
+    if (!window.confirm(`Reset the password for ${employee.fullName}? They must choose a new password at the next sign-in.`)) {
+      return;
+    }
+    setSaveError("");
+    setResetNotice("");
+    try {
+      const result = await resetEmployeePassword(employee.id);
+      setResetNotice(`${result.message} Temporary password: ${result.temporaryPassword}`);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Unable to reset the password.");
+    }
+  }
+
   async function confirmDeleteEmployee() {
     if (!canEditDeleteEmployees || !employeeToDelete) {
       return;
@@ -499,20 +520,43 @@ export default function Employees() {
     setSaving(true);
     setSaveError("");
 
-    const employeeData: EmployeeRequest = {
-      ...form,
-      employeeCode: form.employeeCode.trim(),
-      fullName: form.fullName.trim(),
-      email: form.email.trim().toLowerCase(),
-      phone: form.phone?.trim() || "",
-      accountNumber: form.accountNumber?.trim() || "",
-      department: form.department.trim(),
-      designation: form.designation.trim(),
-      companyCode:
-        editingEmployeeId !== null
-          ? form.companyCode
-          : (getWorkspaceCompany() ?? "CYOND"),
-    };
+    const companyCode = editingEmployeeId !== null
+      ? form.companyCode
+      : (getWorkspaceCompany() ?? "CYOND");
+    const email = form.email.trim().toLowerCase();
+    if (editingEmployeeId === null && !email.endsWith(employeeEmailDomain(companyCode))) {
+      setSaving(false);
+      setSaveError(`Use an email that ends with ${employeeEmailDomain(companyCode)}.`);
+      return;
+    }
+    const employeeData: EmployeeRequest = editingEmployeeId !== null
+      ? {
+          ...form,
+          employeeCode: form.employeeCode.trim(),
+          fullName: form.fullName.trim(),
+          email,
+          phone: form.phone?.trim() || "",
+          accountNumber: form.accountNumber?.trim() || "",
+          department: form.department.trim(),
+          designation: form.designation.trim(),
+          companyCode,
+        }
+      : {
+          employeeCode: form.employeeCode.trim(),
+          fullName: form.employeeCode.trim(),
+          email,
+          phone: "",
+          accountNumber: "",
+          password: defaultEmployeePassword(companyCode),
+          roleType: "EMPLOYEE",
+          department: form.designation.trim(),
+          designation: form.designation.trim(),
+          joiningDate: new Date().toISOString().slice(0, 10),
+          baseSalary: 0,
+          active: true,
+          companyCode,
+          starterAccount: true,
+        };
 
     try {
       if (editingEmployeeId !== null) {
@@ -524,6 +568,9 @@ export default function Employees() {
       setForm({ ...emptyForm });
       setShowCreateForm(false);
       setEditingEmployeeId(null);
+      if (editingEmployeeId === null) {
+        setResetNotice(`Employee added. First password is ${defaultEmployeePassword(companyCode)}. They set a new password, then create their profile.`);
+      }
 
       await loadEmployees();
     } catch (err) {
@@ -690,7 +737,7 @@ export default function Employees() {
               />
             </label>
 
-            <label>
+            {editingEmployeeId !== null && <label>
               Full Name
               <input
                 required
@@ -699,7 +746,7 @@ export default function Employees() {
                   updateForm("fullName", event.target.value)
                 }
               />
-            </label>
+            </label>}
 
             <label>
               Email
@@ -713,7 +760,7 @@ export default function Employees() {
               />
             </label>
 
-            <label>
+            {editingEmployeeId !== null && <label>
               Phone Number
               <input
                 required
@@ -725,9 +772,9 @@ export default function Employees() {
                   updateForm("phone", event.target.value)
                 }
               />
-            </label>
+            </label>}
 
-            <label>
+            {editingEmployeeId !== null && <label>
               Bank Account Number
               <input
                 required
@@ -739,13 +786,15 @@ export default function Employees() {
                   updateForm("accountNumber", event.target.value)
                 }
               />
-            </label>
+            </label>}
 
-            <p className="employee-password-note">
-              No password is saved here. The employee uses this email on the sign-in page, creates a password, then logs in. This works for both CYOND and Gorle.
-            </p>
+            {editingEmployeeId === null && (
+              <p className="employee-password-note">
+                First password is {defaultEmployeePassword(getWorkspaceCompany() ?? "CYOND")}. The email must end with {employeeEmailDomain(getWorkspaceCompany() ?? "CYOND")}. The employee sets a new password, then creates the rest of the profile.
+              </p>
+            )}
 
-            <label>
+            {editingEmployeeId !== null && <label>
               Role
               <select
                 value={form.roleType}
@@ -761,9 +810,9 @@ export default function Employees() {
                 <option value="HR">HR</option>
                 <option value="ADMIN">Admin</option>
               </select>
-            </label>
+            </label>}
 
-            <label>
+            {editingEmployeeId !== null && <label>
               Department
               <input
                 required
@@ -775,7 +824,7 @@ export default function Employees() {
                   )
                 }
               />
-            </label>
+            </label>}
 
             <label>
               Designation
@@ -791,7 +840,7 @@ export default function Employees() {
               />
             </label>
 
-            <label>
+            {editingEmployeeId !== null && <label>
               Joining Date
               <input
                 required
@@ -804,9 +853,9 @@ export default function Employees() {
                   )
                 }
               />
-            </label>
+            </label>}
 
-            <label>
+            {editingEmployeeId !== null && <label>
               Base Salary
               <input
                 required
@@ -820,9 +869,9 @@ export default function Employees() {
                   )
                 }
               />
-            </label>
+            </label>}
 
-            <label>
+            {editingEmployeeId !== null && <label>
               Active
               <input
                 type="checkbox"
@@ -831,7 +880,7 @@ export default function Employees() {
                   updateForm("active", event.target.checked)
                 }
               />
-            </label>
+            </label>}
           </div>
 
           <button
@@ -851,6 +900,7 @@ export default function Employees() {
       )}
 
       <div className="employees-panel">
+        {resetNotice && <div role="status" className="payroll-message">{resetNotice}</div>}
         <div className="employee-filters">
           <label className="employee-search">
             <span className="sr-only">Search employees</span>
@@ -994,6 +1044,14 @@ export default function Employees() {
                                 disabled={saving}
                               >
                                 Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="table-action"
+                                onClick={() => void handleResetPassword(employee)}
+                                disabled={saving}
+                              >
+                                Reset password
                               </button>
 
                               <button

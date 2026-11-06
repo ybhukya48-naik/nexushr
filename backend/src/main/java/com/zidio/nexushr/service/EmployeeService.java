@@ -11,6 +11,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -65,24 +67,64 @@ public class EmployeeService {
             );
         }
 
+        boolean starter = Boolean.TRUE.equals(request.getStarterAccount());
+        String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
+        if (starter) {
+            String domain = CompanyPasswords.emailDomain(companyCode);
+            if (!email.endsWith(domain)) {
+                throw new IllegalArgumentException(
+                        "Use an employee email that ends with " + domain
+                );
+            }
+        }
+
         Employee employee = new Employee();
         employee.setCompany(company);
         employee.setEmployeeCode(request.getEmployeeCode());
-        employee.setFullName(request.getFullName());
-        employee.setEmail(request.getEmail());
+        employee.setFullName(starter && (request.getFullName() == null || request.getFullName().isBlank())
+                ? request.getEmployeeCode()
+                : request.getFullName());
+        employee.setEmail(email.isBlank() ? request.getEmail() : email);
         employee.setPhone(request.getPhone());
         employee.setAccountNumber(request.getAccountNumber());
         String rawPassword = request.getPassword();
+        if (starter && (rawPassword == null || rawPassword.isBlank())) {
+            rawPassword = CompanyPasswords.initialPassword(companyCode);
+        }
         employee.setPassword(
                 rawPassword == null || rawPassword.isBlank()
                         ? ExcelPayrollService.UNSET_PASSWORD_HASH
                         : passwordEncoder.encode(rawPassword)
         );
-        employee.setRoleType(request.getRoleType());
-        employee.setDepartment(request.getDepartment());
+        if (starter) {
+            employee.setPasswordChangeRequired(true);
+            employee.setProfileCompleted(false);
+            if (request.getDepartment() == null || request.getDepartment().isBlank()) {
+                employee.setDepartment(request.getDesignation());
+            }
+            if (request.getJoiningDate() == null) {
+                employee.setJoiningDate(LocalDate.now());
+            }
+            if (request.getBaseSalary() == null) {
+                employee.setBaseSalary(BigDecimal.ZERO);
+            }
+            if (request.getRoleType() == null) {
+                employee.setRoleType(RoleType.EMPLOYEE);
+            }
+        }
+        if (request.getRoleType() != null) {
+            employee.setRoleType(request.getRoleType());
+        }
+        if (request.getDepartment() != null && !request.getDepartment().isBlank()) {
+            employee.setDepartment(request.getDepartment());
+        }
         employee.setDesignation(request.getDesignation());
-        employee.setJoiningDate(request.getJoiningDate());
-        employee.setBaseSalary(request.getBaseSalary());
+        if (request.getJoiningDate() != null) {
+            employee.setJoiningDate(request.getJoiningDate());
+        }
+        if (request.getBaseSalary() != null) {
+            employee.setBaseSalary(request.getBaseSalary());
+        }
 
         employee.setActive(true);
         employee.setLifecycleStatus(
@@ -257,6 +299,39 @@ public class EmployeeService {
         employee.setProfilePhoto(bytes);
         employee.setProfilePhotoType(type);
         return employeeRepository.save(employee);
+    }
+
+    public Employee changeOwnPassword(Long id, String newPassword) {
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new IllegalArgumentException("Password must contain at least 8 characters");
+        }
+        Employee employee = findById(id);
+        employee.setPassword(passwordEncoder.encode(newPassword));
+        employee.setPasswordChangeRequired(false);
+        return employeeRepository.save(employee);
+    }
+
+    public Employee completeOwnProfile(Long id, String fullName, String phone) {
+        if (fullName == null || fullName.isBlank()) {
+            throw new IllegalArgumentException("Enter your name");
+        }
+        Employee employee = findById(id);
+        employee.setFullName(fullName.trim());
+        if (phone != null && !phone.isBlank()) {
+            employee.setPhone(phone.trim());
+        }
+        employee.setProfileCompleted(true);
+        return employeeRepository.save(employee);
+    }
+
+    public String resetToDefaultPassword(Long id) {
+        Employee employee = findById(id);
+        String companyCode = employee.getCompany() == null ? "CYOND" : employee.getCompany().getCode();
+        String temporary = CompanyPasswords.initialPassword(companyCode);
+        employee.setPassword(passwordEncoder.encode(temporary));
+        employee.setPasswordChangeRequired(true);
+        employeeRepository.save(employee);
+        return temporary;
     }
 
     public void delete(Long id) {

@@ -21,6 +21,8 @@ export function clearWebsiteSession() {
   localStorage.removeItem("nexushr_user");
   localStorage.removeItem("nexushr_role");
   localStorage.removeItem("nexushr_dashboard_snapshot");
+  localStorage.removeItem("nexushr_must_change_password");
+  localStorage.removeItem("nexushr_profile_needed");
   localStorage.removeItem(SESSION_KEY);
 }
 
@@ -40,6 +42,8 @@ export interface LoginResponse {
   accessToken: string;
   role: string;
   username: string;
+  mustChangePassword?: boolean;
+  profileCompleted?: boolean;
 }
 
 export interface DashboardSummary {
@@ -104,6 +108,7 @@ export interface EmployeeRequest {
   baseSalary: number;
   active: boolean;
   companyCode?: string;
+  starterAccount?: boolean;
 }
 
 export interface EmployeeLifecycleRequest {
@@ -457,6 +462,35 @@ export async function uploadEmployeePhoto(id: number | "me", file: File) {
 
 export function getEmployee(id: number) {
   return request<EmployeeResponse>(`/employees/${id}`);
+}
+
+export function defaultEmployeePassword(company?: string) {
+  return company === "GORLE" ? "Gorle@1234" : "Cyond@1234";
+}
+
+export function employeeEmailDomain(company?: string) {
+  return company === "GORLE" ? "@gorle.com" : "@cyond.com";
+}
+
+export function changeOwnPassword(password: string) {
+  return request<EmployeeResponse>("/employees/me/password", {
+    method: "POST",
+    body: JSON.stringify({ password }),
+  });
+}
+
+export function completeOwnProfile(fullName: string, phone: string) {
+  return request<EmployeeResponse>("/employees/me/profile", {
+    method: "POST",
+    body: JSON.stringify({ fullName, phone }),
+  });
+}
+
+export function resetEmployeePassword(id: number) {
+  return request<{ message: string; temporaryPassword: string }>(
+    `/employees/${id}/reset-password`,
+    { method: "POST" },
+  );
 }
 
 export function createEmployee(employee: EmployeeRequest) {

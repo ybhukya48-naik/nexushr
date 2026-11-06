@@ -19,6 +19,8 @@ import {
   type PayrollRecord,
   getMyAttendanceStatus,
   register as apiRegister,
+  changeOwnPassword,
+  completeOwnProfile,
   login as apiLogin,
   getAiWorkforceDashboard,
   fetchEmployeePhoto,
@@ -115,6 +117,21 @@ function AppRoutes() {
   const [myPhoto, setMyPhoto] = useState("");
   const [bellOpen, setBellOpen] = useState(false);
   const [bellItems, setBellItems] = useState<NotificationResponse[]>([]);
+  const [accountStep, setAccountStep] = useState<"password" | "profile" | "done">(() => {
+    if (localStorage.getItem("nexushr_must_change_password") === "1") {
+      return "password";
+    }
+    if (localStorage.getItem("nexushr_profile_needed") === "1") {
+      return "profile";
+    }
+    return "done";
+  });
+  const [nextPassword, setNextPassword] = useState("");
+  const [confirmNextPassword, setConfirmNextPassword] = useState("");
+  const [profileName, setProfileName] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [accountError, setAccountError] = useState("");
+  const [accountSaving, setAccountSaving] = useState(false);
 
   useEffect(() => {
     const watch = window.setInterval(() => {
@@ -213,9 +230,103 @@ function AppRoutes() {
     navigate("/login", { replace: true });
   }
 
+  async function saveNewPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAccountError("");
+    if (nextPassword.length < 8) {
+      setAccountError("Password must contain at least 8 characters.");
+      return;
+    }
+    if (nextPassword !== confirmNextPassword) {
+      setAccountError("Passwords do not match.");
+      return;
+    }
+    setAccountSaving(true);
+    try {
+      await changeOwnPassword(nextPassword);
+      localStorage.removeItem("nexushr_must_change_password");
+      setNextPassword("");
+      setConfirmNextPassword("");
+      if (localStorage.getItem("nexushr_profile_needed") === "1") {
+        setAccountStep("profile");
+      } else {
+        setAccountStep("done");
+      }
+    } catch (err) {
+      setAccountError(err instanceof Error ? err.message : "Could not save the password.");
+    } finally {
+      setAccountSaving(false);
+    }
+  }
+
+  async function saveNewProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAccountError("");
+    if (!profileName.trim()) {
+      setAccountError("Enter your name.");
+      return;
+    }
+    setAccountSaving(true);
+    try {
+      const saved = await completeOwnProfile(profileName.trim(), profilePhone.trim());
+      localStorage.setItem("nexushr_user", saved.fullName);
+      localStorage.removeItem("nexushr_profile_needed");
+      setAccountStep("done");
+    } catch (err) {
+      setAccountError(err instanceof Error ? err.message : "Could not save the profile.");
+    } finally {
+      setAccountSaving(false);
+    }
+  }
+
   function enterWorkspace(company: WorkspaceCompany) {
     setWorkspaceCompany(company);
     setWorkspace(company);
+  }
+
+  if (accountStep !== "done") {
+    return (
+      <div className="login-page">
+        <form className="login-card" onSubmit={accountStep === "password" ? saveNewPassword : saveNewProfile}>
+          <div className="login-card-header">
+            <h2>{accountStep === "password" ? "Set your password" : "Create your profile"}</h2>
+            <p>
+              {accountStep === "password"
+                ? "This is your first sign-in. Choose a new password before you continue."
+                : "Your employee ID and designation are already saved. Add your name and phone."}
+            </p>
+          </div>
+          {accountError && <div role="alert" className="login-error">{accountError}</div>}
+          {accountStep === "password" ? (
+            <>
+              <label>
+                New password
+                <input type="password" value={nextPassword} autoComplete="new-password" onChange={(event) => setNextPassword(event.target.value)} />
+              </label>
+              <label>
+                Confirm password
+                <input type="password" value={confirmNextPassword} autoComplete="new-password" onChange={(event) => setConfirmNextPassword(event.target.value)} />
+              </label>
+            </>
+          ) : (
+            <>
+              <label>
+                Full name
+                <input value={profileName} onChange={(event) => setProfileName(event.target.value)} />
+              </label>
+              <label>
+                Phone
+                <input value={profilePhone} onChange={(event) => setProfilePhone(event.target.value)} />
+              </label>
+            </>
+          )}
+          <button className="primary-button" type="submit" disabled={accountSaving}>
+            {accountSaving ? "Saving..." : accountStep === "password" ? "Save password" : "Save profile"}
+          </button>
+          <button className="quiet-button" type="button" onClick={handleLogout}>Sign out</button>
+        </form>
+      </div>
+    );
   }
 
   if (!workspace) {
@@ -509,6 +620,16 @@ function Login() {
         response.role,
       );
       beginWebsiteSession();
+      if (response.mustChangePassword) {
+        localStorage.setItem("nexushr_must_change_password", "1");
+      } else {
+        localStorage.removeItem("nexushr_must_change_password");
+      }
+      if (response.role === "EMPLOYEE" && response.profileCompleted === false) {
+        localStorage.setItem("nexushr_profile_needed", "1");
+      } else {
+        localStorage.removeItem("nexushr_profile_needed");
+      }
 
       clearWorkspaceCompany();
       navigate("/", { replace: true });
@@ -606,11 +727,11 @@ function Login() {
           >
 
             <div className="login-card-brand">
-              <img
-                src="/images/gorle-group-logo.jpeg"
-                alt="Gorle Group logo"
-              />
-              <strong>GORLE GROUP BUSINESS SOLUTION</strong>
+              <div className="login-brand-logos">
+                <img className="brand-logo-large" src="/images/cyond-logo.jpeg" alt="CYOND logo" />
+                <img className="brand-logo-large" src="/images/gorle-group-logo.jpeg" alt="Gorle Group logo" />
+              </div>
+              <strong>CYOND and Gorle Group</strong>
             </div>
 
             <div className="login-card-header">
@@ -622,7 +743,7 @@ function Login() {
               <p>
                 {mode === "create"
                   ? "Enter your employee code, your own email, and a password. Admin and manager keep their role. Then sign in with that same email and password."
-                  : "Sign in with your own email and password. Admin and manager save that email once, using their employee code."}
+                  : "Sign in with your company email, such as name@cyond.com or name@gorle.com, and your password."}
               </p>
 
             </div>

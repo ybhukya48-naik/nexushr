@@ -74,6 +74,12 @@ public class Employee {
     @Column(name = "site_visitor", nullable = false)
     private boolean siteVisitor = false;
 
+    @Column(name = "password_change_required", nullable = false)
+    private boolean passwordChangeRequired = false;
+
+    @Column(name = "profile_completed", nullable = false)
+    private boolean profileCompleted = true;
+
     @Column(name = "reporting_manager_id")
     private Long reportingManagerId;
 
@@ -230,6 +236,22 @@ public class Employee {
 
     public void setSiteVisitor(boolean siteVisitor) {
         this.siteVisitor = siteVisitor;
+    }
+
+    public boolean isPasswordChangeRequired() {
+        return passwordChangeRequired;
+    }
+
+    public void setPasswordChangeRequired(boolean passwordChangeRequired) {
+        this.passwordChangeRequired = passwordChangeRequired;
+    }
+
+    public boolean isProfileCompleted() {
+        return profileCompleted;
+    }
+
+    public void setProfileCompleted(boolean profileCompleted) {
+        this.profileCompleted = profileCompleted;
     }
 
     public Long getReportingManagerId() {

@@ -7,7 +7,13 @@ public class AuthDtos {
     public record CreatePasswordRequest(String email, String password) {}
 
     /** Access token response — also includes username so the UI can display it. */
-    public record LoginResponse(String accessToken, String role, String username) {}
+    public record LoginResponse(
+            String accessToken,
+            String role,
+            String username,
+            boolean mustChangePassword,
+            boolean profileCompleted
+    ) {}
 
     public record RefreshRequest(String accessToken) {}
 }

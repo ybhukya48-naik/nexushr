@@ -23,6 +23,7 @@ public class EmployeeRequest {
     private String companyCode;
     private Boolean siteVisitor;
     private Long reportingManagerId;
+    private Boolean starterAccount;
 
         public String getCompanyCode() {
         return companyCode;
@@ -142,5 +143,13 @@ public class EmployeeRequest {
 
     public void setReportingManagerId(Long reportingManagerId) {
         this.reportingManagerId = reportingManagerId;
+    }
+
+    public Boolean getStarterAccount() {
+        return starterAccount;
+    }
+
+    public void setStarterAccount(Boolean starterAccount) {
+        this.starterAccount = starterAccount;
     }
 }
