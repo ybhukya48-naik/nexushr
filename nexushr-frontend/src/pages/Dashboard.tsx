@@ -22,7 +22,6 @@ import {
   getEmployeeAttendance,
   getLeaves,
   clockedWorkMinutes,
-  isCheckoutMissing,
   isWindowsComputer,
   monthDateKeys,
   shownCheckOut,
@@ -41,6 +40,18 @@ const PUBLIC_HOLIDAYS = [
 ];
 
 type HolidayMark = { date: string; name: string };
+
+function kolkataClock(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
+  return { hour, minute };
+}
 
 function todayIso() {
   const now = new Date();
@@ -295,7 +306,9 @@ export default function Dashboard() {
   );
   const pending = leaves.filter((leave) => leave.status === "PENDING");
   const nowForMissing = new Date();
-  const missingCheckInDue = nowForMissing.getHours() > 11 || (nowForMissing.getHours() === 11 && nowForMissing.getMinutes() >= 0);
+  const kolkata = kolkataClock(nowForMissing);
+  const missingCheckInDue = kolkata.hour > 11 || (kolkata.hour === 11 && kolkata.minute >= 0);
+  const checkoutMissedDue = kolkata.hour >= 23;
   const activePeople = people.filter((person) => person.active);
   const onLeaveIds = new Set(onLeave.map((leave) => leave.employee?.id).filter((id): id is number => typeof id === "number"));
   const missedCheckInPeople = missingCheckInDue
@@ -304,7 +317,12 @@ export default function Dashboard() {
         && !todayRows.some((row) => row.employee?.id === person.id && row.checkInTime),
       )
     : [];
-  const missedCheckOutPeople = todayRows.filter((row) => isCheckoutMissing(row) && row.employee);
+  const missedCheckOutPeople = todayRows.filter((row) =>
+    row.checkInTime
+    && !row.checkOutTime
+    && row.employee
+    && row.attendanceStatus !== "INACTIVE",
+  );
   const noLunchLogin = todayRows.filter((row) =>
     row.checkInTime
     && row.employee
@@ -526,9 +544,9 @@ export default function Dashboard() {
               )}
             </div>
             <div>
-              <strong>Check-out missed ({missedCheckOutPeople.length})</strong>
+              <strong>{checkoutMissedDue ? "Check-out missed" : "Not checked out"} ({missedCheckOutPeople.length})</strong>
               {missedCheckOutPeople.length === 0 ? (
-                <p className="hr-empty">Nobody missed check-out. This shows after 11:00 PM.</p>
+                <p className="hr-empty">{checkoutMissedDue ? "Nobody missed check-out." : "Everyone who checked in has checked out."}</p>
               ) : (
                 <ul>
                   {missedCheckOutPeople.map((row) => (
