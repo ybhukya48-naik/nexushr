@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { isCompanyMatch } from "../utils/company";
+import { getWorkspaceCompany } from "../utils/workspace";
 import "./Performance.css";
 import {
   createPerformanceFeedback,
@@ -16,6 +18,7 @@ export default function Performance() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [reviewTab, setReviewTab] = useState<"reviews" | "hours" | "feedback">("reviews");
   const [feedbackRating, setFeedbackRating] = useState(3);
   const [feedbackComments, setFeedbackComments] = useState("");
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
@@ -47,8 +50,9 @@ export default function Performance() {
 
       const employeeData = await getEmployees();
 
+      const company = getWorkspaceCompany() ?? "CYOND";
       const activeEmployees = employeeData.filter(
-        (employee) => employee.active !== false,
+        (employee) => employee.active !== false && isCompanyMatch(employee.companyCode, company),
       );
 
       setEmployees(activeEmployees);
@@ -246,16 +250,16 @@ export default function Performance() {
   return (
     <div className="performance-page">
       <div className="ux-tabs">
-        <span className="active">Reviews</span>
-        <span>Hours</span>
-        <span>Feedback</span>
+        <button type="button" className={reviewTab === "reviews" ? "active" : ""} onClick={() => setReviewTab("reviews")}>Reviews</button>
+        <button type="button" className={reviewTab === "hours" ? "active" : ""} onClick={() => setReviewTab("hours")}>Hours</button>
+        <button type="button" className={reviewTab === "feedback" ? "active" : ""} onClick={() => setReviewTab("feedback")}>Feedback</button>
       </div>
       <section className="performance-hero">
         <div>
           <p className="performance-eyebrow">{role === "EMPLOYEE" ? "My Reviews" : "Performance"}</p>
           <h2>{role === "EMPLOYEE" ? "My Reviews" : "Performance"}</h2>
           <p className="performance-subtitle">
-            Hours worked are shown separately from reviews.
+            Reviews are separate from attendance hours.
           </p>
         </div>
 
@@ -297,6 +301,8 @@ export default function Performance() {
         </section>
       )}
 
+      {reviewTab === "hours" && (
+      <>
       <section className="performance-stats">
         <div className="performance-stat-card featured">
           <div className="stat-card-top">
@@ -304,8 +310,8 @@ export default function Performance() {
           </div>
 
           <div className="score-row">
-            <strong>{scorecard?.averageScore ?? averageScore}</strong>
-            <span>/100</span>
+            <strong>{scorecard?.workedHours ?? 0}</strong>
+            <span>h worked</span>
           </div>
 
           <div className="score-track">
@@ -355,9 +361,9 @@ export default function Performance() {
       <section className="performance-panel performance-attendance-panel">
         <div className="performance-panel-header">
           <div>
-            <h3>Working Hours Intelligence</h3>
+            <h3>Working hours</h3>
             <p>
-              Performance calculated from real attendance working hours.
+              These hours come from check-in and check-out. They are not a review score.
             </p>
           </div>
 
@@ -426,7 +432,10 @@ export default function Performance() {
           </p>
         </div>
       </section>
+      </>
+      )}
 
+      {reviewTab === "reviews" && (
       <section className="performance-main-grid">
         <div className="performance-panel">
           <div className="performance-panel-header">
@@ -526,8 +535,9 @@ export default function Performance() {
           )}
         </div>
       </section>
+      )}
 
-      {role !== "EMPLOYEE" && selected && (
+      {reviewTab === "feedback" && role !== "EMPLOYEE" && selected && (
         <section className="performance-panel feedback-panel">
           <div className="performance-panel-header">
             <div>

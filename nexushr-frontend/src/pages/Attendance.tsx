@@ -1273,6 +1273,35 @@ export default function Attendance() {
             </p>
           </div>
 
+          <button
+            type="button"
+            className="panel-link"
+            onClick={() => {
+              const lines = ["Employee,Code,Date,Check in,Check out,Work,Late"];
+              for (const { employee, record } of visibleRows) {
+                const cells = [
+                  employee.fullName,
+                  employee.employeeCode,
+                  date,
+                  record?.checkInTime ?? "",
+                  record?.checkOutTime ?? "",
+                  record ? workAndBreak(record).work : "",
+                  record?.checkInTime
+                    ? (record.lateArrivalMinutes > 0 ? formatAsHours(record.lateArrivalMinutes) : "On time")
+                    : "No check-in",
+                ].map((value) => `"${String(value).replaceAll("\"", "\"\"")}"`);
+                lines.push(cells.join(","));
+              }
+              const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/csv" }));
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = `attendance-${date}.csv`;
+              link.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            Export
+          </button>
           {selectedEmployee && (
             <button
               className="panel-link"

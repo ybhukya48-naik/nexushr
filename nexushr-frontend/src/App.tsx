@@ -330,9 +330,7 @@ function AppRoutes() {
 
       <main className="main-area">
         <header className="topbar">
-          <div>
-            <h1>{workspaceName(workspace)}</h1>
-          </div>
+          <div />
 
           <div className="user-area">
             <div className="bell-wrap">
@@ -405,7 +403,7 @@ function AppRoutes() {
             </button>
 
             <button
-              className="secondary-button"
+              className="quiet-button"
               onClick={handleLogout}
             >
               Logout
@@ -1351,7 +1349,7 @@ function AIInsights() {
       setError("");
 
       const response =
-        await getAiWorkforceDashboard();
+        await getAiWorkforceDashboard(getWorkspaceCompany() ?? "CYOND");
 
       setData(response);
     } catch (err) {
@@ -1418,42 +1416,19 @@ function AIInsights() {
       )}
 
 
-      <div className="stats-grid">
-
-        <Stat
-          title="Active employees"
-          value={data ? data.activeEmployees.toLocaleString() : "0"}
-          change={data ? `${data.inactiveEmployees} not active` : "Waiting for records"}
-          icon="A"
-        />
-
-        <Stat
-          title="Needs attention"
-          value={data ? data.highAttritionRisk.toLocaleString() : "0"}
-          change="From saved reviews"
-          icon="!"
-        />
-
-        <Stat
-          title="Watch closely"
-          value={data ? data.mediumAttritionRisk.toLocaleString() : "0"}
-          change="From saved reviews"
-          icon="M"
-        />
-
-        <Stat
-          title="Engagement"
-          value={data ? `${data.averageEngagementScore.toFixed(1)}%` : "0"}
-          change="From saved reviews"
-          icon="E"
-        />
-
-      </div>
-
-      {(!data || (data.activeEmployees === 0 && data.highAttritionRisk === 0 && data.averageEngagementScore === 0)) && (
+      {data && data.activeEmployees > 0 ? (
+        <div className="stats-grid">
+          <Stat
+            title="Active employees"
+            value={data.activeEmployees.toLocaleString()}
+            change={`${data.inactiveEmployees} not active`}
+            icon="A"
+          />
+        </div>
+      ) : !loading && (
         <section className="panel">
           <h3>No reports yet</h3>
-          <p>Counts appear after attendance and reviews are saved.</p>
+          <p>Headcount appears here for the company you have open. Review scores stay on Performance.</p>
         </section>
       )}
     </>

@@ -446,8 +446,19 @@ public class AiInsightService {
      * Workforce-wide AI analytics for HR/Admin/Manager dashboards.
      */
     public Map<String, Object> workforceDashboard() {
+        return workforceDashboard(null);
+    }
+
+    public Map<String, Object> workforceDashboard(String companyCode) {
 
         List<Employee> employees = employeeRepository.findAll();
+        if (companyCode != null && !companyCode.isBlank()) {
+            String company = companyCode.trim();
+            employees = employees.stream()
+                    .filter(employee -> employee.getCompany() != null
+                            && company.equalsIgnoreCase(employee.getCompany().getCode()))
+                    .toList();
+        }
 
         int totalEmployees = employees.size();
 

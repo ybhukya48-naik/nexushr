@@ -175,6 +175,14 @@ button,
   gap: 12px;
 }
 
+.quiet-button {
+  border: 0;
+  background: transparent;
+  color: #667085;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .user-area span {
   color: #667085;
 }

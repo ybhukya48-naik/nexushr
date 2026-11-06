@@ -55,8 +55,9 @@ public class AiInsightsController {
     }
 
     @GetMapping("/workforce-dashboard")
-    public Map<String, Object> workforceDashboard() {
+    public Map<String, Object> workforceDashboard(
+            @RequestParam(required = false) String companyCode) {
 
-        return aiInsightService.workforceDashboard();
+        return aiInsightService.workforceDashboard(companyCode);
     }
 }

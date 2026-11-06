@@ -1120,9 +1120,10 @@ export function getAiRecommendations(employeeId: number) {
     `/ai/recommendations/${employeeId}`,
   );
 }
-export function getAiWorkforceDashboard() {
+export function getAiWorkforceDashboard(companyCode?: string) {
+  const query = companyCode ? `?companyCode=${encodeURIComponent(companyCode)}` : "";
   return request<AiWorkforceDashboardResponse>(
-    "/ai/workforce-dashboard",
+    `/ai/workforce-dashboard${query}`,
   );
 }
 

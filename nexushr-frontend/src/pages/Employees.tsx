@@ -173,6 +173,21 @@ function roleLabel(role: EmployeeRole) {
   }
 }
 
+function formatJoined(value?: string) {
+  if (!value) {
+    return "—";
+  }
+  const parsed = new Date(`${value.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 function initials(name: string) {
   return name
     .trim()
@@ -386,7 +401,6 @@ export default function Employees() {
     (employee) => employee.lifecycleStatus === "OFFBOARDED",
   ).length;
 
-  const canSeeSalary = role === "HR" || role === "ADMIN" || role === "SUPER_ADMIN";
   const [directoryView, setDirectoryView] = useState<"list" | "chart" | "joiners">("list");
   const [listOpen, setListOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -917,7 +931,6 @@ export default function Employees() {
                     <th>Role</th>
                     <th>Joining Date</th>
                     <th>Status</th>
-                    {canSeeSalary && <th>Salary</th>}
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -950,7 +963,7 @@ export default function Employees() {
                           ?? "—"}
                       </td>
                       <td>{roleLabel(employee.roleType)}</td>
-                      <td>{employee.joiningDate}</td>
+                      <td>{formatJoined(employee.joiningDate)}</td>
                       <td>
                         <span
                           className={statusClass(
@@ -962,11 +975,6 @@ export default function Employees() {
                           )}
                         </span>
                       </td>
-                      {canSeeSalary && (
-                      <td>
-                        {`\u20B9`}{employee.baseSalary.toLocaleString("en-IN")}
-                      </td>
-                      )}
                       <td>
                         <div className="employee-actions">
                           <button
@@ -1005,7 +1013,7 @@ export default function Employees() {
 
                   {filteredEmployees.length === 0 && (
                     <tr>
-                      <td colSpan={canSeeSalary ? 10 : 9}>
+                      <td colSpan={9}>
                         <div className="employee-empty-state">
                           <strong>No employees found</strong>
                           <span>
