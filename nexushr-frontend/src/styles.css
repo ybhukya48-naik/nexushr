@@ -7072,6 +7072,23 @@ textarea {
   gap: 6px;
 }
 
+.payroll-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.employee-dashboard .attendance-actions button:disabled,
+.hr-payslip .attendance-actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.hr-payslip {
+  display: grid;
+  gap: 12px;
+}
+
 .employees-page .employees-table td,
 .attendance-table td {
   overflow: hidden;

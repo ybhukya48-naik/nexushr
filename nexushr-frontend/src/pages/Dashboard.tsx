@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  downloadPayslipPdf,
+  emailPayslip,
   getCurrentEmployee,
   getDashboardSummary,
   getEmployees,
   getHolidays,
+  getPayrollRecords,
+  type PayrollRecord,
   type CompanyHoliday,
   type DashboardSummary,
   type EmployeeResponse,
@@ -150,6 +154,10 @@ export default function Dashboard() {
   const [rosterOpen, setRosterOpen] = useState(false);
   const [rosterDate, setRosterDate] = useState(todayIso);
   const [clockNow, setClockNow] = useState(() => new Date());
+  const [payrollRows, setPayrollRows] = useState<PayrollRecord[]>([]);
+  const [payslipId, setPayslipId] = useState("");
+  const [payslipBusy, setPayslipBusy] = useState<"" | "download" | "email">("");
+  const [payslipNote, setPayslipNote] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -164,8 +172,9 @@ export default function Dashboard() {
       getAttendanceByDate(today).catch(() => [] as AttendanceRecord[]),
       getLeaves().catch(() => [] as LeaveRequest[]),
       getHolidays().catch(() => [] as CompanyHoliday[]),
+      getPayrollRecords().catch(() => [] as PayrollRecord[]),
     ])
-      .then(([dashboard, current, employees, attendance, leaveRows, extraHolidays]) => {
+      .then(([dashboard, current, employees, attendance, leaveRows, extraHolidays, payroll]) => {
         if (cancelled) {
           return;
         }
@@ -175,6 +184,11 @@ export default function Dashboard() {
         setTodayRows(asList<AttendanceRecord>(attendance).filter((row) => isCompanyMatch(row.employee?.companyCode, company)));
         setLeaves(asList<LeaveRequest>(leaveRows).filter((leave) => isCompanyMatch(leave.employee?.companyCode, company)));
         setHolidays(upcomingHolidays(asList<CompanyHoliday>(extraHolidays), company));
+        const slips = asList<PayrollRecord>(payroll)
+          .filter((row) => row?.employee && isCompanyMatch(row.employee.companyCode, company))
+          .sort((a, b) => b.payMonth.localeCompare(a.payMonth));
+        setPayrollRows(slips);
+        setPayslipId((currentId) => currentId || (slips[0] ? String(slips[0].id) : ""));
       })
       .catch((err) => {
         if (!cancelled) {
@@ -358,6 +372,51 @@ export default function Dashboard() {
     }
   }
 
+  const selectedSlip = payrollRows.find((row) => String(row.id) === payslipId) ?? null;
+
+  async function downloadSelectedPayslip() {
+    if (!selectedSlip) {
+      setPayslipNote("No payslip yet. Calculate pay on the Payroll page first.");
+      return;
+    }
+    setPayslipBusy("download");
+    setPayslipNote("");
+    try {
+      const pdf = await downloadPayslipPdf(selectedSlip.id);
+      const url = window.URL.createObjectURL(pdf);
+      const link = document.createElement("a");
+      const companyPrefix = (selectedSlip.employee.companyCode || company).replace(/[^A-Za-z0-9]+/g, "");
+      link.href = url;
+      link.download = `${companyPrefix}-Payslip-${selectedSlip.employee.employeeCode}-${selectedSlip.payMonth}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setPayslipNote("Payslip downloaded.");
+    } catch (err) {
+      setPayslipNote(err instanceof Error ? err.message : "Unable to download payslip.");
+    } finally {
+      setPayslipBusy("");
+    }
+  }
+
+  async function emailSelectedPayslip() {
+    if (!selectedSlip) {
+      setPayslipNote("No payslip yet. Calculate pay on the Payroll page first.");
+      return;
+    }
+    setPayslipBusy("email");
+    setPayslipNote("");
+    try {
+      await emailPayslip(selectedSlip.id);
+      setPayslipNote(`Payslip emailed only to ${selectedSlip.employee.fullName}.`);
+    } catch (err) {
+      setPayslipNote(err instanceof Error ? err.message : "Unable to email payslip.");
+    } finally {
+      setPayslipBusy("");
+    }
+  }
+
   return (
     <div className="hr-home">
       <header className="hr-home-head">
@@ -516,6 +575,33 @@ export default function Dashboard() {
         </div>
         {!windowsPunch && <p className="hr-empty">Check in and check out work only on a Windows computer.</p>}
         {punchNote && <p className="hr-empty">{punchNote}</p>}
+      </section>
+
+      <section className="hr-card hr-payslip">
+        <div>
+          <strong>Payslip</strong>
+          <p className="hr-empty">Download a payslip, or email that same payslip only to the employee.</p>
+        </div>
+        <label className="hr-date-pick">
+          Employee
+          <select value={payslipId} onChange={(event) => setPayslipId(event.target.value)}>
+            {payrollRows.length === 0 && <option value="">No payslip yet</option>}
+            {payrollRows.map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.employee.fullName} · {row.payMonth}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="attendance-actions">
+          <button className="primary-button" type="button" disabled={payslipBusy !== ""} onClick={() => void downloadSelectedPayslip()}>
+            {payslipBusy === "download" ? "Downloading..." : "Download payslip"}
+          </button>
+          <button className="secondary-button" type="button" disabled={payslipBusy !== ""} onClick={() => void emailSelectedPayslip()}>
+            {payslipBusy === "email" ? "Emailing..." : "Email payslip"}
+          </button>
+        </div>
+        {payslipNote && <p className="hr-empty">{payslipNote}</p>}
       </section>
 
       <section className="hr-card" id="employee-month">

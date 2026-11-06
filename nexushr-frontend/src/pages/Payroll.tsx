@@ -663,6 +663,45 @@ export default function Payroll() {
                 : "Generated payroll records and payment status."}
             </p>
           </div>
+          {role === "EMPLOYEE" && (
+            <div className="payroll-page-actions">
+              <button
+                type="button"
+                className="primary-action"
+                onClick={() => {
+                  const latest = [...records].sort((a, b) => b.payMonth.localeCompare(a.payMonth))[0];
+                  if (!latest) {
+                    setError("No payslip yet. It appears after pay is calculated.");
+                    return;
+                  }
+                  void handleDownloadPdf({
+                    payrollId: latest.id,
+                    employeeCode: latest.employee.employeeCode,
+                    payMonth: latest.payMonth,
+                    companyCode: latest.employee.companyCode,
+                  });
+                }}
+                disabled={downloadingId !== null}
+              >
+                {downloadingId !== null ? "Downloading..." : "Download payslip"}
+              </button>
+              <button
+                type="button"
+                className="table-action"
+                onClick={() => {
+                  const latest = [...records].sort((a, b) => b.payMonth.localeCompare(a.payMonth))[0];
+                  if (!latest) {
+                    setError("No payslip yet. It appears after pay is calculated.");
+                    return;
+                  }
+                  void handleEmailPayslip(latest.id);
+                }}
+                disabled={emailingId !== null}
+              >
+                {emailingId !== null ? "Emailing..." : "Email payslip"}
+              </button>
+            </div>
+          )}
         </div>
 
         {loading ? (

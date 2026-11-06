@@ -13,8 +13,11 @@ import {
 import {
   getCurrentEmployee,
   getEmployeeNotifications,
+  downloadPayslipPdf,
+  emailPayslip,
   getEmployeePayroll,
   getHolidays,
+  type PayrollRecord,
   getMyAttendanceStatus,
   register as apiRegister,
   login as apiLogin,
@@ -933,7 +936,8 @@ function EmployeeDashboard() {
   const [myLeaves, setMyLeaves] = useState<LeaveRequest[]>([]);
   const [leaveDays, setLeaveDays] = useState<number | null>(null);
   const [nextHoliday, setNextHoliday] = useState("None listed");
-  const [latestPay, setLatestPay] = useState("");
+  const [latestPay, setLatestPay] = useState<PayrollRecord | null>(null);
+  const [payslipNote, setPayslipNote] = useState("");
 
   const [loading, setLoading] = useState(!cachedDashboard?.employee);
   const [detailsLoading, setDetailsLoading] = useState((cachedDashboard?.records.length ?? 0) === 0);
@@ -981,7 +985,7 @@ function EmployeeDashboard() {
           const pay = (Array.isArray(payroll) ? payroll : [])
             .filter((item) => item?.payMonth)
             .sort((a, b) => b.payMonth.localeCompare(a.payMonth))[0];
-          setLatestPay(pay ? pay.payMonth : "No payslip yet");
+          setLatestPay(pay ?? null);
         });
       })
       .catch((err) => {
@@ -1053,18 +1057,16 @@ function EmployeeDashboard() {
 
   const signedInEmployee = employee;
 
-  async function punchDay() {
-    const todayRecord = records.find((row) => String(row.attendanceDate ?? "").slice(0, 10) === todayKey());
-    const open = Boolean(todayRecord?.checkInTime && !todayRecord?.checkOutTime);
+  async function punch(kind: "in" | "out") {
     setPunching(true);
     setPunchNote("");
     try {
-      await (open ? checkOut(signedInEmployee.id) : checkIn(signedInEmployee.id));
+      await (kind === "out" ? checkOut(signedInEmployee.id) : checkIn(signedInEmployee.id));
       const history = await getEmployeeAttendance(signedInEmployee.id);
       const savedHistory = [...history].sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
       setRecords(savedHistory);
       writeDashboardSnapshot(signedInEmployee, savedHistory);
-      setPunchNote(open ? "Checked out." : "Checked in.");
+      setPunchNote(kind === "out" ? "Checked out." : "Checked in.");
     } catch (err) {
       setPunchNote(
         err instanceof Error
@@ -1073,6 +1075,43 @@ function EmployeeDashboard() {
       );
     } finally {
       setPunching(false);
+    }
+  }
+
+  async function downloadMyPayslip() {
+    if (!latestPay) {
+      setPayslipNote("No payslip yet. It appears after pay is calculated.");
+      return;
+    }
+    setPayslipNote("");
+    try {
+      const pdf = await downloadPayslipPdf(latestPay.id);
+      const url = window.URL.createObjectURL(pdf);
+      const link = document.createElement("a");
+      const companyPrefix = (latestPay.employee.companyCode || "CYOND").replace(/[^A-Za-z0-9]+/g, "");
+      link.href = url;
+      link.download = `${companyPrefix}-Payslip-${latestPay.employee.employeeCode}-${latestPay.payMonth}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setPayslipNote("Payslip downloaded.");
+    } catch (err) {
+      setPayslipNote(err instanceof Error ? err.message : "Unable to download payslip.");
+    }
+  }
+
+  async function emailMyPayslip() {
+    if (!latestPay) {
+      setPayslipNote("No payslip yet. It appears after pay is calculated.");
+      return;
+    }
+    setPayslipNote("");
+    try {
+      await emailPayslip(latestPay.id);
+      setPayslipNote("Payslip emailed to you.");
+    } catch (err) {
+      setPayslipNote(err instanceof Error ? err.message : "Unable to email payslip.");
     }
   }
 
@@ -1166,8 +1205,11 @@ function EmployeeDashboard() {
                 <strong>{hoursLabel(clockedWorkMinutes(todayRecord))}</strong>
                 <em>worked today</em>
                 <div className="attendance-actions">
-                  <button className="primary-button" type="button" disabled={punching || !isWindowsComputer()} onClick={() => void punchDay()}>
-                    {checkedIn ? "Check out" : "Check in"}
+                  <button className="primary-button" type="button" disabled={punching || !isWindowsComputer() || checkedIn} onClick={() => void punch("in")}>
+                    Check in
+                  </button>
+                  <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !checkedIn} onClick={() => void punch("out")}>
+                    Check out
                   </button>
                   <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !todayRecord?.checkInTime || Boolean(todayRecord?.checkOutTime)} onClick={() => void punchLunch("out")}>
                     Start lunch
@@ -1200,7 +1242,9 @@ function EmployeeDashboard() {
                 <article className="home-actions">
                   <span>Quick actions</span>
                   <button type="button" onClick={() => navigate("/leave")}>Apply leave ({leaveCount})</button>
-                  <button type="button" onClick={() => navigate("/payroll")}>Payslip{latestPay ? ` · ${latestPay}` : ""}</button>
+                  <button type="button" onClick={() => void downloadMyPayslip()}>Download payslip</button>
+                  <button type="button" onClick={() => void emailMyPayslip()}>Email payslip</button>
+                  {payslipNote && <em>{payslipNote}</em>}
                   <button type="button" onClick={() => navigate("/attendance")}>My attendance</button>
                   <button type="button" onClick={() => navigate("/notifications")}>Open updates</button>
                 </article>
