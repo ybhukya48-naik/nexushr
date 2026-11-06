@@ -326,12 +326,71 @@ public class EmployeeService {
 
     public String resetToDefaultPassword(Long id) {
         Employee employee = findById(id);
-        String companyCode = employee.getCompany() == null ? "CYOND" : employee.getCompany().getCode();
-        String temporary = CompanyPasswords.initialPassword(companyCode);
+        return applyDefaultPassword(employee);
+    }
+
+    public void setPasswordFromLogin(String email, String currentPassword, String newPassword) {
+        Employee employee = requireStaffAccount(email);
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new IllegalArgumentException("Password must contain at least 8 characters");
+        }
+        String companyCode = companyCode(employee);
+        if (newPassword.equals(CompanyPasswords.initialPassword(companyCode))) {
+            throw new IllegalArgumentException("Choose a password that is not the default password");
+        }
+        if (!currentPasswordMatches(employee, currentPassword)) {
+            throw new IllegalArgumentException(
+                    "Current password does not match. Use the default password, or reset it first."
+            );
+        }
+        employee.setPassword(passwordEncoder.encode(newPassword));
+        employee.setPasswordChangeRequired(false);
+        employeeRepository.save(employee);
+    }
+
+    public String resetPasswordFromLogin(String email) {
+        return applyDefaultPassword(requireStaffAccount(email));
+    }
+
+    private String applyDefaultPassword(Employee employee) {
+        String temporary = CompanyPasswords.initialPassword(companyCode(employee));
         employee.setPassword(passwordEncoder.encode(temporary));
         employee.setPasswordChangeRequired(true);
         employeeRepository.save(employee);
         return temporary;
+    }
+
+    private Employee requireStaffAccount(String email) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("Enter your email");
+        }
+        Employee employee = employeeRepository.findByEmailIgnoreCase(email.trim())
+                .orElseThrow(() -> new IllegalArgumentException("No employee account uses this email"));
+        RoleType role = employee.getRoleType();
+        if (role == RoleType.ADMIN || role == RoleType.HR || role == RoleType.SUPER_ADMIN) {
+            throw new IllegalArgumentException("HR and admin passwords stay on the HR login.");
+        }
+        if (!employee.isActive()) {
+            throw new IllegalArgumentException("This account is not active");
+        }
+        return employee;
+    }
+
+    private boolean currentPasswordMatches(Employee employee, String rawPassword) {
+        String stored = employee.getPassword();
+        String fallback = CompanyPasswords.initialPassword(companyCode(employee));
+        if (stored == null || stored.isBlank() || ExcelPayrollService.UNSET_PASSWORD_HASH.equals(stored)) {
+            return rawPassword != null && rawPassword.equals(fallback);
+        }
+        try {
+            return passwordEncoder.matches(rawPassword, stored);
+        } catch (RuntimeException ex) {
+            return rawPassword != null && rawPassword.equals(fallback);
+        }
+    }
+
+    private static String companyCode(Employee employee) {
+        return employee.getCompany() == null ? "CYOND" : employee.getCompany().getCode();
     }
 
     public void delete(Long id) {

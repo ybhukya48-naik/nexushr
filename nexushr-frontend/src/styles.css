@@ -6496,10 +6496,17 @@ button.employee-summary-card {
   font-size: 14px;
 }
 
-.login-switch {
-  display: block;
-  width: 100%;
+.login-actions {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
   margin-top: 14px;
+}
+
+.login-switch {
+  display: inline;
+  width: auto;
+  margin-top: 0;
   padding: 0;
   border: 0;
   background: none;

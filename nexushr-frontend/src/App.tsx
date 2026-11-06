@@ -18,10 +18,11 @@ import {
   getHolidays,
   type PayrollRecord,
   getMyAttendanceStatus,
-  register as apiRegister,
   changeOwnPassword,
   completeOwnProfile,
   login as apiLogin,
+  resetLoginPassword,
+  setLoginPassword,
   getAiWorkforceDashboard,
   fetchEmployeePhoto,
   API_BASE,
@@ -572,14 +573,11 @@ function Login() {
   const [searchParams] = useSearchParams();
 
   const [username, setUsername] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [employeeCode, setEmployeeCode] = useState("");
-  const [companyCode, setCompanyCode] = useState<"CYOND" | "GORLE">("CYOND");
   const [password, setPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [mode, setMode] = useState<"signin" | "create">(
-    searchParams.get("create") === "1" ? "create" : "signin",
+  const [mode, setMode] = useState<"signin" | "set" | "reset">(
+    searchParams.get("create") === "1" ? "set" : "signin",
   );
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -653,19 +651,17 @@ function Login() {
     }
   }
 
-  async function handleCreateProfile(event: FormEvent<HTMLFormElement>) {
+  async function handleSetPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setNotice("");
-
     const email = username.trim();
-    const mobile = phone.trim();
-    if (!fullName.trim()) {
-      setError("Enter your name.");
+    if (!email) {
+      setError("Enter your company email.");
       return;
     }
-    if (!email) {
-      setError("Enter your email address.");
+    if (!currentPassword) {
+      setError("Enter the default password or your current password.");
       return;
     }
     if (password.length < 8) {
@@ -676,33 +672,38 @@ function Login() {
       setError("Passwords do not match.");
       return;
     }
-
     setLoading(true);
     try {
-      const response = await apiRegister({
-        fullName: fullName.trim(),
-        email,
-        phone: mobile || undefined,
-        password,
-        companyCode,
-        employeeCode: employeeCode.trim() || undefined,
-      });
-      setUsername(email);
+      const response = await setLoginPassword(email, currentPassword, password);
       setPassword("");
+      setCurrentPassword("");
       setConfirmPassword("");
-      setEmployeeCode("");
       setMode("signin");
-      setNotice(
-        response.employeeCode
-          ? `${response.message} Email: ${response.email}. Employee code: ${response.employeeCode}.`
-          : response.message,
-      );
+      setNotice(response.message);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Could not create the profile.",
-      );
+      setError(err instanceof Error ? err.message : "Could not set the password.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResetPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+    const email = username.trim();
+    if (!email) {
+      setError("Enter your company email.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await resetLoginPassword(email);
+      setPassword(response.temporaryPassword);
+      setMode("signin");
+      setNotice(`${response.message} Default password: ${response.temporaryPassword}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not reset the password.");
     } finally {
       setLoading(false);
     }
@@ -723,7 +724,7 @@ function Login() {
 
           <form
             className="login-card"
-            onSubmit={mode === "create" ? handleCreateProfile : handleSubmit}
+            onSubmit={mode === "set" ? handleSetPassword : mode === "reset" ? handleResetPassword : handleSubmit}
           >
 
             <div className="login-card-brand">
@@ -737,13 +738,15 @@ function Login() {
             <div className="login-card-header">
 
               <h2>
-                {mode === "create" ? "Create your profile" : "Welcome back"}
+                {mode === "set" ? "Set password" : mode === "reset" ? "Reset password" : "Employee sign in"}
               </h2>
 
               <p>
-                {mode === "create"
-                  ? "Enter your employee code, your own email, and a password. Admin and manager keep their role. Then sign in with that same email and password."
-                  : "Sign in with your company email, such as name@cyond.com or name@gorle.com, and your password."}
+                {mode === "set"
+                  ? "Enter your company email, the default password, and the new password you want to keep."
+                  : mode === "reset"
+                    ? "This puts the company default password back. Sign in with it, then set your own."
+                    : "Sign in with your company email. The first password is Cyond@1234 for @cyond.com and Gorle@1234 for @gorle.com."}
               </p>
 
             </div>
@@ -763,7 +766,7 @@ function Login() {
                 <div>
 
                   <strong>
-                    {mode === "create" ? "Could not create profile" : "Sign-in failed"}
+                    {mode === "set" ? "Could not set password" : mode === "reset" ? "Could not reset password" : "Sign-in failed"}
                   </strong>
 
                   <span>
@@ -780,141 +783,72 @@ function Login() {
             ================================================== */}
             <div className="login-fields">
 
-              {/* EMPLOYEE CODE / EMAIL */}
-              {mode === "create" && (
+              <label>
+                <span>Email</span>
+                <div className="login-input-wrap">
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(event) => setUsername(event.target.value)}
+                    placeholder="name@cyond.com or name@gorle.com"
+                    autoComplete="username"
+                    required
+                  />
+                </div>
+              </label>
+
+              {mode === "set" && (
                 <label>
-                  <span>Full name</span>
+                  <span>Default or current password</span>
                   <div className="login-input-wrap">
                     <input
-                      type="text"
-                      value={fullName}
-                      onChange={(event) => setFullName(event.target.value)}
-                      placeholder="Your name"
-                      autoComplete="name"
+                      type="password"
+                      value={currentPassword}
+                      onChange={(event) => setCurrentPassword(event.target.value)}
+                      placeholder="Cyond@1234 or Gorle@1234"
+                      autoComplete="current-password"
                       required
                     />
                   </div>
                 </label>
               )}
 
-              {mode === "create" && (
+              {mode !== "reset" && (
                 <label>
-                  <span>Phone number</span>
+                  <span>{mode === "set" ? "New password" : "Password"}</span>
                   <div className="login-input-wrap">
                     <input
-                      type="tel"
-                      value={phone}
-                      onChange={(event) => setPhone(event.target.value)}
-                      placeholder="10-digit mobile number"
-                      autoComplete="tel"
+                      type="password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      placeholder={mode === "set" ? "At least 8 characters" : "Default or your password"}
+                      autoComplete={mode === "set" ? "new-password" : "current-password"}
+                      required
                     />
                   </div>
                 </label>
               )}
 
-              <label>
-
-                <span>
-                  {mode === "create" ? "Email" : "Email or employee code"}
-                </span>
-
-                <div className="login-input-wrap">
-
-                  <input
-                    type={mode === "create" ? "email" : "text"}
-                    value={username}
-                    onChange={(event) =>
-                      setUsername(event.target.value)
-                    }
-                    placeholder={
-                      mode === "create"
-                        ? "name@company.com"
-                        : "Email or employee code"
-                    }
-                    autoComplete="username"
-                    required
-                  />
-
-                </div>
-
-              </label>
-
-              {/* PASSWORD */}
-              <label>
-
-                <span>
-                  {mode === "create" ? "New password" : "Password"}
-                </span>
-
-                <div className="login-input-wrap">
-
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(event) =>
-                      setPassword(event.target.value)
-                    }
-                    placeholder={
-                      mode === "create"
-                        ? "At least 8 characters"
-                        : "Your password"
-                    }
-                    autoComplete={mode === "create" ? "new-password" : "current-password"}
-                    required
-                  />
-
-                </div>
-
-              </label>
-
-              {mode === "create" && (
+              {mode === "set" && (
                 <label>
-                  <span>Employee code</span>
-                  <div className="login-input-wrap">
-                    <input
-                      type="text"
-                      value={employeeCode}
-                      onChange={(event) => setEmployeeCode(event.target.value)}
-                      placeholder="Your employee code"
-                      autoComplete="off"
-                    />
-                  </div>
-                </label>
-              )}
-
-              {mode === "create" && (
-                <label>
-                  <span>Company</span>
-                  <div className="login-input-wrap">
-                    <select
-                      value={companyCode}
-                      onChange={(event) =>
-                        setCompanyCode(event.target.value === "GORLE" ? "GORLE" : "CYOND")
-                      }
-                    >
-                      <option value="CYOND">CYOND</option>
-                      <option value="GORLE">Gorle Group</option>
-                    </select>
-                  </div>
-                </label>
-              )}
-
-              {mode === "create" && (
-                <label>
-                  <span>Confirm password</span>
+                  <span>Confirm new password</span>
                   <div className="login-input-wrap">
                     <input
                       type="password"
                       value={confirmPassword}
-                      onChange={(event) =>
-                        setConfirmPassword(event.target.value)
-                      }
-                      placeholder="Repeat the password"
+                      onChange={(event) => setConfirmPassword(event.target.value)}
+                      placeholder="Repeat the new password"
                       autoComplete="new-password"
                       required
                     />
                   </div>
                 </label>
+              )}
+
+              {mode === "signin" && (
+                <p className="login-notice">
+                  Default password: Cyond@1234 for CYOND, Gorle@1234 for Gorle. Use Set password to choose your own.
+                </p>
               )}
 
             </div>
@@ -928,12 +862,12 @@ function Login() {
 
               <span>
                 {loading
-                  ? mode === "create"
-                    ? "Creating profile..."
-                    : "Signing in..."
-                  : mode === "create"
-                    ? "Create profile"
-                    : "Sign in"}
+                  ? "Please wait..."
+                  : mode === "set"
+                    ? "Set password"
+                    : mode === "reset"
+                      ? "Reset password"
+                      : "Sign in"}
               </span>
 
               {!loading && (
@@ -944,21 +878,56 @@ function Login() {
 
             </button>
 
-            <button
-              className="login-switch"
-              type="button"
-              onClick={() => {
-                setMode(mode === "create" ? "signin" : "create");
-                setError("");
-                setNotice("");
-                setPassword("");
-                setConfirmPassword("");
-              }}
-            >
-              {mode === "create"
-                ? "Already saved your email? Sign in"
-                : "Admin, manager, or employee? Set your own email"}
-            </button>
+            <div className="login-actions">
+              {mode !== "set" && (
+                <button
+                  className="login-switch"
+                  type="button"
+                  onClick={() => {
+                    setMode("set");
+                    setError("");
+                    setNotice("");
+                    setPassword("");
+                    setCurrentPassword("");
+                    setConfirmPassword("");
+                  }}
+                >
+                  Set password
+                </button>
+              )}
+              {mode !== "reset" && (
+                <button
+                  className="login-switch"
+                  type="button"
+                  onClick={() => {
+                    setMode("reset");
+                    setError("");
+                    setNotice("");
+                    setPassword("");
+                    setCurrentPassword("");
+                    setConfirmPassword("");
+                  }}
+                >
+                  Reset password
+                </button>
+              )}
+              {mode !== "signin" && (
+                <button
+                  className="login-switch"
+                  type="button"
+                  onClick={() => {
+                    setMode("signin");
+                    setError("");
+                    setNotice("");
+                    setPassword("");
+                    setCurrentPassword("");
+                    setConfirmPassword("");
+                  }}
+                >
+                  Back to sign in
+                </button>
+              )}
+            </div>
 
             {/* SECURITY */}
             <div className="login-security">

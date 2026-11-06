@@ -199,6 +199,20 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json();
 }
 
+export function setLoginPassword(email: string, currentPassword: string, newPassword: string) {
+  return request<{ message: string }>("/auth/set-password", {
+    method: "POST",
+    body: JSON.stringify({ email, currentPassword, newPassword }),
+  });
+}
+
+export function resetLoginPassword(email: string) {
+  return request<{ message: string; temporaryPassword: string }>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
 export async function createPassword(
   email: string,
   password: string,

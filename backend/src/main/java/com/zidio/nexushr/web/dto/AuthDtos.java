@@ -6,6 +6,10 @@ public class AuthDtos {
 
     public record CreatePasswordRequest(String email, String password) {}
 
+    public record SetPasswordRequest(String email, String currentPassword, String newPassword) {}
+
+    public record ResetPasswordRequest(String email) {}
+
     /** Access token response — also includes username so the UI can display it. */
     public record LoginResponse(
             String accessToken,

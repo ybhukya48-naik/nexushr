@@ -8,6 +8,7 @@ import com.zidio.nexushr.domain.RoleType;
 import com.zidio.nexushr.repository.CompanyRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.security.JwtTokenService;
+import com.zidio.nexushr.service.EmployeeService;
 import com.zidio.nexushr.service.ExcelPayrollService;
 import com.zidio.nexushr.web.dto.AuthDtos;
 import com.zidio.nexushr.web.dto.RegisterRequest;
@@ -37,6 +38,7 @@ public class AuthController {
     private final EmployeeRepository employeeRepository;
     private final CompanyRepository companyRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmployeeService employeeService;
 
     @Value("${app.auth.demo-users-enabled:true}")
     private boolean demoUsersEnabled;
@@ -45,12 +47,14 @@ public class AuthController {
             JwtTokenService jwtTokenService,
             EmployeeRepository employeeRepository,
             CompanyRepository companyRepository,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            EmployeeService employeeService) {
 
         this.jwtTokenService = jwtTokenService;
         this.employeeRepository = employeeRepository;
         this.companyRepository = companyRepository;
         this.passwordEncoder = passwordEncoder;
+        this.employeeService = employeeService;
     }
 
     @PostMapping("/register")
@@ -369,6 +373,38 @@ public class AuthController {
         return !text.equalsIgnoreCase("false")
                 && !text.equalsIgnoreCase("f")
                 && !text.equals("0");
+    }
+
+    @PostMapping("/set-password")
+    public ResponseEntity<?> setPassword(@RequestBody AuthDtos.SetPasswordRequest request) {
+        try {
+            if (request == null) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Email and password are required"));
+            }
+            employeeService.setPasswordFromLogin(
+                    request.email(),
+                    request.currentPassword(),
+                    request.newPassword());
+            return ResponseEntity.ok(Map.of(
+                    "message", "Password saved. Sign in with the new password."
+            ));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody AuthDtos.ResetPasswordRequest request) {
+        try {
+            String email = request == null ? "" : request.email();
+            String temporary = employeeService.resetPasswordFromLogin(email);
+            return ResponseEntity.ok(Map.of(
+                    "message", "Password reset. Sign in with the default password, then set a new one.",
+                    "temporaryPassword", temporary
+            ));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
     }
 
     @PostMapping("/create-password")
