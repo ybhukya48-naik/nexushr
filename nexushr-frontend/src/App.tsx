@@ -568,7 +568,7 @@ function AppRoutes() {
     </div>
   );
 }
-function Login() {
+function Login({ employee = false }: { employee?: boolean }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -577,8 +577,9 @@ function Login() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [mode, setMode] = useState<"signin" | "set" | "reset">(
-    searchParams.get("create") === "1" ? "set" : "signin",
+    employee && searchParams.get("create") === "1" ? "set" : "signin",
   );
+  const audience = employee ? mode : "signin";
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
@@ -724,7 +725,7 @@ function Login() {
 
           <form
             className="login-card"
-            onSubmit={mode === "set" ? handleSetPassword : mode === "reset" ? handleResetPassword : handleSubmit}
+            onSubmit={audience === "set" ? handleSetPassword : audience === "reset" ? handleResetPassword : handleSubmit}
           >
 
             <div className="login-card-brand">
@@ -738,15 +739,17 @@ function Login() {
             <div className="login-card-header">
 
               <h2>
-                {mode === "set" ? "Set password" : mode === "reset" ? "Reset password" : "Employee sign in"}
+                {audience === "set" ? "Set password" : audience === "reset" ? "Reset password" : employee ? "Employee sign in" : "Sign in"}
               </h2>
 
               <p>
-                {mode === "set"
+                {audience === "set"
                   ? "Enter your company email, the default password, and the new password you want to keep."
-                  : mode === "reset"
+                  : audience === "reset"
                     ? "This puts the company default password back. Sign in with it, then set your own."
-                    : "Sign in with your company email. The first password is Cyond@1234 for @cyond.com and Gorle@1234 for @gorle.com."}
+                    : employee
+                      ? "Sign in with your company email. The first password is Cyond@1234 for @cyond.com and Gorle@1234 for @gorle.com."
+                      : "Sign in with your email and password."}
               </p>
 
             </div>
@@ -766,7 +769,7 @@ function Login() {
                 <div>
 
                   <strong>
-                    {mode === "set" ? "Could not set password" : mode === "reset" ? "Could not reset password" : "Sign-in failed"}
+                    {audience === "set" ? "Could not set password" : audience === "reset" ? "Could not reset password" : "Sign-in failed"}
                   </strong>
 
                   <span>
@@ -790,14 +793,14 @@ function Login() {
                     type="text"
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
-                    placeholder="name@cyond.com or name@gorle.com"
+                    placeholder={employee ? "name@cyond.com or name@gorle.com" : "Email"}
                     autoComplete="username"
                     required
                   />
                 </div>
               </label>
 
-              {mode === "set" && (
+              {audience === "set" && (
                 <label>
                   <span>Default or current password</span>
                   <div className="login-input-wrap">
@@ -813,23 +816,23 @@ function Login() {
                 </label>
               )}
 
-              {mode !== "reset" && (
+              {audience !== "reset" && (
                 <label>
-                  <span>{mode === "set" ? "New password" : "Password"}</span>
+                  <span>{audience === "set" ? "New password" : "Password"}</span>
                   <div className="login-input-wrap">
                     <input
                       type="password"
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
-                      placeholder={mode === "set" ? "At least 8 characters" : "Default or your password"}
-                      autoComplete={mode === "set" ? "new-password" : "current-password"}
+                      placeholder={audience === "set" ? "At least 8 characters" : employee ? "Default or your password" : "Password"}
+                      autoComplete={audience === "set" ? "new-password" : "current-password"}
                       required
                     />
                   </div>
                 </label>
               )}
 
-              {mode === "set" && (
+              {audience === "set" && (
                 <label>
                   <span>Confirm new password</span>
                   <div className="login-input-wrap">
@@ -845,7 +848,7 @@ function Login() {
                 </label>
               )}
 
-              {mode === "signin" && (
+              {employee && audience === "signin" && (
                 <p className="login-notice">
                   Default password: Cyond@1234 for CYOND, Gorle@1234 for Gorle. Use Set password to choose your own.
                 </p>
@@ -863,9 +866,9 @@ function Login() {
               <span>
                 {loading
                   ? "Please wait..."
-                  : mode === "set"
+                  : audience === "set"
                     ? "Set password"
-                    : mode === "reset"
+                    : audience === "reset"
                       ? "Reset password"
                       : "Sign in"}
               </span>
@@ -878,7 +881,7 @@ function Login() {
 
             </button>
 
-            <div className="login-actions">
+            {employee ? <div className="login-actions">
               {mode !== "set" && (
                 <button
                   className="login-switch"
@@ -927,7 +930,13 @@ function Login() {
                   Back to sign in
                 </button>
               )}
-            </div>
+            </div> : (
+              <div className="login-actions">
+                <button className="login-switch" type="button" onClick={() => navigate("/employee-login")}>
+                  Employee sign in
+                </button>
+              </div>
+            )}
 
             {/* SECURITY */}
             <div className="login-security">
@@ -1615,6 +1624,11 @@ export default function App() {
         <Route
           path="/login"
           element={<PageGuard><Login /></PageGuard>}
+        />
+
+        <Route
+          path="/employee-login"
+          element={<PageGuard><Login employee /></PageGuard>}
         />
 
         <Route
