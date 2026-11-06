@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -211,7 +212,7 @@ class AiInsightsControllerTest {
                 "employeeInsights", List.of()
         );
 
-        when(aiInsightService.workforceDashboard()).thenReturn(response);
+        when(aiInsightService.workforceDashboard(nullable(String.class))).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/ai/workforce-dashboard"))
                 .andExpect(status().isOk())
