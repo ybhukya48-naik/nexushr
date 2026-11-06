@@ -202,9 +202,64 @@
   margin-top: 10px;
 }
 
+.employee-dashboard .dashboard-hero-copy h2 {
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.employee-dashboard .home-board {
+  align-items: stretch;
+}
+
+.employee-dashboard .home-clock-card strong {
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.employee-dashboard .home-tiles article strong {
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.employee-dashboard .home-wide strong {
+  font-size: 16px;
+  line-height: 1.3;
+}
+
+.employee-dashboard .home-board article span,
+.employee-dashboard .home-board article em,
+.employee-dashboard .home-clock-card span,
+.employee-dashboard .home-clock-card em,
+.employee-dashboard .panel p,
+.employee-dashboard .month-history .employees-table td {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.employee-dashboard .month-history .employees-table th,
+.employee-dashboard .panel h3 {
+  font-size: 16px;
+}
+
+.employee-dashboard .month-history .employees-table th {
+  font-size: 12px;
+}
+
+.employee-dashboard .home-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.employee-dashboard .home-actions button {
+  margin: 0;
+  font-size: 13px;
+}
+
 .home-week i {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
   background: #ece7fb;
   color: #3b2f80;

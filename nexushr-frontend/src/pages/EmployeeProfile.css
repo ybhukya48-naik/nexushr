@@ -191,7 +191,9 @@
 }
 
 .employee-summary-card strong .employee-status {
-  width: auto;
+  display: inline-flex;
+  width: fit-content;
+  align-self: flex-start;
 }
 
 /* Status badges */

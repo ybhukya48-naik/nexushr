@@ -1208,8 +1208,8 @@ function EmployeeDashboard() {
               <article className="home-wide">
                 <span>This week</span>
                 <div className="home-week">
-                  {week.map((day) => (
-                    <i key={day.label} className={day.present ? "in" : ""} title={day.label}>{day.label.slice(0, 1)}</i>
+                  {week.map((day, index) => (
+                    <i key={`${day.label}-${index}`} className={day.present ? "in" : ""} title={day.label}>{day.label.slice(0, 2)}</i>
                   ))}
                 </div>
               </article>
