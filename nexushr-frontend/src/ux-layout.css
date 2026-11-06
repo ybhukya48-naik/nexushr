@@ -216,6 +216,31 @@
   line-height: 1.1;
 }
 
+.home-timers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.home-lunch-timer {
+  padding-left: 16px;
+  border-left: 1px solid #d9d0f5;
+}
+
+@media (max-width: 700px) {
+  .home-timers {
+    grid-template-columns: 1fr;
+  }
+
+  .home-lunch-timer {
+    padding-left: 0;
+    border-left: 0;
+    padding-top: 12px;
+    border-top: 1px solid #d9d0f5;
+  }
+}
+
 .employee-dashboard .home-tiles article strong {
   font-size: 22px;
   line-height: 1.2;

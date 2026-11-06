@@ -924,6 +924,14 @@ function hoursLabel(minutes?: number) {
   return `${Math.floor(value / 60)}h ${value % 60}m`;
 }
 
+function formatTimer(totalSeconds: number) {
+  const safe = Math.max(0, totalSeconds);
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = safe % 60;
+  return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 function EmployeeDashboard() {
   const navigate = useNavigate();
   const cachedDashboard = readDashboardSnapshot();
@@ -943,6 +951,12 @@ function EmployeeDashboard() {
   const [error, setError] = useState("");
   const [punching, setPunching] = useState(false);
   const [punchNote, setPunchNote] = useState("");
+  const [clockNow, setClockNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1182,26 +1196,42 @@ function EmployeeDashboard() {
           present: records.some((row) => String(row.attendanceDate ?? "").slice(0, 10) === date && row.checkInTime),
         }));
         const checkedIn = Boolean(todayRecord?.checkInTime && !todayRecord?.checkOutTime);
+        const onLunch = Boolean(todayRecord?.checkInTime && todayRecord?.checkOutTime);
+        const lunchStarted = onLunch ? new Date(String(todayRecord?.checkOutTime)).getTime() : 0;
+        const lunchSeconds = lunchStarted
+          ? Math.max(0, Math.floor((clockNow.getTime() - lunchStarted) / 1000))
+          : Math.max(0, (todayRecord?.breakMinutes ?? 0) * 60);
         return (
           <>
             <section className="home-board">
               <article className="home-clock-card">
                 <span>{new Date().toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short" })} · General shift 9:30–6:30</span>
-                <strong>{hoursLabel(clockedWorkMinutes(todayRecord))}</strong>
-                <em>worked today</em>
-                <div className="attendance-actions">
-                  <button className="primary-button" type="button" disabled={punching || !isWindowsComputer() || checkedIn} onClick={() => void punch("in")}>
-                    Check in
-                  </button>
-                  <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !checkedIn} onClick={() => void punch("out")}>
-                    Check out
-                  </button>
-                  <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !todayRecord?.checkInTime || Boolean(todayRecord?.checkOutTime)} onClick={() => void punchLunch("out")}>
-                    Start lunch
-                  </button>
-                  <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !todayRecord?.checkOutTime} onClick={() => void punchLunch("in")}>
-                    End lunch
-                  </button>
+                <div className="home-timers">
+                  <div>
+                    <strong>{hoursLabel(clockedWorkMinutes(todayRecord, clockNow))}</strong>
+                    <em>worked today</em>
+                    <div className="attendance-actions">
+                      <button className="primary-button" type="button" disabled={punching || !isWindowsComputer() || checkedIn} onClick={() => void punch("in")}>
+                        Check in
+                      </button>
+                      <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !checkedIn} onClick={() => void punch("out")}>
+                        Check out
+                      </button>
+                    </div>
+                  </div>
+                  <div className="home-lunch-timer">
+                    <strong>{formatTimer(lunchSeconds)}</strong>
+                    <em>{onLunch ? "lunch timer" : "lunch taken"}</em>
+                    <div className="attendance-actions">
+                      <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !todayRecord?.checkInTime || Boolean(todayRecord?.checkOutTime)} onClick={() => void punchLunch("out")}>
+                        Start lunch
+                      </button>
+                      <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !todayRecord?.checkOutTime} onClick={() => void punchLunch("in")}>
+                        End lunch
+                      </button>
+                    </div>
+                    <em>{lunchSeconds > 3600 ? "Past 1 paid hour. Extra time stays a break." : "1 hour is paid. It can be any hour."}</em>
+                  </div>
                 </div>
               </article>
               <article className="home-side">
