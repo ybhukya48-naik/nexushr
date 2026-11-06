@@ -147,6 +147,7 @@ export default function Dashboard() {
   const [personHistory, setPersonHistory] = useState<AttendanceRecord[]>([]);
   const [rangeRows, setRangeRows] = useState<AttendanceRecord[]>([]);
   const [rosterView, setRosterView] = useState<"date" | "week" | "lastWeek" | "month">("date");
+  const [rosterOpen, setRosterOpen] = useState(false);
   const [rosterDate, setRosterDate] = useState(todayIso);
   const [clockNow, setClockNow] = useState(() => new Date());
 
@@ -291,6 +292,7 @@ export default function Dashboard() {
   const windowsPunch = isWindowsComputer();
   const late = todayRows.filter((row) => row.lateWarning || (row.lateArrivalMinutes ?? 0) > 0).length;
   const activePeople = people.filter((person) => person.active);
+  const shownPeople = rosterOpen ? activePeople : activePeople.slice(0, 6);
   const onboardingCount = activePeople.filter((person) =>
     person.lifecycleStatus === "PENDING_ONBOARDING" || person.lifecycleStatus === "PENDING_APPROVAL",
   ).length;
@@ -523,6 +525,7 @@ export default function Dashboard() {
             <button type="button" onClick={viewAllToday}>View all</button>
           ) : (
             <div className="hr-view-tabs">
+              <button type="button" onClick={() => setRosterOpen((open) => !open)}>{rosterOpen ? "View less" : "View all"}</button>
               <button type="button" className={rosterView === "date" ? "active" : ""} onClick={() => setRosterView("date")}>Date</button>
               <button type="button" className={rosterView === "week" ? "active" : ""} onClick={() => setRosterView("week")}>Week</button>
               <button type="button" className={rosterView === "lastWeek" ? "active" : ""} onClick={() => setRosterView("lastWeek")}>Last week</button>
@@ -534,7 +537,7 @@ export default function Dashboard() {
           <p className="hr-empty">Only {lunchPerson.fullName}'s check-in, check-out, and working hours. View all returns to everyone.</p>
         ) : (
           <p className="hr-empty">
-            Click a name to open that person's month.
+            {rosterOpen ? `Showing all ${activePeople.length}.` : `Showing ${Math.min(6, activePeople.length)} of ${activePeople.length}.`} Click a name to open that person's month.
           </p>
         )}
         {!lunchPerson && rosterView === "date" && (
@@ -555,11 +558,11 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {activePeople.length === 0 ? (
+              {shownPeople.length === 0 ? (
                 <tr>
                   <td colSpan={4}>No employees for this company.</td>
                 </tr>
-              ) : activePeople.map((person) => {
+              ) : shownPeople.map((person) => {
                 const row = (rosterDate === today ? todayRows : rangeRows).find((item) => item.employee?.id === person.id && String(item.attendanceDate ?? "").slice(0, 10) === rosterDate);
                 const checkOut = shownCheckOut(row);
                 return (
@@ -589,7 +592,7 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {activePeople.map((person) => (
+              {shownPeople.map((person) => (
                 <tr key={person.id}>
                   <td>
                     <button type="button" className="panel-link" onClick={() => openEmployeeMonth(person.id)}>{person.fullName}</button>
@@ -615,7 +618,7 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {activePeople.map((person) => {
+              {shownPeople.map((person) => {
                 const rows = rangeRows.filter((item) => item.employee?.id === person.id && item.checkInTime);
                 const minutes = rows.reduce((sum, row) => sum + clockedWorkMinutes(row), 0);
                 return (

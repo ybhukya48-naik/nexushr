@@ -388,6 +388,7 @@ export default function Employees() {
 
   const canSeeSalary = role === "HR" || role === "ADMIN" || role === "SUPER_ADMIN";
   const [directoryView, setDirectoryView] = useState<"list" | "chart" | "joiners">("list");
+  const [listOpen, setListOpen] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 25;
   const directoryRows = directoryView === "joiners"
@@ -400,6 +401,7 @@ export default function Employees() {
   const pageCount = Math.max(1, Math.ceil(directoryRows.length / pageSize));
   const safePage = Math.min(page, pageCount);
   const pageRows = directoryRows.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const shownRows = listOpen ? pageRows : pageRows.slice(0, 6);
 
   function updateForm(
     field: keyof EmployeeRequest,
@@ -921,7 +923,7 @@ export default function Employees() {
                 </thead>
 
                 <tbody>
-                  {pageRows.map((employee) => (
+                  {shownRows.map((employee) => (
                     <tr key={employee.id}>
                       <td>
                         <button
@@ -1022,7 +1024,8 @@ export default function Employees() {
               –
               <strong>{Math.min(safePage * pageSize, directoryRows.length)}</strong> of{" "}
               <strong>{directoryRows.length}</strong>
-              {pageCount > 1 && (
+              <button type="button" className="table-action" onClick={() => setListOpen((open) => !open)}>{listOpen ? "View less" : "View all"}</button>
+              {listOpen && pageCount > 1 && (
                 <>
                   {" "}
                   <button type="button" className="table-action" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}>Previous</button>

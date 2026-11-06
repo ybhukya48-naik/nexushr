@@ -969,13 +969,13 @@ export default function Attendance() {
           <p className="eyebrow">{isManagementRole ? "Attendance" : "My Attendance"}</p>
           <h2>{isManagementRole ? "Attendance" : "My Attendance"}</h2>
           <p>
-            {canPunch || isManagementRole
+            {canPunch
               ? "Check in when you arrive and check out when you leave. Start lunch to pause hours. End lunch to continue them. Lunch is not a warning."
-              : "View only. A day is 9 hours: 8 hours of work and 1 hour of lunch."}
+              : "Company attendance. Check in and check out stay on each person's own Home."}
           </p>
         </div>
 
-        {(canPunch || isManagementRole) && (
+        {canPunch && (
         <div className="attendance-actions">
           {!officePunchAllowed && (
             <p>Check in and check out work only on a Windows computer. A phone cannot punch. Signing out of the site does not check you out.</p>
@@ -1216,7 +1216,7 @@ export default function Attendance() {
         </div>
       )}
 
-      {(canPunch || isManagementRole) && (
+      {canPunch && (
         <div className="ux-clock">
           <div>
             <span>{formatDate(date)} · General shift 9:30–6:30 · {sessionOpen ? "Checked in" : "Not checked in"}</span>

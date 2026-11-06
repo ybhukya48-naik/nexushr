@@ -1,6 +1,7 @@
 import { isCompanyMatch } from "../utils/company";
 import { getWorkspaceCompany } from "../utils/workspace";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   createPayroll,
   getAttendanceMonthlySummary,
@@ -49,6 +50,7 @@ function toOptionalNumber(value: string): number | undefined {
 }
 
 export default function Payroll() {
+  const navigate = useNavigate();
   const role = (localStorage.getItem("nexushr_role") || "EMPLOYEE").toUpperCase();
   const isManagementRole = ["ADMIN", "HR", "MANAGER"].includes(role);
 
@@ -296,6 +298,7 @@ export default function Payroll() {
       const result = await generatePayrollFromAttendance(payMonth, selectedCompany);
       setMessage(result.message);
       await loadData();
+      document.getElementById("payroll-records")?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to generate payroll from working hours.");
     } finally {
@@ -536,11 +539,11 @@ export default function Payroll() {
 
       {isManagementRole && (
         <div className="ux-steps" aria-label="Payroll steps">
-          <span>1 Attendance</span>
-          <span>2 Inputs</span>
-          <span>3 Calculate</span>
-          <span>4 Review</span>
-          <span>5 Payslips</span>
+          <button type="button" onClick={() => navigate("/attendance")}>1 Attendance</button>
+          <button type="button" onClick={() => document.getElementById("payroll-inputs")?.scrollIntoView({ behavior: "smooth", block: "start" })}>2 Inputs</button>
+          <button type="button" onClick={() => void handleGenerateFromHours()}>3 Calculate</button>
+          <button type="button" onClick={() => document.getElementById("payroll-records")?.scrollIntoView({ behavior: "smooth", block: "start" })}>4 Review</button>
+          <button type="button" onClick={() => document.getElementById("payroll-records")?.scrollIntoView({ behavior: "smooth", block: "start" })}>5 Payslips</button>
         </div>
       )}
 
@@ -568,7 +571,7 @@ export default function Payroll() {
       </div>
 
       {isManagementRole && (
-        <div className="employees-panel">
+        <div className="employees-panel" id="payroll-inputs">
           <div className="panel-header">
             <div>
               <p className="page-eyebrow">Payroll</p>
@@ -1009,7 +1012,7 @@ export default function Payroll() {
         </div>
       )}
 
-      <div className="employees-panel">
+      <div className="employees-panel" id="payroll-records">
         <div className="panel-header">
           <div>
             <p className="page-eyebrow">Payroll Records</p>

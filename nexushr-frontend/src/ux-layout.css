@@ -117,12 +117,16 @@
   margin-bottom: 16px;
 }
 
-.ux-steps span {
+.ux-steps span,
+.ux-steps button {
   padding: 10px;
+  border: 0;
   border-radius: 10px;
   background: #f7f4ff;
   color: #3b2f80;
   font-weight: 700;
+  text-align: left;
+  cursor: pointer;
 }
 
 .ux-approver {
