@@ -254,12 +254,14 @@ export default function Leave() {
   return (
     <section className="leave-page">
       <div className="ux-tabs">
-        <button type="button" className={tab === "mine" ? "active" : ""} onClick={() => setTab("mine")}>My leave</button>
+        <button type="button" className={tab === "mine" ? "active" : ""} onClick={() => setTab("mine")}>{isEmployee ? "My leave" : "Leave"}</button>
         <button type="button" className={tab === "calendar" ? "active" : ""} onClick={() => setTab("calendar")}>Team calendar</button>
         <button type="button" className={tab === "approvals" ? "active" : ""} onClick={() => setTab("approvals")}>Approvals ({pending.length})</button>
         <button type="button" className={tab === "holidays" ? "active" : ""} onClick={() => setTab("holidays")}>Holidays</button>
         <button type="button" className={tab === "policy" ? "active" : ""} onClick={() => setTab("policy")}>Policy</button>
-        <button type="button" className="ux-tabs-action" onClick={() => setTab("mine")}>Apply leave</button>
+        {isEmployee && (
+          <button type="button" className="ux-tabs-action" onClick={() => setTab("mine")}>Apply leave</button>
+        )}
       </div>
 
       <div className="ux-balances">
@@ -354,8 +356,8 @@ export default function Leave() {
       )}
 
       {(tab === "mine" || tab === "approvals") && (
-      <div className={tab === "mine" ? "ux-split" : "ux-stack"}>
-      {tab === "mine" && (
+      <div className={tab === "mine" && isEmployee ? "ux-split" : "ux-stack"}>
+      {tab === "mine" && isEmployee && (
       <section className="panel leave-request-panel">
         <div className="panel-header">
           <div>
@@ -469,11 +471,13 @@ export default function Leave() {
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">{tab === "approvals" ? "Approvals" : "My requests"}</p>
+            <p className="eyebrow">{tab === "approvals" ? "Approvals" : isEmployee ? "My requests" : "Leave"}</p>
             <h3>{tab === "approvals" ? "Waiting for a decision" : "Leave requests"}</h3>
             <p>
               {companyLeaves.length === 0
-                ? "No leave requests yet. Apply leave to add one."
+                ? isEmployee
+                  ? "No leave requests yet. Apply leave to add one."
+                  : "No leave requests yet."
                 : `${companyLeaves.length} request${companyLeaves.length === 1 ? "" : "s"} recorded.`}
             </p>
           </div>
@@ -588,7 +592,7 @@ export default function Leave() {
                     <div className="employee-empty-state">
                       <strong>No leave requests yet</strong>
                       <span>
-                        Apply leave to add one.
+                        {isEmployee ? "Apply leave to add one." : "Requests show here when an employee applies."}
                       </span>
                     </div>
                   </td>
