@@ -4,26 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   createPayroll,
-  getAttendanceMonthlySummary,
   getEmployees,
   getCurrentEmployee,
   getEmployeePayroll,
   getPayrollAutoComponents,
   getPayrollRecords,
-  importAttendanceExcel,
-  importAttendancePaste,
   generatePayrollFromAttendance,
-  importPayrollExcel,
   getPayslip,
   downloadPayslipPdf,
-  downloadSampleAttendance,
   emailPayslip,
   markPayrollPaid,
-  type AttendanceImportResponse,
-  type AttendanceMonthlySummaryResponse,
   type EmployeeResponse,
   type PayrollAutoComponentsResponse,
-  type PayrollExcelImportResponse,
   type PayrollRecord,
   type PayslipResponse,
 } from "../api";
@@ -70,21 +62,7 @@ export default function Payroll() {
   const [otherDeductions, setOtherDeductions] = useState("");
   const [autoFromAttendance, setAutoFromAttendance] = useState(true);
 
-  const [attendanceFile, setAttendanceFile] = useState<File | null>(null);
-  const [importingAttendance, setImportingAttendance] = useState(false);
-  const [pastedAttendance, setPastedAttendance] = useState("");
-  const [pastingAttendance, setPastingAttendance] = useState(false);
-  const [attendanceImportResult, setAttendanceImportResult] =
-    useState<AttendanceImportResponse | null>(null);
-  const [attendanceSummary, setAttendanceSummary] =
-    useState<AttendanceMonthlySummaryResponse | null>(null);
-
-  // Salary Excel import state
-  const [salaryFile, setSalaryFile] = useState<File | null>(null);
-  const [importingSalary, setImportingSalary] = useState(false);
   const [generatingFromHours, setGeneratingFromHours] = useState(false);
-  const [salaryImportResult, setSalaryImportResult] =
-    useState<PayrollExcelImportResponse | null>(null);
 
 
   const [autoComponents, setAutoComponents] =
@@ -99,7 +77,6 @@ export default function Payroll() {
   const [payslip, setPayslip] = useState<PayslipResponse | null>(null);
   const [payslipLoading, setPayslipLoading] = useState(false);
   const [emailingPayslip, setEmailingPayslip] = useState(false);
-  const [emailAfterImport, setEmailAfterImport] = useState(false);
 
   const companyEmployees = useMemo(
     () =>
@@ -134,20 +111,6 @@ export default function Payroll() {
             isCompanyMatch(record.employee.companyCode, selectedCompany)),
       ),
     [records, selectedCompany, payMonth],
-  );
-
-  const monthRows = useMemo(
-    () =>
-      (attendanceSummary?.employees ?? []).filter(
-        (row) =>
-          selectedCompany === "All Companies" ||
-          employees.some(
-            (employee) =>
-              employee.id === row.employeeId &&
-              isCompanyMatch(employee.companyCode, selectedCompany),
-          ),
-      ),
-    [attendanceSummary, employees, selectedCompany],
   );
 
   async function loadData() {
@@ -190,19 +153,6 @@ export default function Payroll() {
     }
   }
 
-  async function loadAttendanceSummary(targetMonth: string) {
-    if (!isManagementRole) {
-      return;
-    }
-
-    try {
-      const summary = await getAttendanceMonthlySummary(targetMonth);
-      setAttendanceSummary(summary);
-    } catch (err) {
-      console.error("Attendance summary load failed:", err);
-    }
-  }
-
   async function loadAutoComponents(
     employeeId: string,
     targetMonth: string,
@@ -234,62 +184,6 @@ export default function Payroll() {
     }
   }
 
-  async function handleAttendanceImport(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!attendanceFile) {
-      setError("Please choose an attendance Excel file to import.");
-      return;
-    }
-
-    setImportingAttendance(true);
-    setError("");
-    setMessage("");
-
-    try {
-      const result = await importAttendanceExcel(payMonth, attendanceFile);
-
-      setAttendanceImportResult(result);
-      setMessage("Attendance imported successfully.");
-
-      await loadAttendanceSummary(payMonth);
-
-      if (selectedEmployee) {
-        await loadAutoComponents(selectedEmployee, payMonth);
-      }
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to import attendance Excel.",
-      );
-    } finally {
-      setImportingAttendance(false);
-    }
-  }
-
-  async function handleAttendancePaste(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!pastedAttendance.trim()) {
-      setError("Paste Excel rows first.");
-      return;
-    }
-    setPastingAttendance(true);
-    setError("");
-    setMessage("");
-    try {
-      const result = await importAttendancePaste(payMonth, pastedAttendance);
-      setAttendanceImportResult(result);
-      setMessage("Pasted attendance saved. Salary uses the 9 hour day.");
-      setPastedAttendance("");
-      await loadAttendanceSummary(payMonth);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to paste attendance.");
-    } finally {
-      setPastingAttendance(false);
-    }
-  }
-
   async function handleGenerateFromHours() {
     setGeneratingFromHours(true);
     setError("");
@@ -306,54 +200,9 @@ export default function Payroll() {
     }
   }
 
-  /**
-   * Optional salary workbook for people who already exist.
-   * Hours come from attendance. The sheet cannot create employees.
-   */
-  async function handleSalaryExcelImport(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!salaryFile) {
-      setError("Please choose a salary Excel file (.xlsx) to import.");
-      return;
-    }
-
-    setImportingSalary(true);
-    setError("");
-    setMessage("");
-    setSalaryImportResult(null);
-
-    try {
-      const result = await importPayrollExcel(payMonth, salaryFile, emailAfterImport);
-      setSalaryImportResult(result);
-      setMessage(
-        `✅ ${result.message} Attendance summary and payroll records updated.`
-      );
-      // Reload attendance summary and payroll records
-      await loadAttendanceSummary(payMonth);
-      await loadData();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to import salary Excel. Check the file format.",
-      );
-    } finally {
-      setImportingSalary(false);
-    }
-  }
-
   useEffect(() => {
     void loadData();
   }, []);
-
-  useEffect(() => {
-    if (!isManagementRole) {
-      return;
-    }
-
-    void loadAttendanceSummary(payMonth);
-  }, [payMonth, isManagementRole]);
 
   useEffect(() => {
     if (!isManagementRole || !selectedEmployee) {
@@ -577,17 +426,8 @@ export default function Payroll() {
               <p className="page-eyebrow">Payroll</p>
             <h2>Create Salary Record</h2>
             <p>
-              Payroll is generated using the employee base salary and
-              optional salary components.
+              Pay is calculated from each employee&apos;s check-in and check-out. A spreadsheet is not used.
             </p>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => void loadData()}
-              disabled={loading}
-            >
-              {loading ? "Loading..." : "Refresh employees"}
-            </button>
           </div>
         </div>
 
@@ -608,217 +448,6 @@ export default function Payroll() {
             </button>
           </div>
 
-          <div className="payroll-attendance-import">
-            <div>
-              <strong>Sample employee sheet</strong>
-              <span>
-                Optional. Download a blank attendance layout for people already in Employees. Importing it does not create accounts.
-              </span>
-            </div>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => {
-                void downloadSampleAttendance().then((file) => {
-                  const url = window.URL.createObjectURL(file);
-                  const link = document.createElement("a");
-                  link.href = url;
-                  link.download = "nexushr-sample-attendance.xlsx";
-                  document.body.appendChild(link);
-                  link.click();
-                  link.remove();
-                  window.URL.revokeObjectURL(url);
-                }).catch((err) => {
-                  setError(err instanceof Error ? err.message : "Unable to download the sample sheet.");
-                });
-              }}
-            >
-              Download sample Excel
-            </button>
-          </div>
-
-          <form
-            className="payroll-attendance-import"
-            onSubmit={handleAttendanceImport}
-          >
-            <label>
-              Attendance Excel (month-wise)
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={(event) =>
-                  setAttendanceFile(event.target.files?.[0] ?? null)
-                }
-              />
-            </label>
-
-            <button
-              type="submit"
-              className="secondary-button"
-              disabled={importingAttendance}
-            >
-              {importingAttendance ? "Importing..." : "Import Attendance"}
-            </button>
-          </form>
-
-          <form className="payroll-attendance-import" onSubmit={handleAttendancePaste}>
-            <label>
-              Paste from Excel
-              <span>
-                Copy rows from Excel and paste them here. Columns: date, employee code, check in, check out.
-              </span>
-              <textarea
-                rows={5}
-                value={pastedAttendance}
-                onChange={(event) => setPastedAttendance(event.target.value)}
-                placeholder={"2026-10-21\tCY-EMP-003\t10:00\t19:00"}
-              />
-            </label>
-            <button type="submit" className="secondary-button" disabled={pastingAttendance}>
-              {pastingAttendance ? "Saving..." : "Save pasted rows"}
-            </button>
-          </form>
-
-          {/* ── Salary Excel Import ── */}
-          <form
-            className="payroll-attendance-import payroll-salary-import"
-            onSubmit={handleSalaryExcelImport}
-          >
-            <label>
-              Import salary Excel
-              <span>
-                Optional. Matches people already in Employees and uses their recorded hours. Rows that are not real employees are skipped.
-              </span>
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={(event) =>
-                  setSalaryFile(event.target.files?.[0] ?? null)
-                }
-              />
-            </label>
-
-            <label className="payroll-email-choice">
-              <input
-                type="checkbox"
-                checked={emailAfterImport}
-                onChange={(event) => setEmailAfterImport(event.target.checked)}
-              />
-              Email payslips after this import
-            </label>
-
-            <button
-              type="submit"
-              className="primary-button"
-              disabled={importingSalary}
-              onClick={(event) => {
-                if (
-                  emailAfterImport &&
-                  !window.confirm("Email payslips to every employee in this file?")
-                ) {
-                  event.preventDefault();
-                }
-              }}
-            >
-              {importingSalary
-                ? "Importing..."
-                : emailAfterImport
-                  ? "Import salary and email payslips"
-                  : "Import salary"}
-            </button>
-
-            {salaryImportResult && (
-              <div className="payroll-attendance-summary payroll-import-result">
-                <strong>Salary import ({salaryImportResult.payMonth})</strong>
-                <span>{salaryImportResult.imported} salary record(s) saved.</span>
-                <span>
-                  {salaryImportResult.message
-                    || `Email sent: ${salaryImportResult.emailsSent ?? 0}. Failed: ${salaryImportResult.emailsFailed ?? 0}.`}
-                </span>
-                {salaryImportResult.employees && salaryImportResult.employees.length > 0 && (
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Code</th>
-                        <th>Name</th>
-                        <th>Gross</th>
-                        <th>Net</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {salaryImportResult.employees.map((employee) => (
-                        <tr key={`${employee.employeeCode}-${employee.fullName}`}>
-                          <td>{employee.employeeCode}</td>
-                          <td>{employee.fullName}</td>
-                          <td>{money(employee.grossSalary)}</td>
-                          <td>{money(employee.netSalary)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
-          </form>
-
-          {attendanceImportResult && (
-            <div className="payroll-attendance-summary">
-              <strong>
-                Import result ({attendanceImportResult.payMonth})
-              </strong>
-
-              <span>
-                Imported {attendanceImportResult.importedCount}, updated {attendanceImportResult.updatedCount}, skipped {attendanceImportResult.skippedCount}.
-              </span>
-
-              {attendanceImportResult.errors.length > 0 && (
-                <span>
-                  {attendanceImportResult.errors.length} rows had validation issues.
-                </span>
-              )}
-              {attendanceImportResult.errors.length > 0 && (
-                <ul>
-                  {attendanceImportResult.errors.slice(0, 10).map((err, i) => (
-                    <li key={i}>{typeof err === "string" ? err : JSON.stringify(err)}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-
-          {attendanceSummary && (
-            <div className="payroll-attendance-summary">
-              <strong>
-                Attendance month summary ({attendanceSummary.payMonth}
-                {selectedCompany === "All Companies" ? "" : ` · ${selectedCompany === "GORLE" ? "Gorle Group" : "CYOND"}`})
-              </strong>
-
-              <span>
-                {monthRows.length} employees, {monthRows
-                  .reduce((total, row) => total + row.workedHours, 0)
-                  .toFixed(1)} worked hours, {monthRows
-                  .reduce((total, row) => total + row.shortfallHours, 0)
-                  .toFixed(1)} shortfall hours.
-              </span>
-
-              <table>
-                <thead>
-                  <tr>
-                    <th>Code</th><th>Name</th><th>Worked hrs</th><th>Expected hrs</th><th>Shortfall hrs</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {monthRows.map((e) => (
-                    <tr key={e.employeeId}>
-                      <td>{e.employeeCode}</td><td>{e.fullName}</td>
-                      <td>{e.workedHours.toFixed(1)}</td><td>{e.expectedHours.toFixed(1)}</td>
-                      <td>{e.shortfallHours.toFixed(1)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
 
         <form className="payroll-salary-form" onSubmit={handleGenerate}>
           <div className="employee-filters">
