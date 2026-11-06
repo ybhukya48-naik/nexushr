@@ -296,16 +296,24 @@ export default function Dashboard() {
   const pending = leaves.filter((leave) => leave.status === "PENDING");
   const nowForMissing = new Date();
   const missingCheckInDue = nowForMissing.getHours() > 11 || (nowForMissing.getHours() === 11 && nowForMissing.getMinutes() >= 0);
-  const missingCheckIn = missingCheckInDue
-    ? people.filter((employee) =>
-        employee.active
-        && !todayRows.some((row) => row.employee?.id === employee.id && row.checkInTime),
-      ).length
-    : 0;
-  const missingCheckOut = todayRows.filter((row) => isCheckoutMissing(row)).length;
+  const activePeople = people.filter((person) => person.active);
+  const onLeaveIds = new Set(onLeave.map((leave) => leave.employee?.id).filter((id): id is number => typeof id === "number"));
+  const missedCheckInPeople = missingCheckInDue
+    ? activePeople.filter((person) =>
+        !onLeaveIds.has(person.id)
+        && !todayRows.some((row) => row.employee?.id === person.id && row.checkInTime),
+      )
+    : [];
+  const missedCheckOutPeople = todayRows.filter((row) => isCheckoutMissing(row) && row.employee);
+  const noLunchLogin = todayRows.filter((row) =>
+    row.checkInTime
+    && row.employee
+    && !row.employee.siteVisitor
+    && row.attendanceStatus !== "INACTIVE"
+    && (row.breakMinutes ?? 0) < 1,
+  );
   const windowsPunch = isWindowsComputer();
   const late = todayRows.filter((row) => row.lateWarning || (row.lateArrivalMinutes ?? 0) > 0).length;
-  const activePeople = people.filter((person) => person.active);
   const shownPeople = rosterOpen ? activePeople : activePeople.slice(0, 6);
   const onboardingCount = activePeople.filter((person) =>
     person.lifecycleStatus === "PENDING_ONBOARDING" || person.lifecycleStatus === "PENDING_APPROVAL",
@@ -500,9 +508,53 @@ export default function Dashboard() {
             <h3>Exceptions today</h3>
             <button type="button" onClick={viewAllToday}>View all</button>
           </div>
+          <div className="hr-miss-lists">
+            <div>
+              <strong>No check-in {!missingCheckInDue ? "" : `(${missedCheckInPeople.length})`}</strong>
+              {!missingCheckInDue ? (
+                <p className="hr-empty">Shown after 11:00.</p>
+              ) : missedCheckInPeople.length === 0 ? (
+                <p className="hr-empty">Nobody missed check-in.</p>
+              ) : (
+                <ul>
+                  {missedCheckInPeople.map((person) => (
+                    <li key={person.id}>
+                      <button type="button" onClick={() => openEmployeeMonth(person.id)}>{person.fullName}</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div>
+              <strong>Check-out missed ({missedCheckOutPeople.length})</strong>
+              {missedCheckOutPeople.length === 0 ? (
+                <p className="hr-empty">Nobody missed check-out. This shows after 11:00 PM.</p>
+              ) : (
+                <ul>
+                  {missedCheckOutPeople.map((row) => (
+                    <li key={row.employee?.id ?? row.id}>
+                      <button type="button" onClick={() => openEmployeeMonth(row.employee?.id)}>{row.employee?.fullName || "Employee"}</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div>
+              <strong>No lunch login ({noLunchLogin.length})</strong>
+              {noLunchLogin.length === 0 ? (
+                <p className="hr-empty">Everyone who checked in has logged back from lunch.</p>
+              ) : (
+                <ul>
+                  {noLunchLogin.map((row) => (
+                    <li key={`lunch-${row.employee?.id ?? row.id}`}>
+                      <button type="button" onClick={() => openEmployeeMonth(row.employee?.id)}>{row.employee?.fullName || "Employee"}</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
           <p className="hr-exception-line">
-            <button type="button" onClick={() => navigate("/attendance")}>No check-in {missingCheckIn}</button>
-            <button type="button" onClick={() => navigate("/attendance")}>Check-out missed {missingCheckOut}</button>
             <button type="button" onClick={() => navigate("/attendance")}>Idle warnings {idleWarnings}</button>
             <button type="button" onClick={() => navigate("/attendance")}>Late {late}</button>
           </p>

@@ -10,10 +10,8 @@ import {
 } from "../api";
 import {
   createLeave,
-  getLeaveBalance,
   getLeaves,
   updateLeaveStatus,
-  type LeaveBalance,
   type LeaveRequest,
 } from "./Attendance";
 
@@ -27,7 +25,6 @@ export default function Leave() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
-  const [balance, setBalance] = useState<LeaveBalance | null>(null);
   const [leaveType, setLeaveType] = useState("CASUAL");
   const [halfDay, setHalfDay] = useState(false);
   const [message, setMessage] = useState("");
@@ -83,11 +80,6 @@ export default function Leave() {
         setSelectedEmployee(String(me.id));
         setEmployees([me]);
         setSelectedCompany(me.companyCode || "CYOND");
-        try {
-          setBalance(await getLeaveBalance(me.id));
-        } catch {
-          setBalance(null);
-        }
 
         return;
       }
@@ -107,17 +99,8 @@ export default function Leave() {
     void load();
   }, []);
 
-  async function selectEmployee(id: string) {
+  function selectEmployee(id: string) {
     setSelectedEmployee(id);
-    if (!id) {
-      setBalance(null);
-      return;
-    }
-    try {
-      setBalance(await getLeaveBalance(Number(id)));
-    } catch {
-      setBalance(null);
-    }
   }
 
   async function submit(event: React.FormEvent) {
@@ -184,13 +167,6 @@ export default function Leave() {
           : "Leave request rejected.",
       );
       await load();
-      if (selectedEmployee) {
-        try {
-          setBalance(await getLeaveBalance(Number(selectedEmployee)));
-        } catch {
-          setBalance(null);
-        }
-      }
     } catch (err) {
       setError(
         err instanceof Error
@@ -278,7 +254,7 @@ export default function Leave() {
         <article>
           <span>Earned</span>
           <strong>{Math.max(0, 1 - paidThisMonth)}</strong>
-          <em>of 1 this month · {balance?.remainingDays ?? "—"} left this year</em>
+          <em>of 1 this month</em>
         </article>
         <article>
           <span>Comp-off</span>
@@ -350,7 +326,7 @@ export default function Leave() {
       {tab === "policy" && (
         <section className="panel">
           <h3>Leave policy</h3>
-          <p>One casual leave and one paid leave each month. The year balance is the saved entitlement. Sundays and listed holidays are not counted.</p>
+          <p>One casual leave and one paid leave each month. Sundays and listed holidays are not counted.</p>
           <p>A request can be a full day or a half day. It stays pending until someone approves or rejects it.</p>
         </section>
       )}
@@ -391,7 +367,7 @@ export default function Leave() {
                 <select
                   value={selectedEmployee}
                   onChange={(event) =>
-                    void selectEmployee(event.target.value)
+                    selectEmployee(event.target.value)
                   }
                   required
                 >

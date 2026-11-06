@@ -35,7 +35,6 @@ import {
   checkOut,
   getAttendanceAudit,
   getEmployeeAttendance,
-  getLeaveBalance,
   getLeaves,
   sendAttendanceHeartbeat,
   type AttendanceAuditEntry,
@@ -941,7 +940,6 @@ function EmployeeDashboard() {
   const [audit, setAudit] = useState<AttendanceAuditEntry[]>([]);
   const [leaveCount, setLeaveCount] = useState(0);
   const [myLeaves, setMyLeaves] = useState<LeaveRequest[]>([]);
-  const [leaveDays, setLeaveDays] = useState<number | null>(null);
   const [nextHoliday, setNextHoliday] = useState("None listed");
   const [latestPay, setLatestPay] = useState<PayrollRecord | null>(null);
   const [payslipNote, setPayslipNote] = useState("");
@@ -972,9 +970,8 @@ function EmployeeDashboard() {
           getAttendanceAudit(me.id).catch(() => []),
           getLeaves().catch(() => []),
           getEmployeePayroll(me.id).catch(() => []),
-          getLeaveBalance(me.id).catch(() => null),
           getHolidays().catch(() => []),
-        ]).then(([history, punches, leaves, payroll, balance, holidays]) => {
+        ]).then(([history, punches, leaves, payroll, holidays]) => {
           if (cancelled) {
             return;
           }
@@ -986,7 +983,6 @@ function EmployeeDashboard() {
           setAudit(Array.isArray(punches) ? punches : []);
           setLeaveCount(Array.isArray(leaves) ? leaves.length : 0);
           setMyLeaves(Array.isArray(leaves) ? leaves : []);
-          setLeaveDays(balance && typeof balance.remainingDays === "number" ? balance.remainingDays : null);
           const upcoming = (Array.isArray(holidays) ? holidays : [])
             .filter((holiday) => holiday?.holidayDate && holiday.holidayDate >= todayKey())
             .sort((a, b) => a.holidayDate.localeCompare(b.holidayDate))[0];
@@ -1150,7 +1146,6 @@ function EmployeeDashboard() {
           <p>
             {new Date().toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short" })}
             {" · "}General shift 9:30–6:30
-            {" · "}Days left {leaveDays ?? "—"}
             {" · "}Next holiday {nextHoliday}
           </p>
 

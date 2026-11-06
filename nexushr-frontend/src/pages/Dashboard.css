@@ -185,6 +185,37 @@
   margin: 12px 0 0;
 }
 
+.hr-miss-lists {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.hr-miss-lists strong {
+  display: block;
+  font-size: 13px;
+  color: #3b2f80;
+}
+
+.hr-miss-lists ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hr-miss-lists button {
+  border: 0;
+  background: transparent;
+  color: #3b2f80;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  padding: 0;
+}
+
 .hr-lunch {
   display: flex;
   flex-wrap: wrap;
