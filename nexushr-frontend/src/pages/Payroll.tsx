@@ -77,6 +77,7 @@ export default function Payroll() {
   const [payslip, setPayslip] = useState<PayslipResponse | null>(null);
   const [payslipLoading, setPayslipLoading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [emailingId, setEmailingId] = useState<number | null>(null);
 
   const companyEmployees = useMemo(
     () =>
@@ -112,6 +113,8 @@ export default function Payroll() {
       ),
     [records, selectedCompany, payMonth],
   );
+
+  const visibleRecords = isManagementRole ? companyRecords : records;
 
   async function loadData() {
     setLoading(true);
@@ -332,19 +335,7 @@ export default function Payroll() {
       link.remove();
 
       window.URL.revokeObjectURL(url);
-
-      try {
-        await emailPayslip(target.payrollId);
-        setMessage(
-          "Payslip downloaded. A copy was emailed only to this employee.",
-        );
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? `Payslip downloaded, but the email was not sent. ${err.message}`
-            : "Payslip downloaded, but the email was not sent.",
-        );
-      }
+      setMessage("Payslip downloaded.");
     } catch (err) {
       setError(
         err instanceof Error
@@ -356,6 +347,29 @@ export default function Payroll() {
     }
   }
 
+  async function handleEmailPayslip(payrollId: number) {
+    setEmailingId(payrollId);
+    setError("");
+    setMessage("");
+
+    try {
+      await emailPayslip(payrollId);
+      setMessage(
+        isManagementRole
+          ? "Payslip emailed only to this employee."
+          : "Payslip emailed to you.",
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to email payslip.",
+      );
+    } finally {
+      setEmailingId(null);
+    }
+  }
+
 
   return (
     <section className="employees-page">
@@ -364,8 +378,9 @@ export default function Payroll() {
           <p className="page-eyebrow">{selectedCompany === "GORLE" ? "Gorle Group" : selectedCompany === "CYOND" ? "CYOND" : selectedCompany}</p>
           <h1>{role === "EMPLOYEE" ? "My Pay" : "Payroll"}</h1>
           <p>
-            Generate payroll, track salary payments and view employee
-            payslips.
+            {role === "EMPLOYEE"
+              ? "Download your payslip, or email that same payslip to yourself."
+              : "Download a payslip, or email that payslip to the employee."}
           </p>
         </div>
       </div>
@@ -399,19 +414,19 @@ export default function Payroll() {
         </article>
         <article>
           <span>Gross</span>
-          <strong>{money(companyRecords.reduce((sum, record) => sum + Number(record.grossSalary || 0), 0))}</strong>
+          <strong>{money(visibleRecords.reduce((sum, record) => sum + Number(record.grossSalary || 0), 0))}</strong>
         </article>
         <article>
           <span>Deductions</span>
-          <strong>{money(companyRecords.reduce((sum, record) => sum + Number(record.deductions || 0), 0))}</strong>
+          <strong>{money(visibleRecords.reduce((sum, record) => sum + Number(record.deductions || 0), 0))}</strong>
         </article>
         <article>
           <span>Net pay</span>
-          <strong>{money(companyRecords.reduce((sum, record) => sum + Number(record.netSalary || 0), 0))}</strong>
+          <strong>{money(visibleRecords.reduce((sum, record) => sum + Number(record.netSalary || 0), 0))}</strong>
         </article>
         <article>
           <span>Flags</span>
-          <strong>{companyRecords.filter((record) => Number(record.deductions || 0) > 0).length}</strong>
+          <strong>{visibleRecords.filter((record) => Number(record.deductions || 0) > 0).length}</strong>
         </article>
       </div>
 
@@ -643,7 +658,9 @@ export default function Payroll() {
             <p className="page-eyebrow">Payroll Records</p>
             <h2>Salary Records</h2>
             <p>
-              Generated payroll records and payment status.
+              {role === "EMPLOYEE"
+                ? "Your salary records. Download a payslip, or email it to yourself."
+                : "Generated payroll records and payment status."}
             </p>
           </div>
         </div>
@@ -653,10 +670,18 @@ export default function Payroll() {
             <strong>Loading payroll...</strong>
             <span>Fetching salary records from the backend.</span>
           </div>
-        ) : companyRecords.length === 0 ? (
+        ) : visibleRecords.length === 0 ? (
           <div className="employee-empty-state">
-            <strong>No payroll records for {payMonth}</strong>
-            <span>Calculate pay from attendance for this month.</span>
+            <strong>
+              {role === "EMPLOYEE"
+                ? "No payslip yet"
+                : `No payroll records for ${payMonth}`}
+            </strong>
+            <span>
+              {role === "EMPLOYEE"
+                ? "Your payslip appears here after pay is calculated."
+                : "Calculate pay from attendance for this month."}
+            </span>
           </div>
         ) : (
           <div className="table-wrapper">
@@ -674,7 +699,7 @@ export default function Payroll() {
               </thead>
 
               <tbody>
-                {companyRecords.map((record) => (
+                {visibleRecords.map((record) => (
                   <tr key={record.id}>
                     <td>
                       <strong>{record.employee.fullName}</strong>
@@ -721,8 +746,19 @@ export default function Payroll() {
                         disabled={downloadingId === record.id}
                       >
                         {downloadingId === record.id
-                          ? "Sending..."
+                          ? "Downloading..."
                           : "Download payslip"}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="table-action"
+                        onClick={() => void handleEmailPayslip(record.id)}
+                        disabled={emailingId === record.id}
+                      >
+                        {emailingId === record.id
+                          ? "Emailing..."
+                          : "Email payslip"}
                       </button>
 
                       <button
@@ -785,8 +821,19 @@ export default function Payroll() {
                 disabled={downloadingId === payslip.payrollId}
               >
                 {downloadingId === payslip.payrollId
-                  ? "Sending..."
+                  ? "Downloading..."
                   : "Download payslip"}
+              </button>
+
+              <button
+                type="button"
+                className="table-action"
+                onClick={() => void handleEmailPayslip(payslip.payrollId)}
+                disabled={emailingId === payslip.payrollId}
+              >
+                {emailingId === payslip.payrollId
+                  ? "Emailing..."
+                  : "Email payslip"}
               </button>
 
               <button
