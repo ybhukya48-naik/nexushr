@@ -500,6 +500,13 @@ export function completeOwnProfile(fullName: string, phone: string) {
   });
 }
 
+export function resetOwnPassword() {
+  return request<{ message: string; temporaryPassword: string }>(
+    "/employees/me/reset-password",
+    { method: "POST" },
+  );
+}
+
 export function resetEmployeePassword(id: number) {
   return request<{ message: string; temporaryPassword: string }>(
     `/employees/${id}/reset-password`,

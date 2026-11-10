@@ -8,7 +8,6 @@ import {
   Routes,
   useLocation,
   useNavigate,
-  useSearchParams,
 } from "react-router-dom";
 import {
   getCurrentEmployee,
@@ -21,8 +20,7 @@ import {
   changeOwnPassword,
   completeOwnProfile,
   login as apiLogin,
-  resetLoginPassword,
-  setLoginPassword,
+  resetOwnPassword,
   getAiWorkforceDashboard,
   fetchEmployeePhoto,
   API_BASE,
@@ -132,6 +130,7 @@ function AppRoutes() {
   const [profileName, setProfileName] = useState("");
   const [profilePhone, setProfilePhone] = useState("");
   const [accountError, setAccountError] = useState("");
+  const [accountNotice, setAccountNotice] = useState("");
   const [accountSaving, setAccountSaving] = useState(false);
 
   useEffect(() => {
@@ -185,6 +184,14 @@ function AppRoutes() {
   }, [me]);
 
   useEffect(() => {
+    if (role === "EMPLOYEE" && me?.companyCode) {
+      const company = asWorkspaceCompany(me.companyCode);
+      setWorkspaceCompany(company);
+      setWorkspace(company);
+    }
+  }, [me, role]);
+
+  useEffect(() => {
     const sync = () => setWorkspace(getWorkspaceCompany());
     window.addEventListener("nexushr-company", sync);
     return () => window.removeEventListener("nexushr-company", sync);
@@ -234,6 +241,7 @@ function AppRoutes() {
   async function saveNewPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAccountError("");
+    setAccountNotice("");
     if (nextPassword.length < 8) {
       setAccountError("Password must contain at least 8 characters.");
       return;
@@ -248,9 +256,10 @@ function AppRoutes() {
       localStorage.removeItem("nexushr_must_change_password");
       setNextPassword("");
       setConfirmNextPassword("");
-      if (localStorage.getItem("nexushr_profile_needed") === "1") {
+      if (role === "EMPLOYEE" && localStorage.getItem("nexushr_profile_needed") === "1") {
         setAccountStep("profile");
       } else {
+        localStorage.removeItem("nexushr_profile_needed");
         setAccountStep("done");
       }
     } catch (err) {
@@ -263,6 +272,7 @@ function AppRoutes() {
   async function saveNewProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAccountError("");
+    setAccountNotice("");
     if (!profileName.trim()) {
       setAccountError("Enter your name.");
       return;
@@ -272,9 +282,30 @@ function AppRoutes() {
       const saved = await completeOwnProfile(profileName.trim(), profilePhone.trim());
       localStorage.setItem("nexushr_user", saved.fullName);
       localStorage.removeItem("nexushr_profile_needed");
+      const company = asWorkspaceCompany(saved.companyCode);
+      setWorkspaceCompany(company);
+      setWorkspace(company);
       setAccountStep("done");
     } catch (err) {
       setAccountError(err instanceof Error ? err.message : "Could not save the profile.");
+    } finally {
+      setAccountSaving(false);
+    }
+  }
+
+  async function resetSignedInPassword() {
+    setAccountError("");
+    setAccountNotice("");
+    setAccountSaving(true);
+    try {
+      const result = await resetOwnPassword();
+      setNextPassword("");
+      setConfirmNextPassword("");
+      setAccountStep("password");
+      localStorage.setItem("nexushr_must_change_password", "1");
+      setAccountNotice(`Password reset. Default password is ${result.temporaryPassword}. Set a new password now.`);
+    } catch (err) {
+      setAccountError(err instanceof Error ? err.message : "Could not reset the password.");
     } finally {
       setAccountSaving(false);
     }
@@ -293,10 +324,11 @@ function AppRoutes() {
             <h2>{accountStep === "password" ? "Set your password" : "Create your profile"}</h2>
             <p>
               {accountStep === "password"
-                ? "This is your first sign-in. Choose a new password before you continue."
-                : "Your employee ID and designation are already saved. Add your name and phone."}
+                ? "You are signed in. Set a new password, or reset it to the company default. Your profile comes next, then the dashboard."
+                : "Your employee ID and designation are already saved. Add your name and phone. The dashboard opens after this."}
             </p>
           </div>
+          {accountNotice && <p className="login-notice">{accountNotice}</p>}
           {accountError && <div role="alert" className="login-error">{accountError}</div>}
           {accountStep === "password" ? (
             <>
@@ -322,8 +354,13 @@ function AppRoutes() {
             </>
           )}
           <button className="primary-button" type="submit" disabled={accountSaving}>
-            {accountSaving ? "Saving..." : accountStep === "password" ? "Save password" : "Save profile"}
+            {accountSaving ? "Saving..." : accountStep === "password" ? "Set password" : "Save profile"}
           </button>
+          {accountStep === "password" && role === "EMPLOYEE" && (
+            <button className="quiet-button" type="button" onClick={() => void resetSignedInPassword()} disabled={accountSaving}>
+              Reset password
+            </button>
+          )}
           <button className="quiet-button" type="button" onClick={handleLogout}>Sign out</button>
         </form>
       </div>
@@ -570,16 +607,9 @@ function AppRoutes() {
 }
 function Login({ employee = false }: { employee?: boolean }) {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [mode, setMode] = useState<"signin" | "set" | "reset">(
-    employee && searchParams.get("create") === "1" ? "set" : "signin",
-  );
-  const audience = employee ? mode : "signin";
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
@@ -618,6 +648,7 @@ function Login({ employee = false }: { employee?: boolean }) {
         "nexushr_role",
         response.role,
       );
+      localStorage.removeItem("nexushr_dashboard_snapshot");
       beginWebsiteSession();
       if (response.mustChangePassword) {
         localStorage.setItem("nexushr_must_change_password", "1");
@@ -652,64 +683,6 @@ function Login({ employee = false }: { employee?: boolean }) {
     }
   }
 
-  async function handleSetPassword(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    setNotice("");
-    const email = username.trim();
-    if (!email) {
-      setError("Enter your company email.");
-      return;
-    }
-    if (!currentPassword) {
-      setError("Enter the default password or your current password.");
-      return;
-    }
-    if (password.length < 8) {
-      setError("Password must contain at least 8 characters.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const response = await setLoginPassword(email, currentPassword, password);
-      setPassword("");
-      setCurrentPassword("");
-      setConfirmPassword("");
-      setMode("signin");
-      setNotice(response.message);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not set the password.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleResetPassword(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    setNotice("");
-    const email = username.trim();
-    if (!email) {
-      setError("Enter your company email.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const response = await resetLoginPassword(email);
-      setPassword(response.temporaryPassword);
-      setMode("signin");
-      setNotice(`${response.message} Default password: ${response.temporaryPassword}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not reset the password.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
     <div className="login-page">
       <div className="login-background-orb login-orb-one"></div>
@@ -725,7 +698,7 @@ function Login({ employee = false }: { employee?: boolean }) {
 
           <form
             className="login-card"
-            onSubmit={audience === "set" ? handleSetPassword : audience === "reset" ? handleResetPassword : handleSubmit}
+            onSubmit={handleSubmit}
           >
 
             <div className="login-card-brand">
@@ -738,18 +711,12 @@ function Login({ employee = false }: { employee?: boolean }) {
 
             <div className="login-card-header">
 
-              <h2>
-                {audience === "set" ? "Set password" : audience === "reset" ? "Reset password" : employee ? "Employee sign in" : "Sign in"}
-              </h2>
+              <h2>{employee ? "Employee sign in" : "Sign in"}</h2>
 
               <p>
-                {audience === "set"
-                  ? "Enter your company email, the default password, and the new password you want to keep."
-                  : audience === "reset"
-                    ? "This puts the company default password back. Sign in with it, then set your own."
-                    : employee
-                      ? "Sign in with your company email. The first password is Cyond@1234 for @cyond.com and Gorle@1234 for @gorle.com."
-                      : "Sign in with your email and password."}
+                {employee
+                  ? "Sign in with your email and password. After that you set a password, create your profile, and then the dashboard opens."
+                  : "Sign in with your email and password."}
               </p>
 
             </div>
@@ -769,7 +736,7 @@ function Login({ employee = false }: { employee?: boolean }) {
                 <div>
 
                   <strong>
-                    {audience === "set" ? "Could not set password" : audience === "reset" ? "Could not reset password" : "Sign-in failed"}
+                    Sign-in failed
                   </strong>
 
                   <span>
@@ -800,57 +767,23 @@ function Login({ employee = false }: { employee?: boolean }) {
                 </div>
               </label>
 
-              {audience === "set" && (
-                <label>
-                  <span>Default or current password</span>
-                  <div className="login-input-wrap">
-                    <input
-                      type="password"
-                      value={currentPassword}
-                      onChange={(event) => setCurrentPassword(event.target.value)}
-                      placeholder="Cyond@1234 or Gorle@1234"
-                      autoComplete="current-password"
-                      required
-                    />
-                  </div>
-                </label>
-              )}
+              <label>
+                <span>Password</span>
+                <div className="login-input-wrap">
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder={employee ? "Password from HR" : "Password"}
+                    autoComplete="current-password"
+                    required
+                  />
+                </div>
+              </label>
 
-              {audience !== "reset" && (
-                <label>
-                  <span>{audience === "set" ? "New password" : "Password"}</span>
-                  <div className="login-input-wrap">
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      placeholder={audience === "set" ? "At least 8 characters" : employee ? "Default or your password" : "Password"}
-                      autoComplete={audience === "set" ? "new-password" : "current-password"}
-                      required
-                    />
-                  </div>
-                </label>
-              )}
-
-              {audience === "set" && (
-                <label>
-                  <span>Confirm new password</span>
-                  <div className="login-input-wrap">
-                    <input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(event) => setConfirmPassword(event.target.value)}
-                      placeholder="Repeat the new password"
-                      autoComplete="new-password"
-                      required
-                    />
-                  </div>
-                </label>
-              )}
-
-              {employee && audience === "signin" && (
+              {employee && (
                 <p className="login-notice">
-                  Default password: Cyond@1234 for CYOND, Gorle@1234 for Gorle. Use Set password to choose your own.
+                  First password: Cyond@1234 for @cyond.com, Gorle@1234 for @gorle.com.
                 </p>
               )}
 
@@ -863,15 +796,7 @@ function Login({ employee = false }: { employee?: boolean }) {
               disabled={loading}
             >
 
-              <span>
-                {loading
-                  ? "Please wait..."
-                  : audience === "set"
-                    ? "Set password"
-                    : audience === "reset"
-                      ? "Reset password"
-                      : "Sign in"}
-              </span>
+              <span>{loading ? "Please wait..." : "Sign in"}</span>
 
               {!loading && (
                 <span className="login-submit-arrow">
@@ -881,56 +806,7 @@ function Login({ employee = false }: { employee?: boolean }) {
 
             </button>
 
-            {employee ? <div className="login-actions">
-              {mode !== "set" && (
-                <button
-                  className="login-switch"
-                  type="button"
-                  onClick={() => {
-                    setMode("set");
-                    setError("");
-                    setNotice("");
-                    setPassword("");
-                    setCurrentPassword("");
-                    setConfirmPassword("");
-                  }}
-                >
-                  Set password
-                </button>
-              )}
-              {mode !== "reset" && (
-                <button
-                  className="login-switch"
-                  type="button"
-                  onClick={() => {
-                    setMode("reset");
-                    setError("");
-                    setNotice("");
-                    setPassword("");
-                    setCurrentPassword("");
-                    setConfirmPassword("");
-                  }}
-                >
-                  Reset password
-                </button>
-              )}
-              {mode !== "signin" && (
-                <button
-                  className="login-switch"
-                  type="button"
-                  onClick={() => {
-                    setMode("signin");
-                    setError("");
-                    setNotice("");
-                    setPassword("");
-                    setCurrentPassword("");
-                    setConfirmPassword("");
-                  }}
-                >
-                  Back to sign in
-                </button>
-              )}
-            </div> : (
+            {!employee && (
               <div className="login-actions">
                 <button className="login-switch" type="button" onClick={() => navigate("/employee-login")}>
                   Employee sign in

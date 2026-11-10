@@ -204,6 +204,7 @@ public class SecurityConfig {
                     HttpMethod.POST,
                     "/api/v1/employees/me/photo",
                     "/api/v1/employees/me/password",
+                    "/api/v1/employees/me/reset-password",
                     "/api/v1/employees/me/profile"
                 )
                 .hasAnyRole(

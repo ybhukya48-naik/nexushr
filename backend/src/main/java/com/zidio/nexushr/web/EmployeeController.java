@@ -92,6 +92,16 @@ public class EmployeeController {
         }
     }
 
+    @PostMapping("/me/reset-password")
+    public Map<String, String> resetOwnPassword(Authentication authentication) {
+        Long employeeId = requireSelf(authentication);
+        String temporary = employeeService.resetToDefaultPassword(employeeId);
+        return Map.of(
+                "message", "Password reset to the company default. Set a new password now.",
+                "temporaryPassword", temporary
+        );
+    }
+
     @PostMapping("/{id}/reset-password")
     public Map<String, String> resetPassword(
             @PathVariable Long id,
