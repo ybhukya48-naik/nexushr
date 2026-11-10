@@ -776,7 +776,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                     type="text"
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
-                    placeholder={employee ? "name@cyond.com or name@gorle.com" : "Email"}
+                    placeholder={employee ? "example@cyond.com" : "Email"}
                     autoComplete="username"
                     required
                   />
@@ -790,7 +790,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                     type="password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder={employee ? "Password from HR" : "Password"}
+                    placeholder={employee ? "Cyond@1234" : "Password"}
                     autoComplete="current-password"
                     required
                   />
@@ -799,7 +799,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
 
               {employee && (
                 <p className="login-notice">
-                  First password: Cyond@1234 for @cyond.com, Gorle@1234 for @gorle.com.
+                  Example: example@cyond.com and Cyond@1234. Gorle is example@gorle.com and Gorle@1234. HR adds that email first. After sign-in, set a new password, then create the profile.
                 </p>
               )}
 
