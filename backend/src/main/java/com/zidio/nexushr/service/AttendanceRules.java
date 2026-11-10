@@ -153,7 +153,8 @@ public final class AttendanceRules {
         if (!dayComplete(checkIn, checkOut, attendanceDate, now)) {
             return 0;
         }
-        return countedWorkMinutes(checkIn, checkOut, attendanceDate, storedWorkMinutes, breakMinutes, now);
+        int minutes = countedWorkMinutes(checkIn, checkOut, attendanceDate, storedWorkMinutes, breakMinutes, now);
+        return Math.min(WORK_MINUTES, minutes);
     }
 
     /**

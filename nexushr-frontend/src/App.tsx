@@ -43,7 +43,8 @@ import {
   sendAttendanceHeartbeat,
   type AttendanceAuditEntry,
   type LeaveRequest,
-  clockedWorkMinutes,
+  dayCountedMinutes,
+  dayExtraMinutes,
   dayIsComplete,
   isCheckoutMissing,
   isWindowsComputer,
@@ -1415,13 +1416,16 @@ function EmployeeDashboard() {
           const date = String(row.attendanceDate ?? "").slice(0, 10);
           return date >= `${month}-01` && date <= today;
         });
-        const todayMinutes = clockedWorkMinutes(todayRecord, clockNow);
+        const todayMinutes = dayCountedMinutes(todayRecord, clockNow);
+        const todayExtra = dayExtraMinutes(todayRecord, clockNow);
         const todayComplete = dayIsComplete(todayRecord, clockNow);
         const doneMinutes = monthRows
           .filter((row) => dayIsComplete(row, clockNow))
-          .reduce((sum, row) => sum + clockedWorkMinutes(row, clockNow), 0);
-        const monthMinutes = monthRows.reduce((sum, row) => sum + clockedWorkMinutes(row, clockNow), 0);
-        const historyMinutes = records.reduce((sum, row) => sum + clockedWorkMinutes(row, clockNow), 0);
+          .reduce((sum, row) => sum + dayCountedMinutes(row, clockNow), 0);
+        const monthMinutes = monthRows.reduce((sum, row) => sum + dayCountedMinutes(row, clockNow), 0);
+        const monthExtra = monthRows.reduce((sum, row) => sum + dayExtraMinutes(row, clockNow), 0);
+        const historyMinutes = records.reduce((sum, row) => sum + dayCountedMinutes(row, clockNow), 0);
+        const historyExtra = records.reduce((sum, row) => sum + dayExtraMinutes(row, clockNow), 0);
         const warnings = monthRows.filter((row) => row.yellowFlag).length;
         const halfDay = warnings >= 3 ? Math.round(Number(employee.baseSalary || 0) / 26 / 2) : 0;
         const workday = new Date().getDay() !== 0;
@@ -1470,14 +1474,17 @@ function EmployeeDashboard() {
                       <article>
                         <span>Today working hours</span>
                         <strong>{hoursLabel(todayMinutes)}</strong>
+                        <em>{todayExtra > 0 ? `Extra ${hoursLabel(todayExtra)}` : "Up to 9 hours"}</em>
                       </article>
                       <article>
                         <span>Month working hours</span>
                         <strong>{hoursLabel(monthMinutes)}</strong>
+                        <em>{monthExtra > 0 ? `Extra ${hoursLabel(monthExtra)}` : "9 hours a day"}</em>
                       </article>
                       <article>
                         <span>History total working hours</span>
                         <strong>{hoursLabel(historyMinutes)}</strong>
+                        <em>{historyExtra > 0 ? `Extra ${hoursLabel(historyExtra)}` : "9 hours a day"}</em>
                       </article>
                     </div>
                     <div className="attendance-actions">
@@ -1590,17 +1597,17 @@ function EmployeeDashboard() {
                 <article>
                   <span>Today working hours</span>
                   <strong>{hoursLabel(todayMinutes)}</strong>
-                  <em>{!todayRecord?.checkInTime ? "Not started" : todayComplete ? "Complete" : "Still in"}</em>
+                  <em>{todayExtra > 0 ? `Extra ${hoursLabel(todayExtra)}, not counted in the day` : !todayRecord?.checkInTime ? "Not started" : todayComplete ? "Complete" : "Still in. A day is 9 hours."}</em>
                 </article>
                 <article>
                   <span>Month working hours</span>
                   <strong>{hoursLabel(monthMinutes)}</strong>
-                  <em>1st through today. Salary uses the finished days, {hoursLabel(doneMinutes)}.</em>
+                  <em>1st through today, 9 hours a day. Salary uses the finished days, {hoursLabel(doneMinutes)}.{monthExtra > 0 ? ` Extra ${hoursLabel(monthExtra)} is separate.` : ""}</em>
                 </article>
                 <article>
                   <span>History total working hours</span>
                   <strong>{hoursLabel(historyMinutes)}</strong>
-                  <em>Every recorded day.</em>
+                  <em>{historyExtra > 0 ? `Extra ${hoursLabel(historyExtra)} is separate.` : "Every recorded day, up to 9 hours."}</em>
                 </article>
               </div>
             </section>
@@ -1636,7 +1643,7 @@ function EmployeeDashboard() {
                           <td>{new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
                           <td>{pairs.length > 0 ? pairs.map((pair) => pair.checkIn).join(", ") : "—"}</td>
                           <td>{!row?.checkInTime ? "—" : !checkOut ? "Still in" : pairs.length > 0 ? pairs.map((pair) => pair.checkOut ?? "23:00").join(", ") : formatClock(checkOut)}</td>
-                          <td>{row?.checkInTime ? hoursLabel(clockedWorkMinutes(row)) : "No check-in"}</td>
+                          <td>{row?.checkInTime ? `${hoursLabel(dayCountedMinutes(row))}${dayExtraMinutes(row) > 0 ? ` · Extra ${hoursLabel(dayExtraMinutes(row))}` : ""}` : "No check-in"}</td>
                         </tr>
                       );
                     })}

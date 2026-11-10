@@ -112,6 +112,50 @@ export function shownCheckOut(
   return undefined;
 }
 
+export const DAY_PRESENCE_MINUTES = 9 * 60;
+
+/** Time on the clock, without counting hours past 9 toward the day. */
+export function presenceMinutes(
+  record?: (Pick<AttendanceRecord, "checkInTime" | "checkOutTime" | "breakMinutes" | "workMinutes"> & {
+    attendanceDate?: string;
+  }) | null,
+  now = new Date(),
+) {
+  if (!record?.checkInTime) {
+    return Math.max(0, record?.workMinutes ?? 0);
+  }
+  const start = new Date(record.checkInTime);
+  if (Number.isNaN(start.getTime())) {
+    return Math.max(0, record.workMinutes ?? 0);
+  }
+  const deadline = logoutDeadlineMs(record);
+  const pastLogout = !record.checkOutTime && deadline != null && now.getTime() >= deadline;
+  const end = record.checkOutTime
+    ? new Date(record.checkOutTime)
+    : pastLogout && deadline != null
+      ? new Date(deadline)
+      : now;
+  if (Number.isNaN(end.getTime()) || !end.getTime() || end.getTime() < start.getTime()) {
+    return Math.max(0, record.workMinutes ?? 0);
+  }
+  const breakMinutes = Math.max(0, record.breakMinutes ?? 0);
+  return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000) - breakMinutes);
+}
+
+export function dayCountedMinutes(
+  record?: Parameters<typeof presenceMinutes>[0],
+  now = new Date(),
+) {
+  return Math.min(DAY_PRESENCE_MINUTES, presenceMinutes(record, now));
+}
+
+export function dayExtraMinutes(
+  record?: Parameters<typeof presenceMinutes>[0],
+  now = new Date(),
+) {
+  return Math.max(0, presenceMinutes(record, now) - DAY_PRESENCE_MINUTES);
+}
+
 export function clockedWorkMinutes(
   record?: (Pick<AttendanceRecord, "checkInTime" | "checkOutTime" | "breakMinutes" | "workMinutes"> & {
     attendanceDate?: string;
@@ -392,27 +436,33 @@ export function HoursTotals({ records, now }: { records: AttendanceRecord[]; now
   const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const today = `${month}-${String(now.getDate()).padStart(2, "0")}`;
   const todayRow = records.find((row) => String(row.attendanceDate ?? "").slice(0, 10) === today);
-  const monthMinutes = records
-    .filter((row) => {
-      const date = String(row.attendanceDate ?? "").slice(0, 10);
-      return date >= `${month}-01` && date <= today;
-    })
-    .reduce((sum, row) => sum + clockedWorkMinutes(row, now), 0);
-  const historyMinutes = records.reduce((sum, row) => sum + clockedWorkMinutes(row, now), 0);
+  const inMonth = (row: AttendanceRecord) => {
+    const date = String(row.attendanceDate ?? "").slice(0, 10);
+    return date >= `${month}-01` && date <= today;
+  };
+  const monthRows = records.filter(inMonth);
+  const monthMinutes = monthRows.reduce((sum, row) => sum + dayCountedMinutes(row, now), 0);
+  const monthExtra = monthRows.reduce((sum, row) => sum + dayExtraMinutes(row, now), 0);
+  const historyMinutes = records.reduce((sum, row) => sum + dayCountedMinutes(row, now), 0);
+  const historyExtra = records.reduce((sum, row) => sum + dayExtraMinutes(row, now), 0);
+  const todayExtra = dayExtraMinutes(todayRow, now);
   const asHours = (minutes: number) => `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
   return (
     <div className="hours-totals">
       <article>
         <span>Today working hours</span>
-        <strong>{asHours(clockedWorkMinutes(todayRow, now))}</strong>
+        <strong>{asHours(dayCountedMinutes(todayRow, now))}</strong>
+        <em>{todayExtra > 0 ? `Extra ${asHours(todayExtra)}, not counted in the day` : "A day counts 9 hours, including 1 flexible lunch hour"}</em>
       </article>
       <article>
         <span>Month working hours</span>
         <strong>{asHours(monthMinutes)}</strong>
+        <em>{monthExtra > 0 ? `Extra ${asHours(monthExtra)} is separate` : "1st through today, 9 hours each day"}</em>
       </article>
       <article>
         <span>History total working hours</span>
         <strong>{asHours(historyMinutes)}</strong>
+        <em>{historyExtra > 0 ? `Extra ${asHours(historyExtra)} is separate` : "Every recorded day, up to 9 hours"}</em>
       </article>
     </div>
   );
@@ -1254,7 +1304,7 @@ export default function Attendance() {
               :
               {String((actionEmployeeRecord ? clockedWorkMinutes(actionEmployeeRecord, currentTime) : 0) % 60).padStart(2, "0")}
             </strong>
-            <em>{sessionOpen ? "Hours since check in, including the lunch hour until you start lunch." : "Check in to start the day."}</em>
+            <em>{(actionEmployeeRecord ? dayExtraMinutes(actionEmployeeRecord, currentTime) : 0) > 0 ? `Extra ${formatAsHours(dayExtraMinutes(actionEmployeeRecord, currentTime))} is not counted in the 9 hour day.` : sessionOpen ? "A day is 9 hours, including 1 flexible lunch hour." : "Check in to start the day."}</em>
           </div>
         </div>
       )}
@@ -1502,7 +1552,7 @@ export default function Attendance() {
                   <td>{formatDate(date)}</td>
                   <td>{row ? formatTime(row.checkInTime) : "—"}</td>
                   <td>{checkOut ? formatTime(checkOut) : row?.checkInTime ? "Still in" : "—"}</td>
-                  <td>{row?.checkInTime ? `${formatAsHours(clockedWorkMinutes(row, currentTime))} · ${dayIsComplete(row, currentTime) ? "Complete" : "Still in"}` : "No check-in"}</td>
+                  <td>{row?.checkInTime ? `${formatAsHours(dayCountedMinutes(row, currentTime))}${dayExtraMinutes(row, currentTime) > 0 ? ` · Extra ${formatAsHours(dayExtraMinutes(row, currentTime))}` : ""} · ${dayIsComplete(row, currentTime) ? "Complete" : "Still in"}` : "No check-in"}</td>
                   <td>
                     {[
                       row?.lateWarning ? "Late" : "",
