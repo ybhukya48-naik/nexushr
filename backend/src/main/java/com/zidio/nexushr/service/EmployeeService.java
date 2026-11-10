@@ -7,6 +7,8 @@ import com.zidio.nexushr.domain.RoleType;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.repository.CompanyRepository;
 import com.zidio.nexushr.web.dto.EmployeeRequest;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +22,11 @@ import java.util.List;
 public class EmployeeService {
 
     private final EmployeeRepository employeeRepository;
-    private final CompanyRepository companyRepository;    private final PasswordEncoder passwordEncoder;
+    private final CompanyRepository companyRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public EmployeeService(
             EmployeeRepository employeeRepository,
@@ -311,7 +317,7 @@ public class EmployeeService {
         return employeeRepository.save(employee);
     }
 
-    public Employee completeOwnProfile(Long id, String fullName, String phone) {
+    public Employee completeOwnProfile(Long id, String fullName, String phone, String email) {
         if (fullName == null || fullName.isBlank()) {
             throw new IllegalArgumentException("Enter your name");
         }
@@ -319,6 +325,18 @@ public class EmployeeService {
         employee.setFullName(fullName.trim());
         if (phone != null && !phone.isBlank()) {
             employee.setPhone(phone.trim());
+        }
+        if (email != null && !email.isBlank()) {
+            String nextEmail = email.trim().toLowerCase();
+            if (!nextEmail.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
+                throw new IllegalArgumentException("Enter a valid email address");
+            }
+            employeeRepository.findByEmailIgnoreCase(nextEmail).ifPresent(other -> {
+                if (!other.getId().equals(id)) {
+                    throw new IllegalArgumentException("That email is already used");
+                }
+            });
+            employee.setEmail(nextEmail);
         }
         employee.setProfileCompleted(true);
         return employeeRepository.save(employee);
@@ -395,11 +413,39 @@ public class EmployeeService {
 
     public void delete(Long id) {
         Employee employee = findById(id);
-        employee.setActive(false);
-        employee.setLifecycleStatus(
-                EmployeeLifecycleStatus.OFFBOARDED
-        );
-
-        employeeRepository.save(employee);
+        RoleType role = employee.getRoleType();
+        if (role == RoleType.HR || role == RoleType.ADMIN || role == RoleType.SUPER_ADMIN) {
+            throw new IllegalArgumentException("HR and admin accounts stay. Delete an employee or a manager.");
+        }
+        entityManager.createNativeQuery(
+                "UPDATE employees SET reporting_manager_id = NULL WHERE reporting_manager_id = :id")
+                .setParameter("id", id)
+                .executeUpdate();
+        entityManager.createNativeQuery(
+                "UPDATE attendance_audit_logs SET actor_employee_id = NULL WHERE actor_employee_id = :id")
+                .setParameter("id", id)
+                .executeUpdate();
+        for (String table : List.of(
+                "attendance_selfies",
+                "attendance_audit_logs",
+                "attendance_records",
+                "leave_requests",
+                "payroll_records",
+                "performance_goals",
+                "performance_reviews",
+                "employee_documents",
+                "employee_lifecycle_history",
+                "notifications")) {
+            entityManager.createNativeQuery("DELETE FROM " + table + " WHERE employee_id = :id")
+                    .setParameter("id", id)
+                    .executeUpdate();
+        }
+        entityManager.createNativeQuery(
+                "DELETE FROM performance_feedback WHERE employee_id = :id OR reviewer_id = :id")
+                .setParameter("id", id)
+                .executeUpdate();
+        entityManager.flush();
+        entityManager.clear();
+        employeeRepository.deleteById(id);
     }
 }

@@ -180,7 +180,7 @@ export default function Dashboard() {
     Promise.all([
       getDashboardSummary().catch(() => null),
       getCurrentEmployee().catch(() => null),
-      getEmployees().catch(() => [] as EmployeeResponse[]),
+      getEmployees(),
       getAttendanceByDate(today).catch(() => [] as AttendanceRecord[]),
       getLeaves().catch(() => [] as LeaveRequest[]),
       getHolidays().catch(() => [] as CompanyHoliday[]),
@@ -243,8 +243,15 @@ export default function Dashboard() {
       })
       .catch(() => undefined);
 
+    const refreshWhenShown = () => {
+      if (document.visibilityState === "visible") {
+        setRefreshTick((tick) => tick + 1);
+      }
+    };
+    document.addEventListener("visibilitychange", refreshWhenShown);
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", refreshWhenShown);
     };
   }, [company, refreshTick]);
 
@@ -755,6 +762,7 @@ export default function Dashboard() {
                       <button type="button" className="panel-link" onClick={() => openEmployeeMonth(person.id)}>
                         {person.fullName}
                       </button>
+                      <span>{person.email}{person.designation ? ` · ${person.designation}` : ""}</span>
                     </td>
                     <td>{row?.checkInTime ? clock(row.checkInTime) : "—"}</td>
                     <td>{checkOut ? clock(checkOut) : row?.checkInTime ? "Still in" : "—"}</td>

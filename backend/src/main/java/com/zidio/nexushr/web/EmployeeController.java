@@ -82,8 +82,9 @@ public class EmployeeController {
         Long employeeId = requireSelf(authentication);
         String fullName = body == null ? null : body.get("fullName");
         String phone = body == null ? null : body.get("phone");
+        String email = body == null ? null : body.get("email");
         try {
-            return EmployeeResponse.from(employeeService.completeOwnProfile(employeeId, fullName, phone));
+            return EmployeeResponse.from(employeeService.completeOwnProfile(employeeId, fullName, phone, email));
         } catch (IllegalArgumentException ex) {
             throw new org.springframework.web.server.ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -182,8 +183,14 @@ public class EmployeeController {
             Authentication authentication) {
 
         requireHr(authentication);
-
-        employeeService.delete(id);
+        try {
+            employeeService.delete(id);
+        } catch (IllegalArgumentException ex) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    ex.getMessage()
+            );
+        }
     }
 
     private Long requireSelf(Authentication authentication) {

@@ -304,6 +304,16 @@ export default function Employees() {
   }
 
   useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === "visible" && managementAccess) {
+        void getEmployees().then(setEmployees).catch(() => undefined);
+      }
+    };
+    document.addEventListener("visibilitychange", refresh);
+    return () => document.removeEventListener("visibilitychange", refresh);
+  }, [managementAccess]);
+
+  useEffect(() => {
     let cancelled = false;
 
     if (!managementAccess) {
@@ -497,6 +507,7 @@ export default function Employees() {
 
       setShowDeleteConfirm(false);
       setEmployeeToDelete(null);
+      setResetNotice("Employee deleted.");
 
       await loadEmployees();
     } catch (err) {

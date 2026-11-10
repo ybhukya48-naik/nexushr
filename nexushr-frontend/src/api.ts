@@ -493,10 +493,10 @@ export function changeOwnPassword(password: string) {
   });
 }
 
-export function completeOwnProfile(fullName: string, phone: string) {
+export function completeOwnProfile(fullName: string, phone: string, email: string) {
   return request<EmployeeResponse>("/employees/me/profile", {
     method: "POST",
-    body: JSON.stringify({ fullName, phone }),
+    body: JSON.stringify({ fullName, phone, email }),
   });
 }
 

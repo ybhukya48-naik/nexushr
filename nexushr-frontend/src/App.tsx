@@ -129,6 +129,7 @@ function AppRoutes() {
   const [confirmNextPassword, setConfirmNextPassword] = useState("");
   const [profileName, setProfileName] = useState("");
   const [profilePhone, setProfilePhone] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
   const [accountError, setAccountError] = useState("");
   const [accountNotice, setAccountNotice] = useState("");
   const [accountSaving, setAccountSaving] = useState(false);
@@ -181,6 +182,12 @@ function AppRoutes() {
         URL.revokeObjectURL(objectUrl);
       }
     };
+  }, [me]);
+
+  useEffect(() => {
+    if (me?.email) {
+      setProfileEmail((current) => current || me.email);
+    }
   }, [me]);
 
   useEffect(() => {
@@ -279,7 +286,7 @@ function AppRoutes() {
     }
     setAccountSaving(true);
     try {
-      const saved = await completeOwnProfile(profileName.trim(), profilePhone.trim());
+      const saved = await completeOwnProfile(profileName.trim(), profilePhone.trim(), profileEmail.trim());
       localStorage.setItem("nexushr_user", saved.fullName);
       localStorage.removeItem("nexushr_profile_needed");
       const company = asWorkspaceCompany(saved.companyCode);
@@ -325,7 +332,7 @@ function AppRoutes() {
             <p>
               {accountStep === "password"
                 ? "You are signed in. Set a new password, or reset it to the company default. Your profile comes next, then the dashboard."
-                : "Your employee ID and designation are already saved. Add your name and phone. The dashboard opens after this."}
+                : "Your employee ID and designation are already saved. Add your name and phone. The email can stay as the company email, or you can change it. The dashboard opens after this."}
             </p>
           </div>
           {accountNotice && <p className="login-notice">{accountNotice}</p>}
@@ -350,6 +357,10 @@ function AppRoutes() {
               <label>
                 Phone
                 <input value={profilePhone} onChange={(event) => setProfilePhone(event.target.value)} />
+              </label>
+              <label>
+                Email
+                <input type="email" value={profileEmail} onChange={(event) => setProfileEmail(event.target.value)} />
               </label>
             </>
           )}
