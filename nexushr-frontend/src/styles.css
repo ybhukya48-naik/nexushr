@@ -7501,9 +7501,19 @@ textarea {
 
 .hours-totals {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   margin: 10px 0 12px;
+}
+
+.hours-extra {
+  background: #fffaeb;
+  border-color: #fedf89;
+}
+
+.hours-totals .hours-extra strong,
+.employee-dashboard .home-clock-card .hours-totals .hours-extra strong {
+  color: #b54708;
 }
 
 .hours-totals article {

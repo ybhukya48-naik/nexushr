@@ -1474,17 +1474,22 @@ function EmployeeDashboard() {
                       <article>
                         <span>Today working hours</span>
                         <strong>{hoursLabel(todayMinutes)}</strong>
-                        <em>{todayExtra > 0 ? `Extra ${hoursLabel(todayExtra)}` : "Up to 9 hours"}</em>
+                        <em>Up to 9 hours</em>
                       </article>
                       <article>
                         <span>Month working hours</span>
                         <strong>{hoursLabel(monthMinutes)}</strong>
-                        <em>{monthExtra > 0 ? `Extra ${hoursLabel(monthExtra)}` : "9 hours a day"}</em>
+                        <em>9 hours a day</em>
                       </article>
                       <article>
                         <span>History total working hours</span>
                         <strong>{hoursLabel(historyMinutes)}</strong>
-                        <em>{historyExtra > 0 ? `Extra ${hoursLabel(historyExtra)}` : "9 hours a day"}</em>
+                        <em>9 hours a day</em>
+                      </article>
+                      <article className="hours-extra">
+                        <span>Extra working hours</span>
+                        <strong>{hoursLabel(todayExtra)}</strong>
+                        <em>Today. Month {hoursLabel(monthExtra)}. History {hoursLabel(historyExtra)}.</em>
                       </article>
                     </div>
                     <div className="attendance-actions">
@@ -1597,17 +1602,22 @@ function EmployeeDashboard() {
                 <article>
                   <span>Today working hours</span>
                   <strong>{hoursLabel(todayMinutes)}</strong>
-                  <em>{todayExtra > 0 ? `Extra ${hoursLabel(todayExtra)}, not counted in the day` : !todayRecord?.checkInTime ? "Not started" : todayComplete ? "Complete" : "Still in. A day is 9 hours."}</em>
+                  <em>{!todayRecord?.checkInTime ? "Not started" : todayComplete ? "Complete" : "Still in"}</em>
                 </article>
                 <article>
                   <span>Month working hours</span>
                   <strong>{hoursLabel(monthMinutes)}</strong>
-                  <em>1st through today, 9 hours a day. Salary uses the finished days, {hoursLabel(doneMinutes)}.{monthExtra > 0 ? ` Extra ${hoursLabel(monthExtra)} is separate.` : ""}</em>
+                  <em>1st through today. Salary uses finished days, {hoursLabel(doneMinutes)}.</em>
                 </article>
                 <article>
                   <span>History total working hours</span>
                   <strong>{hoursLabel(historyMinutes)}</strong>
-                  <em>{historyExtra > 0 ? `Extra ${hoursLabel(historyExtra)} is separate.` : "Every recorded day, up to 9 hours."}</em>
+                  <em>Every recorded day, up to 9 hours.</em>
+                </article>
+                <article className="hours-extra">
+                  <span>Extra working hours</span>
+                  <strong>{hoursLabel(todayExtra)}</strong>
+                  <em>Not counted in the day. Month {hoursLabel(monthExtra)}. History {hoursLabel(historyExtra)}.</em>
                 </article>
               </div>
             </section>
@@ -1627,12 +1637,13 @@ function EmployeeDashboard() {
                       <th>Check in</th>
                       <th>Check out</th>
                       <th>Working hours</th>
+                      <th>Extra working hours</th>
                     </tr>
                   </thead>
                   <tbody>
                     {detailsLoading ? (
                       <tr>
-                        <td colSpan={4}>Loading the last 30 days...</td>
+                        <td colSpan={5}>Loading the last 30 days...</td>
                       </tr>
                     ) : monthDateKeys().slice().reverse().map((date) => {
                       const row = records.find((item) => item.attendanceDate?.slice(0, 10) === date);
@@ -1643,7 +1654,8 @@ function EmployeeDashboard() {
                           <td>{new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
                           <td>{pairs.length > 0 ? pairs.map((pair) => pair.checkIn).join(", ") : "—"}</td>
                           <td>{!row?.checkInTime ? "—" : !checkOut ? "Still in" : pairs.length > 0 ? pairs.map((pair) => pair.checkOut ?? "23:00").join(", ") : formatClock(checkOut)}</td>
-                          <td>{row?.checkInTime ? `${hoursLabel(dayCountedMinutes(row))}${dayExtraMinutes(row) > 0 ? ` · Extra ${hoursLabel(dayExtraMinutes(row))}` : ""}` : "No check-in"}</td>
+                          <td>{row?.checkInTime ? hoursLabel(dayCountedMinutes(row)) : "No check-in"}</td>
+                          <td>{row?.checkInTime ? hoursLabel(dayExtraMinutes(row)) : "—"}</td>
                         </tr>
                       );
                     })}

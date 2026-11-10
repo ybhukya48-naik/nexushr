@@ -452,17 +452,24 @@ export function HoursTotals({ records, now }: { records: AttendanceRecord[]; now
       <article>
         <span>Today working hours</span>
         <strong>{asHours(dayCountedMinutes(todayRow, now))}</strong>
-        <em>{todayExtra > 0 ? `Extra ${asHours(todayExtra)}, not counted in the day` : "A day counts 9 hours, including 1 flexible lunch hour"}</em>
+        <em>Up to 9 hours, including 1 flexible lunch hour</em>
       </article>
       <article>
         <span>Month working hours</span>
         <strong>{asHours(monthMinutes)}</strong>
-        <em>{monthExtra > 0 ? `Extra ${asHours(monthExtra)} is separate` : "1st through today, 9 hours each day"}</em>
+        <em>1st through today, 9 hours each day</em>
       </article>
       <article>
         <span>History total working hours</span>
         <strong>{asHours(historyMinutes)}</strong>
-        <em>{historyExtra > 0 ? `Extra ${asHours(historyExtra)} is separate` : "Every recorded day, up to 9 hours"}</em>
+        <em>Every recorded day, up to 9 hours</em>
+      </article>
+      <article className="hours-extra">
+        <span>Extra working hours</span>
+        <strong>{asHours(todayExtra)}</strong>
+        <em>Today. Not counted in the 9 hours.</em>
+        <em>Month {asHours(monthExtra)}</em>
+        <em>History {asHours(historyExtra)}</em>
       </article>
     </div>
   );
@@ -1539,6 +1546,7 @@ export default function Attendance() {
                 <th>Check in</th>
                 <th>Check out</th>
                 <th>Working hours</th>
+                <th>Extra working hours</th>
                 <th>Flags</th>
                 <th>Deduction</th>
               </tr>
@@ -1552,7 +1560,8 @@ export default function Attendance() {
                   <td>{formatDate(date)}</td>
                   <td>{row ? formatTime(row.checkInTime) : "—"}</td>
                   <td>{checkOut ? formatTime(checkOut) : row?.checkInTime ? "Still in" : "—"}</td>
-                  <td>{row?.checkInTime ? `${formatAsHours(dayCountedMinutes(row, currentTime))}${dayExtraMinutes(row, currentTime) > 0 ? ` · Extra ${formatAsHours(dayExtraMinutes(row, currentTime))}` : ""} · ${dayIsComplete(row, currentTime) ? "Complete" : "Still in"}` : "No check-in"}</td>
+                  <td>{row?.checkInTime ? `${formatAsHours(dayCountedMinutes(row, currentTime))} · ${dayIsComplete(row, currentTime) ? "Complete" : "Still in"}` : "No check-in"}</td>
+                  <td>{row?.checkInTime ? formatAsHours(dayExtraMinutes(row, currentTime)) : "—"}</td>
                   <td>
                     {[
                       row?.lateWarning ? "Late" : "",
@@ -1566,7 +1575,7 @@ export default function Attendance() {
                 );
               }) : (
                 <tr>
-                  <td colSpan={6}>Select an employee to see the last 30 days.</td>
+                  <td colSpan={7}>Select an employee to see the last 30 days.</td>
                 </tr>
               )}
             </tbody>
