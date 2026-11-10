@@ -165,6 +165,8 @@ public class AuthController {
         employee.setActive(true);
         employee.setGender(GenderType.PREFER_NOT_TO_SAY);
         employee.setLifecycleStatus(EmployeeLifecycleStatus.ACTIVE);
+        employee.setProfileCompleted(true);
+        employee.setPasswordChangeRequired(false);
 
         Employee saved = employeeRepository.save(employee);
 

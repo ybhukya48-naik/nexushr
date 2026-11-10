@@ -20,6 +20,7 @@ import {
   changeOwnPassword,
   completeOwnProfile,
   login as apiLogin,
+  register as apiRegister,
   resetOwnPassword,
   getAiWorkforceDashboard,
   fetchEmployeePhoto,
@@ -622,9 +623,57 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [companyCode, setCompanyCode] = useState<"CYOND" | "GORLE">("CYOND");
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
+
+  async function openSession(response: { accessToken: string; username: string; role: string; mustChangePassword?: boolean; profileCompleted?: boolean }) {
+    localStorage.setItem("nexushr_token", response.accessToken);
+    localStorage.setItem("nexushr_user", response.username);
+    localStorage.setItem("nexushr_role", response.role);
+    localStorage.removeItem("nexushr_dashboard_snapshot");
+    const signedInRole = response.role.toUpperCase();
+    const allowed = kind === "employee"
+      ? signedInRole === "EMPLOYEE"
+      : kind === "manager"
+        ? signedInRole === "MANAGER"
+        : signedInRole === "HR" || signedInRole === "ADMIN" || signedInRole === "SUPER_ADMIN";
+    if (!allowed) {
+      clearWebsiteSession();
+      setError(signedInRole === "EMPLOYEE"
+        ? "Use Employee login for this email."
+        : signedInRole === "MANAGER"
+          ? "Use Manager login for this email."
+          : "Use HR login for this email.");
+      return;
+    }
+    beginWebsiteSession();
+    if (response.mustChangePassword && signedInRole === "EMPLOYEE") {
+      localStorage.setItem("nexushr_must_change_password", "1");
+    } else {
+      localStorage.removeItem("nexushr_must_change_password");
+    }
+    if (["EMPLOYEE", "HR", "MANAGER"].includes(signedInRole) && response.profileCompleted === false) {
+      localStorage.setItem("nexushr_profile_needed", "1");
+    } else {
+      localStorage.removeItem("nexushr_profile_needed");
+    }
+    clearWorkspaceCompany();
+    try {
+      const me = await getCurrentEmployee();
+      if (me?.companyCode) {
+        setWorkspaceCompany(asWorkspaceCompany(me.companyCode));
+      }
+    } catch {
+      // The company choice stays available if this lookup is slow.
+    }
+    navigate("/", { replace: true });
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -645,67 +694,56 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
         username.trim(),
         password,
       );
-
-      localStorage.setItem(
-        "nexushr_token",
-        response.accessToken,
-      );
-
-      localStorage.setItem(
-        "nexushr_user",
-        response.username,
-      );
-
-      localStorage.setItem(
-        "nexushr_role",
-        response.role,
-      );
-      localStorage.removeItem("nexushr_dashboard_snapshot");
-      const signedInRole = response.role.toUpperCase();
-      const allowed = kind === "employee"
-        ? signedInRole === "EMPLOYEE"
-        : kind === "manager"
-          ? signedInRole === "MANAGER"
-          : signedInRole === "HR" || signedInRole === "ADMIN" || signedInRole === "SUPER_ADMIN";
-      if (!allowed) {
-        clearWebsiteSession();
-        setError(signedInRole === "EMPLOYEE"
-          ? "Use Employee login for this email."
-          : signedInRole === "MANAGER"
-            ? "Use Manager login for this email."
-            : "Use HR login for this email.");
-        return;
-      }
-      beginWebsiteSession();
-      if (response.mustChangePassword && signedInRole === "EMPLOYEE") {
-        localStorage.setItem("nexushr_must_change_password", "1");
-      } else {
-        localStorage.removeItem("nexushr_must_change_password");
-      }
-      if (["EMPLOYEE", "HR", "MANAGER"].includes(signedInRole) && response.profileCompleted === false) {
-        localStorage.setItem("nexushr_profile_needed", "1");
-      } else {
-        localStorage.removeItem("nexushr_profile_needed");
-      }
-
-      clearWorkspaceCompany();
-      try {
-        const me = await getCurrentEmployee();
-        if (me?.companyCode) {
-          setWorkspaceCompany(asWorkspaceCompany(me.companyCode));
-        }
-      } catch {
-        // The company choice stays available if this lookup is slow.
-      }
-      navigate("/", { replace: true });
+      await openSession(response);
     } catch (err) {
       console.error(err);
+      const message = err instanceof Error ? err.message : "Invalid username or password.";
+      if (employee && message.toLowerCase().includes("not saved yet")) {
+        setCreating(true);
+        setError("");
+        setNotice("This email is new. Create your profile with your own password.");
+        return;
+      }
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Invalid username or password.",
-      );
+  async function handleCreateProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+    const email = username.trim();
+    if (!fullName.trim()) {
+      setError("Enter your name.");
+      return;
+    }
+    if (!email) {
+      setError("Enter your email.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must contain at least 8 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await apiRegister({
+        fullName: fullName.trim(),
+        email,
+        password,
+        phone: phone.trim() || undefined,
+        companyCode,
+      });
+      const response = await apiLogin(email, password);
+      await openSession(response);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create the profile.");
     } finally {
       setLoading(false);
     }
@@ -726,7 +764,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
 
           <form
             className="login-card"
-            onSubmit={handleSubmit}
+            onSubmit={creating ? handleCreateProfile : handleSubmit}
           >
 
             <div className="login-card-brand">
@@ -739,12 +777,14 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
 
             <div className="login-card-header">
 
-              <h2>{kind === "employee" ? "Employee sign in" : kind === "manager" ? "Manager sign in" : "HR sign in"}</h2>
+              <h2>{creating ? "Create your profile" : kind === "employee" ? "Employee sign in" : kind === "manager" ? "Manager sign in" : "HR sign in"}</h2>
 
               <p>
-                {kind === "hr" || kind === "manager"
+                {creating
+                  ? "Use your own email and password. HR does not add this profile."
+                  : kind === "hr" || kind === "manager"
                   ? "Sign in with your own email and password. Create your profile next, then the dashboard opens."
-                  : "Sign in with your email and password. After that you set a password, create your profile, and then the dashboard opens."}
+                  : "Sign in with your own email and password. The first time, create your profile here."}
               </p>
 
             </div>
@@ -781,6 +821,15 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
             ================================================== */}
             <div className="login-fields">
 
+              {creating && (
+                <label>
+                  <span>Full name</span>
+                  <div className="login-input-wrap">
+                    <input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="Your name" autoComplete="name" required />
+                  </div>
+                </label>
+              )}
+
               <label>
                 <span>Email</span>
                 <div className="login-input-wrap">
@@ -788,7 +837,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                     type="text"
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
-                    placeholder={employee ? "example@cyond.com" : "Your email"}
+                    placeholder="Your email"
                     autoComplete="username"
                     required
                   />
@@ -802,7 +851,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                     type="password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder={employee ? "Cyond@1234" : "Password"}
+                    placeholder="Your password"
                     autoComplete="current-password"
                     required
                   />
@@ -815,9 +864,35 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                 </p>
               )}
 
-              {employee && (
+              {creating && (
+                <>
+                  <label>
+                    <span>Confirm password</span>
+                    <div className="login-input-wrap">
+                      <input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Repeat your password" autoComplete="new-password" required />
+                    </div>
+                  </label>
+                  <label>
+                    <span>Phone</span>
+                    <div className="login-input-wrap">
+                      <input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Phone number" autoComplete="tel" />
+                    </div>
+                  </label>
+                  <label>
+                    <span>Company</span>
+                    <div className="login-input-wrap">
+                      <select value={companyCode} onChange={(event) => setCompanyCode(event.target.value === "GORLE" ? "GORLE" : "CYOND")}>
+                        <option value="CYOND">CYOND</option>
+                        <option value="GORLE">Gorle Group</option>
+                      </select>
+                    </div>
+                  </label>
+                </>
+              )}
+
+              {employee && !creating && (
                 <p className="login-notice">
-                  Example: example@cyond.com and Cyond@1234. Gorle is example@gorle.com and Gorle@1234. HR adds that email first. After sign-in, set a new password, then create the profile.
+                  Use your own email and password. If you are new, create your profile. HR does not add it.
                 </p>
               )}
 
@@ -830,7 +905,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
               disabled={loading}
             >
 
-              <span>{loading ? "Please wait..." : "Sign in"}</span>
+              <span>{loading ? "Please wait..." : creating ? "Create profile" : "Sign in"}</span>
 
               {!loading && (
                 <span className="login-submit-arrow">
@@ -839,6 +914,24 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
               )}
 
             </button>
+
+            {employee && (
+              <div className="login-actions">
+                <button
+                  className="login-switch"
+                  type="button"
+                  onClick={() => {
+                    setCreating((open) => !open);
+                    setError("");
+                    setNotice("");
+                    setPassword("");
+                    setConfirmPassword("");
+                  }}
+                >
+                  {creating ? "Back to sign in" : "Create your profile"}
+                </button>
+              </div>
+            )}
 
             <div className="login-actions">
               <button className={kind === "hr" ? "login-switch active" : "login-switch"} type="button" onClick={() => navigate("/login")}>
