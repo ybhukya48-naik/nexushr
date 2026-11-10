@@ -323,7 +323,7 @@ public class AuthController {
             }
 
             String message = rows.isEmpty()
-                    ? "That email is not saved yet. Use Create your profile, enter your employee code and your own email, then sign in with that email."
+                    ? "That email is not saved yet. Ask HR to add this account, then sign in here."
                     : sawInactive
                     ? "This employee account is not active."
                     : "Password does not match. Sign in with the email and password you saved.";

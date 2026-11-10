@@ -605,8 +605,9 @@ function AppRoutes() {
     </div>
   );
 }
-function Login({ employee = false }: { employee?: boolean }) {
+function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
   const navigate = useNavigate();
+  const employee = kind === "employee";
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -649,6 +650,21 @@ function Login({ employee = false }: { employee?: boolean }) {
         response.role,
       );
       localStorage.removeItem("nexushr_dashboard_snapshot");
+      const signedInRole = response.role.toUpperCase();
+      const allowed = kind === "employee"
+        ? signedInRole === "EMPLOYEE"
+        : kind === "manager"
+          ? signedInRole === "MANAGER"
+          : signedInRole === "HR" || signedInRole === "ADMIN" || signedInRole === "SUPER_ADMIN";
+      if (!allowed) {
+        clearWebsiteSession();
+        setError(signedInRole === "EMPLOYEE"
+          ? "Use Employee login for this email."
+          : signedInRole === "MANAGER"
+            ? "Use Manager login for this email."
+            : "Use HR login for this email.");
+        return;
+      }
       beginWebsiteSession();
       if (response.mustChangePassword) {
         localStorage.setItem("nexushr_must_change_password", "1");
@@ -711,7 +727,7 @@ function Login({ employee = false }: { employee?: boolean }) {
 
             <div className="login-card-header">
 
-              <h2>{employee ? "Employee sign in" : "Sign in"}</h2>
+              <h2>{kind === "employee" ? "Employee sign in" : kind === "manager" ? "Manager sign in" : "HR sign in"}</h2>
 
               <p>
                 {employee
@@ -806,13 +822,17 @@ function Login({ employee = false }: { employee?: boolean }) {
 
             </button>
 
-            {!employee && (
-              <div className="login-actions">
-                <button className="login-switch" type="button" onClick={() => navigate("/employee-login")}>
-                  Employee sign in
-                </button>
-              </div>
-            )}
+            <div className="login-actions">
+              <button className={kind === "hr" ? "login-switch active" : "login-switch"} type="button" onClick={() => navigate("/login")}>
+                HR login
+              </button>
+              <button className={kind === "employee" ? "login-switch active" : "login-switch"} type="button" onClick={() => navigate("/employee-login")}>
+                Employee login
+              </button>
+              <button className={kind === "manager" ? "login-switch active" : "login-switch"} type="button" onClick={() => navigate("/manager-login")}>
+                Manager login
+              </button>
+            </div>
 
             {/* SECURITY */}
             <div className="login-security">
@@ -1499,12 +1519,17 @@ export default function App() {
 
         <Route
           path="/login"
-          element={<PageGuard><Login /></PageGuard>}
+          element={<PageGuard><Login kind="hr" /></PageGuard>}
         />
 
         <Route
           path="/employee-login"
-          element={<PageGuard><Login employee /></PageGuard>}
+          element={<PageGuard><Login kind="employee" /></PageGuard>}
+        />
+
+        <Route
+          path="/manager-login"
+          element={<PageGuard><Login kind="manager" /></PageGuard>}
         />
 
         <Route

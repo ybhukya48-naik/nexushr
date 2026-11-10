@@ -6499,8 +6499,14 @@ button.employee-summary-card {
 .login-actions {
   display: flex;
   justify-content: center;
-  gap: 18px;
+  flex-wrap: wrap;
+  gap: 16px;
   margin-top: 14px;
+}
+
+.login-switch.active {
+  font-weight: 700;
+  text-decoration: underline;
 }
 
 .login-switch {
