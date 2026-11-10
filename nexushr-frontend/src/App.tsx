@@ -742,11 +742,9 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
               <h2>{kind === "employee" ? "Employee sign in" : kind === "manager" ? "Manager sign in" : "HR sign in"}</h2>
 
               <p>
-                {kind === "hr"
-                  ? "Sign in here first. The HR dashboard opens next, and then you can add an employee."
-                  : employee
-                  ? "Sign in with your email and password. After that you set a password, create your profile, and then the dashboard opens."
-                  : "Sign in with your email and password."}
+                {kind === "hr" || kind === "manager"
+                  ? "Sign in with your own email and password. Create your profile next, then the dashboard opens."
+                  : "Sign in with your email and password. After that you set a password, create your profile, and then the dashboard opens."}
               </p>
 
             </div>
@@ -790,7 +788,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                     type="text"
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
-                    placeholder={kind === "hr" ? "ybhukya@gmail.com" : employee ? "example@cyond.com" : "Email"}
+                    placeholder={employee ? "example@cyond.com" : "Your email"}
                     autoComplete="username"
                     required
                   />
@@ -811,9 +809,9 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                 </div>
               </label>
 
-              {kind === "hr" && (
+              {(kind === "hr" || kind === "manager") && (
                 <p className="login-notice">
-                  HR email: ybhukya@gmail.com. Use HR login, not Employee login. The dashboard opens after you sign in.
+                  Each {kind === "hr" ? "HR person" : "manager"} uses their own email and password. One shared login is not used.
                 </p>
               )}
 
