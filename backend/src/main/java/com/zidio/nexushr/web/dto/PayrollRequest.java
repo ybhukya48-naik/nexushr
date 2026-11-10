@@ -18,6 +18,8 @@ public class PayrollRequest {
     private BigDecimal bonus;
     private BigDecimal overtime;
     private BigDecimal pf;
+    private BigDecimal esi;
+    private BigDecimal pt;
     private BigDecimal leaveDeduction;
     private BigDecimal otherDeductions;
     private Boolean autoFromAttendance;
@@ -76,6 +78,22 @@ public class PayrollRequest {
 
     public void setPf(BigDecimal pf) {
         this.pf = pf;
+    }
+
+    public BigDecimal getEsi() {
+        return esi;
+    }
+
+    public void setEsi(BigDecimal esi) {
+        this.esi = esi;
+    }
+
+    public BigDecimal getPt() {
+        return pt;
+    }
+
+    public void setPt(BigDecimal pt) {
+        this.pt = pt;
     }
 
     public BigDecimal getLeaveDeduction() {

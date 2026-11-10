@@ -164,6 +164,8 @@ public class PayrollService {
                         : request.getOvertime()
         );
         BigDecimal pf = amount(request.getPf());
+        BigDecimal esi = amount(request.getEsi());
+        BigDecimal professionalTax = amount(request.getPt());
         BigDecimal leaveDeduction = amount(
                 request.getLeaveDeduction() == null && autoComponents != null
                         ? autoComponents.leaveDeduction()
@@ -176,6 +178,8 @@ public class PayrollService {
         validateNonNegative("Bonus", bonus);
         validateNonNegative("Overtime", overtime);
         validateNonNegative("PF", pf);
+        validateNonNegative("Insurance", esi);
+        validateNonNegative("Professional tax", professionalTax);
         validateNonNegative("Leave deduction", leaveDeduction);
         validateNonNegative("Other deductions", otherDeductions);
 
@@ -191,6 +195,8 @@ public class PayrollService {
 
         BigDecimal deductions = taxAmount
                 .add(pf)
+                .add(esi)
+                .add(professionalTax)
                 .add(leaveDeduction)
                 .add(otherDeductions)
                 .setScale(2, RoundingMode.HALF_UP);
@@ -219,6 +225,8 @@ public class PayrollService {
         payrollRecord.setGrossSalary(grossSalary);
         payrollRecord.setTaxAmount(taxAmount);
         payrollRecord.setPf(pf);
+        payrollRecord.setEsi(esi);
+        payrollRecord.setPt(professionalTax);
         payrollRecord.setLeaveDeduction(leaveDeduction);
         payrollRecord.setOtherDeductions(otherDeductions);
 
@@ -471,10 +479,15 @@ public class PayrollService {
                         endDate
                 );
 
+        java.time.LocalDateTime now = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Kolkata"));
         int workedMinutes = records.stream()
-                .map(AttendanceRecord::getWorkMinutes)
-                .filter(java.util.Objects::nonNull)
-                .mapToInt(Integer::intValue)
+                .mapToInt(record -> AttendanceRules.countedWorkMinutes(
+                        record.getCheckInTime(),
+                        record.getCheckOutTime(),
+                        record.getAttendanceDate(),
+                        record.getWorkMinutes() == null ? 0 : record.getWorkMinutes(),
+                        record.getBreakMinutes() == null ? 0 : record.getBreakMinutes(),
+                        now))
                 .sum();
         int deductedMinutes = records.stream()
                 .map(AttendanceRecord::getDeductedMinutes)

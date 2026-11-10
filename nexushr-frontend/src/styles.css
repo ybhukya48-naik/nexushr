@@ -5619,6 +5619,10 @@ button.employee-summary-card {
 }
 
 .login-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   width: 100%;
   min-height: 48px;
   margin-top: 4px;
@@ -5988,7 +5992,10 @@ button.employee-summary-card {
 /* ---------- INPUTS ---------- */
 
 .login-fields label {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+  margin-bottom: 14px;
 }
 
 .login-fields label > span {
@@ -6013,8 +6020,14 @@ button.employee-summary-card {
   box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.11);
 }
 
-.login-input-wrap input {
+.login-input-wrap input,
+.login-input-wrap input:hover,
+.login-input-wrap input:focus {
   color: #172033;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
 }
 
 .login-input-wrap input::placeholder {
@@ -6544,18 +6557,12 @@ button.employee-summary-card {
   font-size: 14px;
 }
 
-.password-label-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
 .password-help-links {
   display: flex;
-  flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: -6px 0 14px;
 }
 
 .password-help-links .login-switch {
@@ -7235,4 +7242,27 @@ textarea {
   text-underline-offset: 2px;
   cursor: pointer;
   padding: 0;
+}
+
+.app-shell[data-company="CYOND"] .sidebar {
+  background: linear-gradient(180deg, #24143f 0%, #140c28 100%);
+}
+
+.app-shell[data-company="GORLE"] .sidebar {
+  background: linear-gradient(180deg, #3d2b16 0%, #24180d 100%);
+}
+
+.app-shell[data-company="GORLE"] .nav-link.active {
+  background: linear-gradient(90deg, rgba(212, 164, 74, 0.34), rgba(212, 164, 74, 0.12));
+  border-color: rgba(212, 164, 74, 0.35);
+}
+
+.app-shell[data-company="GORLE"] .nav-link.active::before,
+.app-shell[data-company="GORLE"] .status-dot {
+  background: #d4a44a;
+}
+
+.app-shell[data-company="GORLE"] .primary-button,
+.app-shell[data-company="GORLE"] .primary-action {
+  background: linear-gradient(135deg, #8a5a12 0%, #c4923a 100%);
 }

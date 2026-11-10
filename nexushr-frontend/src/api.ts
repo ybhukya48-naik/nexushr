@@ -844,6 +844,8 @@ export interface PayrollRequest {
   bonus?: number;
   overtime?: number;
   pf?: number;
+  esi?: number;
+  pt?: number;
   leaveDeduction?: number;
   otherDeductions?: number;
   autoFromAttendance?: boolean;
@@ -912,6 +914,11 @@ export interface PayrollRecord {
   grossSalary: number;
   taxAmount: number;
   pf: number;
+  esi?: number;
+  pt?: number;
+  ctc?: number;
+  workedMinutes?: number;
+  expectedWorkMinutes?: number;
   leaveDeduction: number;
   otherDeductions: number;
   deductions: number;

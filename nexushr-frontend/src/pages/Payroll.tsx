@@ -58,6 +58,8 @@ export default function Payroll() {
   const [bonus, setBonus] = useState("");
   const [overtime, setOvertime] = useState("");
   const [pf, setPf] = useState("");
+  const [insurance, setInsurance] = useState("");
+  const [professionalTax, setProfessionalTax] = useState("");
   const [leaveDeduction, setLeaveDeduction] = useState("");
   const [otherDeductions, setOtherDeductions] = useState("");
   const [autoFromAttendance, setAutoFromAttendance] = useState(true);
@@ -241,6 +243,8 @@ export default function Payroll() {
         bonus: toOptionalNumber(bonus),
         overtime: toOptionalNumber(overtime),
         pf: toOptionalNumber(pf),
+        esi: toOptionalNumber(insurance),
+        pt: toOptionalNumber(professionalTax),
         leaveDeduction: toOptionalNumber(leaveDeduction),
         otherDeductions: toOptionalNumber(otherDeductions),
       });
@@ -251,6 +255,8 @@ export default function Payroll() {
       setBonus("");
       setOvertime("");
       setPf("");
+      setInsurance("");
+      setProfessionalTax("");
       setLeaveDeduction("");
       setOtherDeductions("");
 
@@ -433,7 +439,7 @@ export default function Payroll() {
               <p className="page-eyebrow">Payroll</p>
             <h2>Create Salary Record</h2>
             <p>
-              Pay is calculated from each employee&apos;s check-in and check-out. A spreadsheet is not used.
+              Hours start at check-in. Pay for {payMonth} uses every working day from the 1st through the last day of the month, then that total against the employee&apos;s CTC.
             </p>
           </div>
         </div>
@@ -442,7 +448,7 @@ export default function Payroll() {
             <div>
               <strong>Generate from working hours</strong>
               <span>
-                Uses each employee&apos;s check-in and check-out for {payMonth}. A spreadsheet is not required, and this does not add employees.
+                Adds check-in to check-out for every day in {payMonth}, including a day that is still open. The monthly CTC amount is paid in proportion to those hours. PF, insurance, and professional tax stay on the record.
               </span>
             </div>
             <button
@@ -550,7 +556,8 @@ export default function Payroll() {
                       Attendance calculation for {autoComponents.employeeCode}
                     </strong>
                     <span>
-                      Worked {(autoComponents.workedMinutes / 60).toFixed(1)}h of {(autoComponents.expectedWorkMinutes / 60).toFixed(1)}h, shortfall {(autoComponents.shortfallMinutes / 60).toFixed(1)}h.
+                      {payMonth} runs from the 1st through day {new Date(Number(payMonth.slice(0, 4)), Number(payMonth.slice(5, 7)), 0).getDate()}. Worked {(autoComponents.workedMinutes / 60).toFixed(1)}h of {(autoComponents.expectedWorkMinutes / 60).toFixed(1)}h.
+                      {selectedEmployeeData?.baseSalary ? ` Monthly CTC amount ${money(selectedEmployeeData.baseSalary)}.` : " Save a CTC on the employee before pay can be calculated."}
                     </span>
                     <span>
                       This amount goes into Leave Deduction {money(autoComponents.leaveDeduction)} and Overtime {money(autoComponents.overtimeAmount)}.
@@ -604,6 +611,30 @@ export default function Payroll() {
                 step="0.01"
                 value={pf}
                 onChange={(event) => setPf(event.target.value)}
+                placeholder="0"
+              />
+            </label>
+
+            <label>
+              Insurance
+              <input
+                min="0"
+                type="number"
+                step="0.01"
+                value={insurance}
+                onChange={(event) => setInsurance(event.target.value)}
+                placeholder="0"
+              />
+            </label>
+
+            <label>
+              Professional tax
+              <input
+                min="0"
+                type="number"
+                step="0.01"
+                value={professionalTax}
+                onChange={(event) => setProfessionalTax(event.target.value)}
                 placeholder="0"
               />
             </label>
@@ -710,7 +741,11 @@ export default function Payroll() {
                 <tr>
                   <th>Employee</th>
                   <th>Month</th>
+                  {isManagementRole && <th>Hours</th>}
                   <th>Gross Salary</th>
+                  {isManagementRole && <th>PF</th>}
+                  {isManagementRole && <th>Insurance</th>}
+                  {isManagementRole && <th>Professional tax</th>}
                   <th>Deductions</th>
                   <th>Net Salary</th>
                   <th>Status</th>
@@ -730,7 +765,19 @@ export default function Payroll() {
 
                     <td>{record.payMonth}</td>
 
+                    {isManagementRole && (
+                      <td>
+                        {record.workedMinutes == null
+                          ? "—"
+                          : `${(record.workedMinutes / 60).toFixed(1)}h`}
+                      </td>
+                    )}
+
                     <td>{money(record.grossSalary)}</td>
+
+                    {isManagementRole && <td>{money(record.pf)}</td>}
+                    {isManagementRole && <td>{money(record.esi || 0)}</td>}
+                    {isManagementRole && <td>{money(record.pt || 0)}</td>}
 
                     <td>{money(record.deductions)}</td>
 

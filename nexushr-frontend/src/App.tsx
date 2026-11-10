@@ -422,7 +422,7 @@ function AppRoutes() {
   const canSwitchWorkspace = role === "ADMIN" || role === "SUPER_ADMIN" || role === "HR" || role === "MANAGER";
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-company={workspace}>
       <aside className="sidebar">
         <div className="brand">
           <img
@@ -966,15 +966,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
 
               {passwordHelp !== "forgot" && (
                 <label>
-                  <span className="password-label-row">
-                    <span>{passwordHelp === "change" ? "Current password" : "Password"}</span>
-                    {!creating && passwordHelp === null && (
-                      <span className="password-help-links">
-                        <button className="login-switch" type="button" onClick={() => { setPasswordHelp("change"); setError(""); setNotice(""); }}>Change password</button>
-                        <button className="login-switch" type="button" onClick={() => { setPasswordHelp("forgot"); setError(""); setNotice(""); }}>Forgot password</button>
-                      </span>
-                    )}
-                  </span>
+                  <span>{passwordHelp === "change" ? "Current password" : "Password"}</span>
                   <div className="login-input-wrap">
                     <PasswordField
                       value={password}
@@ -984,6 +976,12 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                     />
                   </div>
                 </label>
+              )}
+              {!creating && passwordHelp === null && (
+                <div className="password-help-links">
+                  <button className="login-switch" type="button" onClick={() => { setPasswordHelp("change"); setError(""); setNotice(""); }}>Change password</button>
+                  <button className="login-switch" type="button" onClick={() => { setPasswordHelp("forgot"); setError(""); setNotice(""); }}>Forgot password</button>
+                </div>
               )}
 
               {passwordHelp === "change" && (
@@ -1053,8 +1051,8 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
               <span>{loading ? "Please wait..." : passwordHelp === "forgot" ? "Email me a password" : passwordHelp === "change" ? "Save password" : creating ? "Create profile" : "Sign in"}</span>
 
               {!loading && (
-                <span className="login-submit-arrow">
-                  -&gt;
+                <span className="login-submit-arrow" aria-hidden="true">
+                  →
                 </span>
               )}
 

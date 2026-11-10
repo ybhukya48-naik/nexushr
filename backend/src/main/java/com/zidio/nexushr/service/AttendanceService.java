@@ -981,10 +981,15 @@ public class AttendanceService {
 
             List<AttendanceRecord> records = attendanceByEmployee.getOrDefault(employee.getId(), List.of());
 
+            LocalDateTime now = LocalDateTime.now(COMPANY_ZONE);
             int workedMinutes = records.stream()
-                    .map(AttendanceRecord::getWorkMinutes)
-                    .filter(Objects::nonNull)
-                    .mapToInt(Integer::intValue)
+                    .mapToInt(record -> AttendanceRules.countedWorkMinutes(
+                            record.getCheckInTime(),
+                            record.getCheckOutTime(),
+                            record.getAttendanceDate(),
+                            record.getWorkMinutes() == null ? 0 : record.getWorkMinutes(),
+                            record.getBreakMinutes() == null ? 0 : record.getBreakMinutes(),
+                            now))
                     .sum();
             int deductedMinutes = records.stream()
                     .map(AttendanceRecord::getDeductedMinutes)
@@ -1003,7 +1008,7 @@ public class AttendanceService {
 
             BigDecimal baseSalary = employee.getBaseSalary() != null && employee.getBaseSalary().compareTo(BigDecimal.ZERO) > 0
                     ? employee.getBaseSalary()
-                    : BigDecimal.valueOf(30000);
+                    : BigDecimal.ZERO;
 
             BigDecimal expectedMinutesVal = BigDecimal.valueOf(Math.max(1, expectedWorkMinutes));
             int payableMinutes = Math.max(0, expectedWorkMinutes - shortfallMinutes);
@@ -1026,8 +1031,6 @@ public class AttendanceService {
 
             BigDecimal pf = basicSalary.multiply(BigDecimal.valueOf(0.12)).setScale(2, RoundingMode.HALF_UP);
             BigDecimal taxAmount = grossSalary.multiply(BigDecimal.valueOf(0.10)).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal deductions = pf.add(taxAmount);
-            BigDecimal netSalary = grossSalary.subtract(deductions).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
 
             PayrollRecord payroll = existingPayrollMap.get(employee.getId());
             if (payroll == null) {
@@ -1044,7 +1047,13 @@ public class AttendanceService {
             payroll.setHra(hra);
             payroll.setBonus(BigDecimal.ZERO);
             payroll.setOvertime(overtimeAmount);
+            BigDecimal insurance = payroll.getEsi() == null ? BigDecimal.ZERO : payroll.getEsi();
+            BigDecimal professionalTax = payroll.getPt() == null ? BigDecimal.ZERO : payroll.getPt();
+            BigDecimal deductions = pf.add(taxAmount).add(insurance).add(professionalTax);
+            BigDecimal netSalary = grossSalary.subtract(deductions).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
             payroll.setPf(pf);
+            payroll.setEsi(insurance);
+            payroll.setPt(professionalTax);
             payroll.setTaxAmount(taxAmount);
             payroll.setLeaveDeduction(leaveDeduction);
             payroll.setOtherDeductions(BigDecimal.ZERO);

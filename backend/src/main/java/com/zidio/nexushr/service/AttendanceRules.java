@@ -123,4 +123,35 @@ public final class AttendanceRules {
     public static boolean duringInactivityGrace(LocalTime time) {
         return false;
     }
+
+    /**
+     * A finished day uses the stored minutes. An open check-in counts from
+     * that check-in until now, and stops at 11:00 PM.
+     */
+    public static int countedWorkMinutes(
+            LocalDateTime checkIn,
+            LocalDateTime checkOut,
+            LocalDate attendanceDate,
+            int storedWorkMinutes,
+            int breakMinutes,
+            LocalDateTime now) {
+        if (checkIn == null) {
+            return 0;
+        }
+        if (checkOut != null) {
+            return Math.max(0, storedWorkMinutes);
+        }
+        LocalDateTime end = now == null ? checkIn : now;
+        if (attendanceDate != null) {
+            LocalDateTime cap = attendanceDate.atTime(LOGOUT_DEADLINE);
+            if (end.isAfter(cap)) {
+                end = cap;
+            }
+        }
+        if (!end.isAfter(checkIn)) {
+            return Math.max(0, storedWorkMinutes);
+        }
+        long presence = Duration.between(checkIn, end).toMinutes();
+        return (int) Math.max(0, presence - Math.max(0, breakMinutes));
+    }
 }
