@@ -131,6 +131,10 @@ function spanDates(kind: "week" | "lastWeek") {
   });
 }
 
+function isListedEmployee(role?: string) {
+  return (role || "EMPLOYEE").toUpperCase() === "EMPLOYEE";
+}
+
 function displayDate(value?: string) {
   if (!value) {
     return "—";
@@ -192,8 +196,10 @@ export default function Dashboard() {
         }
         setSummary(dashboard);
         setMe(current);
-        setPeople(asList<EmployeeResponse>(employees).filter((employee) => isCompanyMatch(employee.companyCode, company)));
-        setTodayRows(asList<AttendanceRecord>(attendance).filter((row) => isCompanyMatch(row.employee?.companyCode, company)));
+        setPeople(asList<EmployeeResponse>(employees).filter((employee) =>
+          isCompanyMatch(employee.companyCode, company) && isListedEmployee(employee.roleType)));
+        setTodayRows(asList<AttendanceRecord>(attendance).filter((row) =>
+          isCompanyMatch(row.employee?.companyCode, company) && isListedEmployee(row.employee?.roleType)));
         setLeaves(asList<LeaveRequest>(leaveRows).filter((leave) => isCompanyMatch(leave.employee?.companyCode, company)));
         setHolidays(upcomingHolidays(asList<CompanyHoliday>(extraHolidays), company));
         const slips = asList<PayrollRecord>(payroll)
@@ -223,7 +229,7 @@ export default function Dashboard() {
           return;
         }
         const monthRows = asList<AttendanceRecord>(history).filter((row) =>
-          isCompanyMatch(row.employee?.companyCode, company),
+          isCompanyMatch(row.employee?.companyCode, company) && isListedEmployee(row.employee?.roleType),
         );
         const byDate = new Map<string, AttendanceRecord[]>();
         for (const row of monthRows) {

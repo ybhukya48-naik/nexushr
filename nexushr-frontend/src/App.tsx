@@ -263,7 +263,7 @@ function AppRoutes() {
       localStorage.removeItem("nexushr_must_change_password");
       setNextPassword("");
       setConfirmNextPassword("");
-      if (role === "EMPLOYEE" && localStorage.getItem("nexushr_profile_needed") === "1") {
+      if (["EMPLOYEE", "HR", "MANAGER"].includes(role) && localStorage.getItem("nexushr_profile_needed") === "1") {
         setAccountStep("profile");
       } else {
         localStorage.removeItem("nexushr_profile_needed");
@@ -677,12 +677,12 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
         return;
       }
       beginWebsiteSession();
-      if (response.mustChangePassword) {
+      if (response.mustChangePassword && signedInRole === "EMPLOYEE") {
         localStorage.setItem("nexushr_must_change_password", "1");
       } else {
         localStorage.removeItem("nexushr_must_change_password");
       }
-      if (response.role === "EMPLOYEE" && response.profileCompleted === false) {
+      if (["EMPLOYEE", "HR", "MANAGER"].includes(signedInRole) && response.profileCompleted === false) {
         localStorage.setItem("nexushr_profile_needed", "1");
       } else {
         localStorage.removeItem("nexushr_profile_needed");
