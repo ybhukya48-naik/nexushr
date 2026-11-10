@@ -979,8 +979,8 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
               )}
               {!creating && passwordHelp === null && (
                 <div className="password-help-links">
-                  <button className="login-switch" type="button" onClick={() => { setPasswordHelp("change"); setError(""); setNotice(""); }}>Change password</button>
-                  <button className="login-switch" type="button" onClick={() => { setPasswordHelp("forgot"); setError(""); setNotice(""); }}>Forgot password</button>
+                  <button className="login-help-button" type="button" onClick={() => { setPasswordHelp("change"); setError(""); setNotice(""); }}>Change password</button>
+                  <button className="login-help-button" type="button" onClick={() => { setPasswordHelp("forgot"); setError(""); setNotice(""); }}>Forgot password</button>
                 </div>
               )}
 
@@ -1080,14 +1080,14 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
               </div>
             )}
 
-            <div className="login-actions">
-              <button className={kind === "hr" ? "login-switch active" : "login-switch"} type="button" onClick={() => navigate("/login")}>
+            <div className="login-doors">
+              <button className={kind === "hr" ? "login-door active" : "login-door"} type="button" onClick={() => navigate("/login")}>
                 HR login
               </button>
-              <button className={kind === "employee" ? "login-switch active" : "login-switch"} type="button" onClick={() => navigate("/employee-login")}>
+              <button className={kind === "employee" ? "login-door active" : "login-door"} type="button" onClick={() => navigate("/employee-login")}>
                 Employee login
               </button>
-              <button className={kind === "manager" ? "login-switch active" : "login-switch"} type="button" onClick={() => navigate("/manager-login")}>
+              <button className={kind === "manager" ? "login-door active" : "login-door"} type="button" onClick={() => navigate("/manager-login")}>
                 Manager login
               </button>
             </div>

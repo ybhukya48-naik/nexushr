@@ -5808,7 +5808,8 @@ button.employee-summary-card {
 
 .login-page {
   position: relative;
-  overflow: hidden;
+  overflow: auto;
+  align-items: flex-start;
   background:
     radial-gradient(circle at 12% 18%, rgba(139, 92, 246, 0.20), transparent 30%),
     radial-gradient(circle at 78% 82%, rgba(99, 102, 241, 0.16), transparent 28%),
@@ -7265,4 +7266,158 @@ textarea {
 .app-shell[data-company="GORLE"] .primary-button,
 .app-shell[data-company="GORLE"] .primary-action {
   background: linear-gradient(135deg, #8a5a12 0%, #c4923a 100%);
+}
+
+.login-page {
+  overflow: auto;
+}
+
+.login-layout {
+  margin: 28px auto;
+  padding: 12px 0 28px;
+}
+
+.login-card {
+  padding: 28px 28px 22px;
+}
+
+.login-card-header {
+  margin-bottom: 18px;
+}
+
+.login-card-brand {
+  margin-bottom: 14px;
+  gap: 8px;
+}
+
+.login-card-brand img,
+.login-brand-logos img {
+  width: 168px;
+  height: 64px;
+}
+
+.password-help-links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.login-help-button,
+.login-door {
+  min-height: 38px;
+  padding: 0 8px;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  background: #fff;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.login-help-button:hover,
+.login-door:hover {
+  border-color: #6941c6;
+  color: #6941c6;
+  background: #f7f3ff;
+}
+
+.login-doors {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.login-door.active {
+  border-color: #6941c6;
+  background: #f4f0ff;
+  color: #6941c6;
+}
+
+.login-security,
+.login-footer {
+  margin-top: 12px;
+}
+
+.employees-page .employees-table th:last-child,
+.employees-page .employees-table td:last-child {
+  width: 148px;
+  overflow: visible;
+}
+
+.employees-page .employee-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.employees-page .employee-actions .table-action {
+  width: 100%;
+  margin: 0;
+}
+
+.confirm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(16, 24, 40, 0.48);
+}
+
+.confirm-modal-card {
+  width: min(440px, 100%);
+  padding: 24px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(16, 24, 40, 0.28);
+}
+
+.confirm-modal-card h2 {
+  margin: 0 0 8px;
+  color: #101828;
+  font-size: 20px;
+}
+
+.confirm-modal-card p {
+  margin: 0;
+  color: #475467;
+  line-height: 1.5;
+}
+
+.confirm-modal-error {
+  margin-top: 12px;
+  color: #b42318;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.confirm-modal-actions .primary-action,
+.confirm-modal-actions .table-action {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.confirm-modal-actions .table-action {
+  border: 1px solid #d0d5dd;
+  background: #fff;
+  color: #344054;
+}
+
+.confirm-modal-actions .primary-action {
+  border: 0;
+  background: #b42318;
+  color: #fff;
 }

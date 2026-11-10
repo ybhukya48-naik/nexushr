@@ -1115,31 +1115,16 @@ export default function Employees() {
       </div>
 
       {showDeleteConfirm && employeeToDelete && (
-        <div className="employees-panel">
-          <div className="employees-header">
-            <div>
-              <p className="page-eyebrow">Directory</p>
-              <h2>Delete Employee</h2>
-              <p>
-                Are you sure you want to delete{" "}
-                <strong>{employeeToDelete.fullName}</strong>?
-              </p>
-            </div>
-          </div>
-
-          <div className="employee-empty-state">
-            <span>
-              This action will remove the employee from the organization-wide
-              employee directory.
-            </span>
-
+        <div className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="delete-employee-title">
+          <div className="confirm-modal-card">
+            <h2 id="delete-employee-title">Delete employee</h2>
+            <p>
+              Delete <strong>{employeeToDelete.fullName}</strong> ({employeeToDelete.employeeCode})? Their attendance and pay records for this account are removed with them.
+            </p>
             {saveError && (
-              <span role="alert">
-                {saveError}
-              </span>
+              <p className="confirm-modal-error" role="alert">{saveError}</p>
             )}
-
-            <div className="employee-actions">
+            <div className="confirm-modal-actions">
               <button
                 type="button"
                 className="table-action"
@@ -1154,14 +1139,13 @@ export default function Employees() {
               >
                 Cancel
               </button>
-
               <button
                 type="button"
-                className="table-action"
+                className="primary-action"
                 onClick={() => void confirmDeleteEmployee()}
                 disabled={saving}
               >
-                {saving ? "Deleting..." : "Confirm Delete"}
+                {saving ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>
