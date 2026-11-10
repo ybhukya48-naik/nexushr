@@ -1,6 +1,12 @@
 function resolveApiBase() {
   const host = typeof window === "undefined" ? "" : window.location.hostname;
-  if (host === "hr.cyond.com" || host === "cyond.com" || host === "www.cyond.com") {
+  if (
+    host === "hr.cyond.com"
+    || host === "cyond.com"
+    || host === "www.cyond.com"
+    || host === "localhost"
+    || host === "127.0.0.1"
+  ) {
     return "/api/v1";
   }
   return import.meta.env.VITE_API_BASE_URL
@@ -207,7 +213,7 @@ export function setLoginPassword(email: string, currentPassword: string, newPass
 }
 
 export function resetLoginPassword(email: string) {
-  return request<{ message: string; temporaryPassword: string }>("/auth/reset-password", {
+  return request<{ message: string }>("/auth/reset-password", {
     method: "POST",
     body: JSON.stringify({ email }),
   });
@@ -248,17 +254,31 @@ export async function createPassword(
   return response.json();
 }
 
-export async function login(
-  username: string,
-  password: string,
-): Promise<LoginResponse> {
-  const response = await fetch(`${API_BASE}/auth/login`, {
+async function postLogin(username: string, password: string): Promise<Response> {
+  const send = () => fetch(`${API_BASE}/auth/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ username, password }),
   });
+  try {
+    return await send();
+  } catch {
+    await new Promise((resolve) => window.setTimeout(resolve, 1500));
+    try {
+      return await send();
+    } catch {
+      throw new Error("The server did not answer. Wait a moment and sign in again.");
+    }
+  }
+}
+
+export async function login(
+  username: string,
+  password: string,
+): Promise<LoginResponse> {
+  const response = await postLogin(username, password);
 
   if (!response.ok) {
     let message = "Invalid username or password";
@@ -295,13 +315,18 @@ export interface RegisterResponse {
 export async function register(
   requestData: RegisterRequest,
 ): Promise<RegisterResponse> {
-  const response = await fetch(`${API_BASE}/auth/register`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(requestData),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}/auth/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestData),
+    });
+  } catch {
+    throw new Error("The server did not answer. Wait a moment and create the profile again.");
+  }
 
   if (!response.ok) {
     let message = `Registration failed: ${response.status}`;

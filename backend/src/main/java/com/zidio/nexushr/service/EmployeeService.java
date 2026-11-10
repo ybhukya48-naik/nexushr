@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -348,7 +349,7 @@ public class EmployeeService {
     }
 
     public void setPasswordFromLogin(String email, String currentPassword, String newPassword) {
-        Employee employee = requireStaffAccount(email);
+        Employee employee = findAccountForPasswordHelp(email);
         if (newPassword == null || newPassword.length() < 8) {
             throw new IllegalArgumentException("Password must contain at least 8 characters");
         }
@@ -368,6 +369,41 @@ public class EmployeeService {
 
     public String resetPasswordFromLogin(String email) {
         return applyDefaultPassword(requireStaffAccount(email));
+    }
+
+    public Employee findAccountForPasswordHelp(String email) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("Enter your email");
+        }
+        Employee employee = employeeRepository.findByEmailIgnoreCase(email.trim())
+                .orElseThrow(() -> new IllegalArgumentException("No account uses this email"));
+        if (!employee.isActive()
+                || employee.getLifecycleStatus() == EmployeeLifecycleStatus.OFFBOARDED
+                || employee.getLifecycleStatus() == EmployeeLifecycleStatus.OFFBOARDING) {
+            throw new IllegalArgumentException("This account is not active");
+        }
+        return employee;
+    }
+
+    public String newSignInPassword() {
+        SecureRandom random = new SecureRandom();
+        char[] alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789".toCharArray();
+        char[] value = new char[10];
+        for (int index = 0; index < value.length; index++) {
+            value[index] = alphabet[random.nextInt(alphabet.length)];
+        }
+        return new String(value);
+    }
+
+    public void storeEmailedPassword(Long employeeId, String temporary) {
+        if (employeeId == null || temporary == null || temporary.length() < 8) {
+            throw new IllegalArgumentException("Password must contain at least 8 characters");
+        }
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new IllegalArgumentException("No account uses this email"));
+        employee.setPassword(passwordEncoder.encode(temporary));
+        employee.setPasswordChangeRequired(true);
+        employeeRepository.save(employee);
     }
 
     private String applyDefaultPassword(Employee employee) {

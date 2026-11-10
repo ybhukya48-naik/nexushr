@@ -10,6 +10,7 @@ import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.security.JwtTokenService;
 import com.zidio.nexushr.service.EmployeeService;
 import com.zidio.nexushr.service.ExcelPayrollService;
+import com.zidio.nexushr.service.email.ResendEmailService;
 import com.zidio.nexushr.web.dto.AuthDtos;
 import com.zidio.nexushr.web.dto.RegisterRequest;
 import org.slf4j.Logger;
@@ -18,6 +19,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,6 +41,7 @@ public class AuthController {
     private final CompanyRepository companyRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmployeeService employeeService;
+    private final ResendEmailService resendEmailService;
 
     @Value("${app.auth.demo-users-enabled:true}")
     private boolean demoUsersEnabled;
@@ -48,13 +51,15 @@ public class AuthController {
             EmployeeRepository employeeRepository,
             CompanyRepository companyRepository,
             PasswordEncoder passwordEncoder,
-            EmployeeService employeeService) {
+            EmployeeService employeeService,
+            ResendEmailService resendEmailService) {
 
         this.jwtTokenService = jwtTokenService;
         this.employeeRepository = employeeRepository;
         this.companyRepository = companyRepository;
         this.passwordEncoder = passwordEncoder;
         this.employeeService = employeeService;
+        this.resendEmailService = resendEmailService;
     }
 
     @PostMapping("/register")
@@ -399,14 +404,57 @@ public class AuthController {
     public ResponseEntity<?> resetPassword(@RequestBody AuthDtos.ResetPasswordRequest request) {
         try {
             String email = request == null ? "" : request.email();
-            String temporary = employeeService.resetPasswordFromLogin(email);
+            Employee employee = employeeService.findAccountForPasswordHelp(email);
+            String temporary = employeeService.newSignInPassword();
+            String body = """
+                    Your NexusHR password was reset.
+
+                    Sign in with this email and the password below. The site will then ask you to set a new password.
+
+                    Password: %s
+
+                    Sign in: %s
+                    """.formatted(temporary, signInLink(employee.getRoleType()));
+            try {
+                String sent = resendEmailService.sendTextEmail(
+                        employee.getEmail(),
+                        "Your NexusHR sign-in password",
+                        body);
+                if ("skipped".equals(sent)) {
+                    return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of(
+                            "message", "Password email is not set up yet."
+                    ));
+                }
+            } catch (RestClientResponseException ex) {
+                log.error("PASSWORD_EMAIL_FAILED status={}", ex.getStatusCode().value());
+                String detail = ex.getResponseBodyAsString();
+                String message = detail != null && (detail.contains("testing") || detail.contains("domain"))
+                        ? "The password email could not be sent yet. The mail service still needs the company domain verified."
+                        : "The password email could not be sent. Try again.";
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("message", message));
+            } catch (RuntimeException ex) {
+                log.error("PASSWORD_EMAIL_FAILED", ex);
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of(
+                        "message", "The password email could not be sent. Try again."
+                ));
+            }
+            employeeService.storeEmailedPassword(employee.getId(), temporary);
             return ResponseEntity.ok(Map.of(
-                    "message", "Password reset. Sign in with the default password, then set a new one.",
-                    "temporaryPassword", temporary
+                    "message", "A sign-in password was sent to " + employee.getEmail() + ". Use it to sign in, then set a new password."
             ));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }
+    }
+
+    private static String signInLink(RoleType role) {
+        if (role == RoleType.HR || role == RoleType.ADMIN || role == RoleType.SUPER_ADMIN) {
+            return "https://hr.cyond.com/login";
+        }
+        if (role == RoleType.MANAGER) {
+            return "https://hr.cyond.com/manager-login";
+        }
+        return "https://hr.cyond.com/employee-login";
     }
 
     @PostMapping("/create-password")

@@ -21,7 +21,9 @@ import {
   completeOwnProfile,
   login as apiLogin,
   register as apiRegister,
+  resetLoginPassword,
   resetOwnPassword,
+  setLoginPassword,
   getAiWorkforceDashboard,
   fetchEmployeePhoto,
   API_BASE,
@@ -673,6 +675,8 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [companyCode, setCompanyCode] = useState<"CYOND" | "GORLE">("CYOND");
   const [creating, setCreating] = useState(false);
+  const [passwordHelp, setPasswordHelp] = useState<null | "change" | "forgot">(null);
+  const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
@@ -698,7 +702,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
       return;
     }
     beginWebsiteSession();
-    if (response.mustChangePassword && signedInRole === "EMPLOYEE") {
+    if (response.mustChangePassword) {
       localStorage.setItem("nexushr_must_change_password", "1");
     } else {
       localStorage.removeItem("nexushr_must_change_password");
@@ -794,6 +798,73 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
     }
   }
 
+  function backToSignIn() {
+    setPasswordHelp(null);
+    setCreating(false);
+    setError("");
+    setNotice("");
+    setPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+  }
+
+  async function handleChangePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+    const email = username.trim();
+    if (!email) {
+      setError("Enter your email.");
+      return;
+    }
+    if (!password) {
+      setError("Enter your current password.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setError("Password must contain at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await setLoginPassword(email, password, newPassword);
+      setPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordHelp(null);
+      setNotice(result.message || "Password saved. Sign in with the new password.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not change the password.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleForgotPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+    const email = username.trim();
+    if (!email) {
+      setError("Enter your email.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await resetLoginPassword(email);
+      setPasswordHelp(null);
+      setNotice(result.message || "A sign-in password was sent to that email.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not send the password email.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="login-page">
       <div className="login-background-orb login-orb-one"></div>
@@ -809,7 +880,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
 
           <form
             className="login-card"
-            onSubmit={creating ? handleCreateProfile : handleSubmit}
+            onSubmit={passwordHelp === "change" ? handleChangePassword : passwordHelp === "forgot" ? handleForgotPassword : creating ? handleCreateProfile : handleSubmit}
           >
 
             <div className="login-card-brand">
@@ -822,10 +893,14 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
 
             <div className="login-card-header">
 
-              <h2>{creating ? "Create your profile" : kind === "employee" ? "Employee sign in" : kind === "manager" ? "Manager sign in" : "HR sign in"}</h2>
+              <h2>{passwordHelp === "change" ? "Change password" : passwordHelp === "forgot" ? "Forgot password" : creating ? "Create your profile" : kind === "employee" ? "Employee sign in" : kind === "manager" ? "Manager sign in" : "HR sign in"}</h2>
 
               <p>
-                {creating
+                {passwordHelp === "change"
+                  ? "Enter the password you use now, then choose a new one."
+                  : passwordHelp === "forgot"
+                  ? "Enter the email on your account. A sign-in password will be sent there."
+                  : creating
                   ? "Use your own email and password. HR does not add this profile."
                   : kind === "hr" || kind === "manager"
                   ? "Sign in with your own email and password. Create your profile next, then the dashboard opens."
@@ -849,7 +924,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                 <div>
 
                   <strong>
-                    Sign-in failed
+                    {passwordHelp === "change" ? "Could not change the password" : passwordHelp === "forgot" ? "Could not send the email" : creating ? "Could not create the profile" : "Sign-in failed"}
                   </strong>
 
                   <span>
@@ -889,17 +964,44 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                 </div>
               </label>
 
-              <label>
-                <span>Password</span>
-                <div className="login-input-wrap">
-                  <PasswordField
-                    value={password}
-                    onChange={setPassword}
-                    placeholder="Your password"
-                    autoComplete="current-password"
-                  />
-                </div>
-              </label>
+              {passwordHelp !== "forgot" && (
+                <label>
+                  <span className="password-label-row">
+                    <span>{passwordHelp === "change" ? "Current password" : "Password"}</span>
+                    {!creating && passwordHelp === null && (
+                      <span className="password-help-links">
+                        <button className="login-switch" type="button" onClick={() => { setPasswordHelp("change"); setError(""); setNotice(""); }}>Change password</button>
+                        <button className="login-switch" type="button" onClick={() => { setPasswordHelp("forgot"); setError(""); setNotice(""); }}>Forgot password</button>
+                      </span>
+                    )}
+                  </span>
+                  <div className="login-input-wrap">
+                    <PasswordField
+                      value={password}
+                      onChange={setPassword}
+                      placeholder={passwordHelp === "change" ? "Current password" : "Your password"}
+                      autoComplete="current-password"
+                    />
+                  </div>
+                </label>
+              )}
+
+              {passwordHelp === "change" && (
+                <>
+                  <label>
+                    <span>New password</span>
+                    <div className="login-input-wrap">
+                      <PasswordField value={newPassword} onChange={setNewPassword} placeholder="New password" autoComplete="new-password" />
+                    </div>
+                  </label>
+                  <label>
+                    <span>Confirm password</span>
+                    <div className="login-input-wrap">
+                      <PasswordField value={confirmPassword} onChange={setConfirmPassword} placeholder="Repeat the new password" autoComplete="new-password" />
+                    </div>
+                  </label>
+                </>
+              )}
 
               {(kind === "hr" || kind === "manager") && (
                 <p className="login-notice">
@@ -948,7 +1050,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
               disabled={loading}
             >
 
-              <span>{loading ? "Please wait..." : creating ? "Create profile" : "Sign in"}</span>
+              <span>{loading ? "Please wait..." : passwordHelp === "forgot" ? "Email me a password" : passwordHelp === "change" ? "Save password" : creating ? "Create profile" : "Sign in"}</span>
 
               {!loading && (
                 <span className="login-submit-arrow">
@@ -958,12 +1060,16 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
 
             </button>
 
-            {employee && (
+            {(employee || passwordHelp) && (
               <div className="login-actions">
                 <button
                   className="login-switch"
                   type="button"
                   onClick={() => {
+                    if (passwordHelp) {
+                      backToSignIn();
+                      return;
+                    }
                     setCreating((open) => !open);
                     setError("");
                     setNotice("");
@@ -971,7 +1077,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                     setConfirmPassword("");
                   }}
                 >
-                  {creating ? "Back to sign in" : "Create your profile"}
+                  {passwordHelp || creating ? "Back to sign in" : "Create your profile"}
                 </button>
               </div>
             )}

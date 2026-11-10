@@ -9,6 +9,8 @@ import com.zidio.nexushr.repository.CompanyRepository;
 import com.zidio.nexushr.service.ExcelPayrollService;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.security.JwtTokenService;
+import com.zidio.nexushr.service.EmployeeService;
+import com.zidio.nexushr.service.email.ResendEmailService;
 import com.zidio.nexushr.security.SecurityConfig;
 import com.zidio.nexushr.web.dto.AuthDtos;
 import org.junit.jupiter.api.Test;
@@ -51,6 +53,12 @@ class AuthControllerTest {
 
     @MockitoBean
     private CompanyRepository companyRepository;
+
+    @MockitoBean
+    private EmployeeService employeeService;
+
+    @MockitoBean
+    private ResendEmailService resendEmailService;
 
     @Test
     void login_withAdminCredentials_returnsTokenAndAdminRole() throws Exception {

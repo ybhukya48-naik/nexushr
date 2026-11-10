@@ -7,5 +7,15 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5175,
     strictPort: true,
+    proxy: {
+      '/api': {
+        target: 'https://hr-api.cyond.com',
+        changeOrigin: true,
+        secure: true,
+        headers: {
+          Origin: 'https://hr.cyond.com',
+        },
+      },
+    },
   },
 })

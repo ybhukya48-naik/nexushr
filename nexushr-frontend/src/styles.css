@@ -5651,6 +5651,12 @@ button.employee-summary-card {
 
 /* Error / status messaging */
 
+.login-error > div:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .login-error,
 .login-alert,
 .login-card [role="alert"] {
@@ -6536,6 +6542,25 @@ button.employee-summary-card {
   background: #ecfdf3;
   color: #067647;
   font-size: 14px;
+}
+
+.password-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.password-help-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.password-help-links .login-switch {
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .login-actions {
