@@ -388,6 +388,33 @@ export async function getEmployeeAttendance(employeeId: number) {
   );
 }
 
+export function HoursTotals({ records, now }: { records: AttendanceRecord[]; now: Date }) {
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const today = `${month}-${String(now.getDate()).padStart(2, "0")}`;
+  const todayRow = records.find((row) => String(row.attendanceDate ?? "").slice(0, 10) === today);
+  const monthMinutes = records
+    .filter((row) => String(row.attendanceDate ?? "").startsWith(month))
+    .reduce((sum, row) => sum + clockedWorkMinutes(row, now), 0);
+  const historyMinutes = records.reduce((sum, row) => sum + clockedWorkMinutes(row, now), 0);
+  const asHours = (minutes: number) => `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  return (
+    <div className="hours-totals">
+      <article>
+        <span>Today working hours</span>
+        <strong>{asHours(clockedWorkMinutes(todayRow, now))}</strong>
+      </article>
+      <article>
+        <span>Month working hours</span>
+        <strong>{asHours(monthMinutes)}</strong>
+      </article>
+      <article>
+        <span>History total working hours</span>
+        <strong>{asHours(historyMinutes)}</strong>
+      </article>
+    </div>
+  );
+}
+
 export function monthDateKeys(count = 30) {
   const dates: string[] = [];
   const now = new Date();
@@ -1444,21 +1471,11 @@ export default function Attendance() {
           <div>
             <p className="eyebrow">Last 30 days</p>
             <h3>{historyPerson ? `${historyPerson.fullName} · last 30 days` : "Last 30 days"}</h3>
-            <p>
-              {historyPerson
-                ? (() => {
-                    const month = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, "0")}`;
-                    const today = `${month}-${String(currentTime.getDate()).padStart(2, "0")}`;
-                    const monthRows = history.filter((row) => String(row.attendanceDate ?? "").startsWith(month));
-                    const todayRow = monthRows.find((row) => String(row.attendanceDate ?? "").slice(0, 10) === today);
-                    const done = monthRows
-                      .filter((row) => dayIsComplete(row, currentTime))
-                      .reduce((sum, row) => sum + clockedWorkMinutes(row, currentTime), 0);
-                    const monthMinutes = monthRows.reduce((sum, row) => sum + clockedWorkMinutes(row, currentTime), 0);
-                    return `${historyPerson.fullName}: today ${formatAsHours(clockedWorkMinutes(todayRow, currentTime))} ${dayIsComplete(todayRow, currentTime) ? "complete" : "still separate"}. Total done ${formatAsHours(done)}. Salary uses this month's ${formatAsHours(monthMinutes)}.`;
-                  })()
-                : "Choose one employee. Each person's month stays separate. Today stays on its own until that day is complete, then it joins the total."}
-            </p>
+            {historyEmployeeId ? (
+              <HoursTotals records={history} now={currentTime} />
+            ) : (
+              <p>Choose one employee. Each person's today, month, and history stay separate.</p>
+            )}
           </div>
         </div>
         <div className="employees-table-wrap month-history">

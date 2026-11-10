@@ -1418,6 +1418,7 @@ function EmployeeDashboard() {
           .filter((row) => dayIsComplete(row, clockNow))
           .reduce((sum, row) => sum + clockedWorkMinutes(row, clockNow), 0);
         const monthMinutes = monthRows.reduce((sum, row) => sum + clockedWorkMinutes(row, clockNow), 0);
+        const historyMinutes = records.reduce((sum, row) => sum + clockedWorkMinutes(row, clockNow), 0);
         const warnings = monthRows.filter((row) => row.yellowFlag).length;
         const halfDay = warnings >= 3 ? Math.round(Number(employee.baseSalary || 0) / 26 / 2) : 0;
         const workday = new Date().getDay() !== 0;
@@ -1462,9 +1463,20 @@ function EmployeeDashboard() {
                 <span>{new Date().toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short" })} · General shift 9:30–6:30</span>
                 <div className="home-timers">
                   <div>
-                    <strong>{hoursLabel(todayMinutes)}</strong>
-                    <em>{!todayRecord?.checkInTime ? "no check-in today" : todayComplete ? "today complete" : "today, still in"}</em>
-                    <em>Total done {hoursLabel(doneMinutes)}. Pay uses this month's {hoursLabel(monthMinutes)}.</em>
+                    <div className="hours-totals">
+                      <article>
+                        <span>Today working hours</span>
+                        <strong>{hoursLabel(todayMinutes)}</strong>
+                      </article>
+                      <article>
+                        <span>Month working hours</span>
+                        <strong>{hoursLabel(monthMinutes)}</strong>
+                      </article>
+                      <article>
+                        <span>History total working hours</span>
+                        <strong>{hoursLabel(historyMinutes)}</strong>
+                      </article>
+                    </div>
                     <div className="attendance-actions">
                       <button className="primary-button" type="button" disabled={punching || !isWindowsComputer() || checkedIn} onClick={() => void punch("in")}>
                         Check in
@@ -1571,16 +1583,23 @@ function EmployeeDashboard() {
                   ))}
                 </ul>
               )}
-              <p>
-                Today {hoursLabel(todayMinutes)}{!todayRecord?.checkInTime ? ", not started" : todayComplete ? ", complete" : ", still separate"}.
-                {" "}
-                Total done {hoursLabel(doneMinutes)}.
-                {" "}
-                Tomorrow starts again on its own. Yesterday stays in the total.
-                {" "}
-                Salary uses the whole month, {hoursLabel(monthMinutes)}.
-                {halfDay > 0 ? ` Half-day cut ₹${halfDay.toLocaleString("en-IN")}.` : ""}
-              </p>
+              <div className="hours-totals">
+                <article>
+                  <span>Today working hours</span>
+                  <strong>{hoursLabel(todayMinutes)}</strong>
+                  <em>{!todayRecord?.checkInTime ? "Not started" : todayComplete ? "Complete" : "Still in"}</em>
+                </article>
+                <article>
+                  <span>Month working hours</span>
+                  <strong>{hoursLabel(monthMinutes)}</strong>
+                  <em>Used for this month's salary. Finished days {hoursLabel(doneMinutes)}.</em>
+                </article>
+                <article>
+                  <span>History total working hours</span>
+                  <strong>{hoursLabel(historyMinutes)}</strong>
+                  <em>Every recorded day.</em>
+                </article>
+              </div>
             </section>
             <section className="panel">
               <div className="panel-header">
