@@ -7082,7 +7082,7 @@ textarea {
 .leave-page .employees-table-wrap,
 .attendance-table-wrap,
 .month-history {
-  overflow-x: hidden;
+  overflow-x: auto;
 }
 
 .employees-page .employees-table,
@@ -7090,29 +7090,32 @@ textarea {
 .attendance-table,
 .month-history .employees-table {
   width: 100%;
-  min-width: 0;
-  table-layout: fixed;
+  min-width: 860px;
+  table-layout: auto;
 }
 
 .employees-page .employees-table thead th,
 .leave-page .employees-table thead th,
 .attendance-table thead th,
 .month-history .employees-table thead th {
-  padding: 10px 8px;
-  font-size: 12px;
-  letter-spacing: 0.02em;
-  white-space: normal;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  white-space: nowrap;
 }
 
 .employees-page .employees-table tbody td,
 .leave-page .employees-table tbody td,
 .attendance-table tbody td,
 .month-history .employees-table tbody td {
-  padding: 10px 8px;
+  padding: 8px 10px;
   border-bottom: 1px solid #eaecf0;
-  font-size: 13px;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 
 .employees-page .employees-table tbody tr:last-child td,
@@ -7124,7 +7127,7 @@ textarea {
 
 .employees-page .employees-table tbody td:first-child strong,
 .leave-page .employees-table tbody td:first-child strong {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .employees-page .employees-table tbody td:nth-child(2),
@@ -7144,13 +7147,10 @@ textarea {
 .employees-page .employees-table th:first-child,
 .employees-page .employees-table td:first-child,
 .attendance-table th:first-child,
-.attendance-table td:first-child {
-  width: 24%;
-}
-
+.attendance-table td:first-child,
 .employees-page .employees-table th:last-child,
 .employees-page .employees-table td:last-child {
-  width: 108px;
+  width: auto;
 }
 
 .employees-page .payroll-records th:last-child,
@@ -7160,10 +7160,26 @@ textarea {
 }
 
 .payroll-row-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 12px;
+  justify-content: start;
+}
+
+.employees-page .payroll-records .payroll-row-actions .primary-action,
+.employees-page .payroll-records .payroll-row-actions .table-action {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #53389e;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: left;
+  transform: none;
 }
 
 .payroll-page-actions {
@@ -7185,7 +7201,7 @@ textarea {
 
 .employees-page .employees-table td,
 .attendance-table td {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .employees-page .employee-name-cell {
@@ -7342,22 +7358,24 @@ textarea {
   margin-top: 12px;
 }
 
-.employees-page .employees-table th:last-child,
-.employees-page .employees-table td:last-child {
-  width: 148px;
-  overflow: visible;
-}
-
 .employees-page .employee-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 12px;
+  justify-content: start;
 }
 
 .employees-page .employee-actions .table-action {
-  width: 100%;
+  width: auto;
+  min-height: 0;
   margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #53389e;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
 }
 
 .confirm-modal {
@@ -7433,16 +7451,16 @@ textarea {
 
 .employees-page .payroll-records thead th,
 .employees-page .payroll-records tbody td {
-  padding: 12px 14px;
-  font-size: 14px;
-  line-height: 1.4;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.35;
   letter-spacing: 0;
   white-space: nowrap;
   overflow-wrap: normal;
 }
 
 .employees-page .payroll-records thead th {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: none;
 }
@@ -7461,25 +7479,14 @@ textarea {
 
 .attendance-table thead th,
 .month-history .employees-table thead th {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.01em;
   white-space: nowrap;
 }
 
 .attendance-table tbody td,
-.month-history .employees-table tbody td {
-  font-size: 14px;
-  line-height: 1.4;
-  overflow-wrap: normal;
-}
-
-.attendance-table thead th {
-  font-size: 13px;
-  letter-spacing: 0.02em;
-}
-
-.attendance-table tbody td,
+.month-history .employees-table tbody td,
 .attendance-employee-cell strong,
 .attendance-employee-cell span,
 .attendance-time,
@@ -7487,9 +7494,7 @@ textarea {
 .attendance-value-normal,
 .attendance-value-warning,
 .attendance-value-positive {
-  font-size: 14px;
-}
-
-.attendance-employee-cell strong {
-  font-size: 15px;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: normal;
 }
