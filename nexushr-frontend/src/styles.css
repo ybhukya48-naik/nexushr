@@ -7421,3 +7421,55 @@ textarea {
   background: #b42318;
   color: #fff;
 }
+
+.employees-page .table-wrapper:has(.payroll-records) {
+  overflow-x: auto;
+}
+
+.employees-page .payroll-records {
+  table-layout: auto;
+  min-width: 1180px;
+}
+
+.employees-page .payroll-records thead th,
+.employees-page .payroll-records tbody td {
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.4;
+  letter-spacing: 0;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.employees-page .payroll-records thead th {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: none;
+}
+
+.employees-page .payroll-records th:first-child,
+.employees-page .payroll-records td:first-child,
+.employees-page .payroll-records th:last-child,
+.employees-page .payroll-records td:last-child {
+  width: auto;
+}
+
+.attendance-table-wrap,
+.month-history {
+  overflow-x: auto;
+}
+
+.attendance-table thead th,
+.month-history .employees-table thead th {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.attendance-table tbody td,
+.month-history .employees-table tbody td {
+  font-size: 14px;
+  line-height: 1.4;
+  overflow-wrap: normal;
+}
