@@ -1470,28 +1470,6 @@ function EmployeeDashboard() {
                 <span>{new Date().toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short" })} · General shift 9:30–6:30</span>
                 <div className="home-timers">
                   <div>
-                    <div className="hours-totals">
-                      <article>
-                        <span>Today working hours</span>
-                        <strong>{hoursLabel(todayMinutes)}</strong>
-                        <em>Up to 9 hours</em>
-                      </article>
-                      <article>
-                        <span>Month working hours</span>
-                        <strong>{hoursLabel(monthMinutes)}</strong>
-                        <em>9 hours a day</em>
-                      </article>
-                      <article>
-                        <span>History total working hours</span>
-                        <strong>{hoursLabel(historyMinutes)}</strong>
-                        <em>9 hours a day</em>
-                      </article>
-                      <article className="hours-extra">
-                        <span>Extra working hours</span>
-                        <strong>{hoursLabel(todayExtra)}</strong>
-                        <em>Today. Month {hoursLabel(monthExtra)}. History {hoursLabel(historyExtra)}.</em>
-                      </article>
-                    </div>
                     <div className="attendance-actions">
                       <button className="primary-button" type="button" disabled={punching || !isWindowsComputer() || checkedIn} onClick={() => void punch("in")}>
                         Check in

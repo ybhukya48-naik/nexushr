@@ -214,6 +214,10 @@ public class LeaveService {
     }
 
     private void enforceLeavePolicy(Long employeeId, LeaveRequest request) {
+        String type = normalizeLeaveType(request.getLeaveType());
+        if ("WFH".equals(type) || "SITE_MORNING".equals(type) || "SITE_AFTERNOON".equals(type)) {
+            return;
+        }
         long requestedDays = ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
         long usedDays = getApprovedLeaveDays(employeeId);
         if (usedDays + requestedDays > annualEntitlementDays) {
@@ -222,7 +226,6 @@ public class LeaveService {
                     "Leave request exceeds the remaining annual leave balance"
             );
         }
-        String type = normalizeLeaveType(request.getLeaveType());
         if (!"CASUAL".equals(type) && !"EARNED".equals(type)) {
             return;
         }
@@ -253,7 +256,11 @@ public class LeaveService {
                         LeaveStatus.APPROVED
                 )
                 .stream()
-                .mapToLong(leave ->
+                .filter(leave -> {
+                    String type = normalizeLeaveType(leave.getLeaveType());
+                    return !"WFH".equals(type) && !"SITE_MORNING".equals(type) && !"SITE_AFTERNOON".equals(type);
+                })
+                .mapToLong(leave -> {
                         ChronoUnit.DAYS.between(
                                 leave.getStartDate(),
                                 leave.getEndDate()

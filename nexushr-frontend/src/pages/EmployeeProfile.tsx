@@ -77,7 +77,7 @@ export default function EmployeeProfile() {
   const location = useLocation();
   const { id } = useParams();
   const mine = location.pathname === "/profile";
-  const canSeePay = mine || ["HR", "ADMIN", "SUPER_ADMIN"].includes(localStorage.getItem("nexushr_role") || "");
+  const canSeePay = ["HR", "ADMIN", "SUPER_ADMIN"].includes(localStorage.getItem("nexushr_role") || "");
   const employeeId = Number(id);
   const pictureInput = useRef<HTMLInputElement>(null);
 
@@ -773,7 +773,7 @@ export default function EmployeeProfile() {
           <h2>{profileTab === "leave" ? "Leave" : profileTab === "pay" ? "Pay" : profileTab === "documents" ? "Documents" : "Performance"}</h2>
           <p>
             {profileTab === "leave" && "Leave requests for this person are on the Leave page."}
-            {profileTab === "pay" && (canSeePay ? `Base salary ₹${employee.baseSalary.toLocaleString("en-IN")}. Payslips are on the Payroll page.` : "Pay is visible to HR and on your own profile.")}
+            {profileTab === "pay" && (canSeePay ? `Base salary ₹${employee.baseSalary.toLocaleString("en-IN")}. Payslips are on the Payroll page.` : "Your payslip is on My Pay. Base salary stays with HR.")}
             {profileTab === "documents" && "No documents are saved on this record yet."}
             {profileTab === "performance" && "Reviews and hours are on the Performance page."}
           </p>

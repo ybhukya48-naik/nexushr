@@ -523,7 +523,7 @@ export default function Dashboard() {
                 return (
                   <li key={leave.id}>
                     <span>
-                      Leave · {leave.employee?.fullName || "Employee"} · {displayDate(leave.startDate)} to {displayDate(leave.endDate)}
+                      {leave.leaveType === "WFH" ? "Work from home" : leave.leaveType === "SITE_MORNING" ? "Morning site visit" : leave.leaveType === "SITE_AFTERNOON" ? "Afternoon site visit" : "Leave"} · {leave.employee?.fullName || "Employee"} · {displayDate(leave.startDate)} to {displayDate(leave.endDate)}
                       {waited > 0 ? ` · waiting ${waited} day${waited === 1 ? "" : "s"}` : ""}
                     </span>
                     <button type="button" onClick={() => void updateLeaveStatus(leave.id!, "APPROVED").then(() => setRefreshTick((value) => value + 1))}>Approve</button>

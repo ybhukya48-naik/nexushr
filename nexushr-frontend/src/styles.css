@@ -7501,9 +7501,9 @@ textarea {
 
 .hours-totals {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin: 10px 0 12px;
+  grid-template-columns: repeat(4, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
 }
 
 .hours-extra {
@@ -7517,30 +7517,40 @@ textarea {
 }
 
 .hours-totals article {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   min-width: 0;
-  padding: 8px 10px;
+  padding: 12px 14px;
   border: 1px solid #eaecf0;
   border-radius: 10px;
   background: #f8fafc;
+  overflow: hidden;
 }
 
 .hours-totals span,
 .hours-totals em,
 .employee-dashboard .hours-totals span,
-.employee-dashboard .hours-totals em {
+.employee-dashboard .hours-totals em,
+.employee-dashboard .panel .hours-totals span,
+.employee-dashboard .panel .hours-totals em {
   display: block;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.3;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.35;
   color: #667085;
   font-style: normal;
+  white-space: normal;
 }
 
 .hours-totals strong,
-.employee-dashboard .home-clock-card .hours-totals strong {
+.employee-dashboard .home-clock-card .hours-totals strong,
+.employee-dashboard .panel .hours-totals strong {
   display: block;
-  margin: 2px 0 0;
-  font-size: 16px;
+  margin: 0;
+  font-size: 22px;
   line-height: 1.2;
   color: #101828;
+  white-space: nowrap;
 }

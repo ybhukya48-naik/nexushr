@@ -213,6 +213,9 @@ export default function Leave() {
     if (value === "SICK") return "Sick";
     if (value === "COMP_OFF") return "Comp-off";
     if (value === "LOP") return "LOP";
+    if (value === "WFH") return "Work from home";
+    if (value === "SITE_MORNING") return "Morning site visit";
+    if (value === "SITE_AFTERNOON") return "Afternoon site visit";
     return "Earned";
   }
 
@@ -386,6 +389,9 @@ export default function Leave() {
               <select value={leaveType} onChange={(event) => setLeaveType(event.target.value)}>
                 <option value="CASUAL">Casual</option>
                 <option value="EARNED">Paid</option>
+                <option value="WFH">Work from home</option>
+                <option value="SITE_MORNING">Morning site visit</option>
+                <option value="SITE_AFTERNOON">Afternoon site visit</option>
               </select>
             </label>
 
@@ -485,7 +491,7 @@ export default function Leave() {
                   <tr key={leave.id}>
                     <td>
                       <strong>{leave.employee?.fullName || "-"}</strong>
-                      <div>{leave.leaveType === "COMP_OFF" ? "Comp-off" : leave.leaveType === "LOP" ? "LOP" : leave.leaveType === "SICK" ? "Sick" : leave.leaveType === "CASUAL" ? "Casual" : "Earned"}{leave.halfDay ? " · half day" : ""}</div>
+                      <div>{typeName(leave.leaveType)}{leave.halfDay ? " · half day" : ""}</div>
                     </td>
 
                     <td>
