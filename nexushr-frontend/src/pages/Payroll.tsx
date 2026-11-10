@@ -439,7 +439,7 @@ export default function Payroll() {
               <p className="page-eyebrow">Payroll</p>
             <h2>Create Salary Record</h2>
             <p>
-              Hours start at check-in. Pay for {payMonth} uses every working day from the 1st through the last day of the month, then that total against the employee&apos;s CTC.
+              Pay for {payMonth} uses the working hours from the 1st through the last day. Today stays separate until that day is complete, then those hours join the month total used for the CTC.
             </p>
           </div>
         </div>

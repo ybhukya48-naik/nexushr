@@ -983,7 +983,7 @@ public class AttendanceService {
 
             LocalDateTime now = LocalDateTime.now(COMPANY_ZONE);
             int workedMinutes = records.stream()
-                    .mapToInt(record -> AttendanceRules.countedWorkMinutes(
+                    .mapToInt(record -> AttendanceRules.finishedDayMinutes(
                             record.getCheckInTime(),
                             record.getCheckOutTime(),
                             record.getAttendanceDate(),

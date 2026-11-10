@@ -124,6 +124,38 @@ public final class AttendanceRules {
         return false;
     }
 
+    /** A day is finished after check-out, or after 11:00 PM if check-out was missed. */
+    public static boolean dayComplete(
+            LocalDateTime checkIn,
+            LocalDateTime checkOut,
+            LocalDate attendanceDate,
+            LocalDateTime now) {
+        if (checkIn == null) {
+            return false;
+        }
+        if (checkOut != null) {
+            return true;
+        }
+        if (attendanceDate == null || now == null) {
+            return false;
+        }
+        return !now.isBefore(attendanceDate.atTime(LOGOUT_DEADLINE));
+    }
+
+    /** Hours that count toward the month total. An open day stays out until it is finished. */
+    public static int finishedDayMinutes(
+            LocalDateTime checkIn,
+            LocalDateTime checkOut,
+            LocalDate attendanceDate,
+            int storedWorkMinutes,
+            int breakMinutes,
+            LocalDateTime now) {
+        if (!dayComplete(checkIn, checkOut, attendanceDate, now)) {
+            return 0;
+        }
+        return countedWorkMinutes(checkIn, checkOut, attendanceDate, storedWorkMinutes, breakMinutes, now);
+    }
+
     /**
      * A finished day uses the stored minutes. An open check-in counts from
      * that check-in until now, and stops at 11:00 PM.

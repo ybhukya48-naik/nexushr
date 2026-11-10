@@ -70,6 +70,17 @@ export function isWindowsComputer() {
   return /Windows NT|Macintosh|Mac OS X/i.test(ua);
 }
 
+/** A finished day has a check-out, or it is past 11:00 PM. An open check-in is not finished. */
+export function dayIsComplete(
+  record?: { checkInTime?: string; checkOutTime?: string; attendanceDate?: string } | null,
+  now = new Date(),
+) {
+  if (!record?.checkInTime) {
+    return false;
+  }
+  return Boolean(record.checkOutTime) || isCheckoutMissing(record, now);
+}
+
 /** A missed check-out is only after 11:00 PM. Signing out of the site is not a check-out. */
 export function isCheckoutMissing(
   record?: { checkInTime?: string; checkOutTime?: string; attendanceDate?: string } | null,
@@ -1435,8 +1446,18 @@ export default function Attendance() {
             <h3>{historyPerson ? `${historyPerson.fullName} · last 30 days` : "Last 30 days"}</h3>
             <p>
               {historyPerson
-                ? `Only ${historyPerson.fullName}'s check-in, check-out, and working hours. Choose another employee to see that person's month.`
-                : "Choose one employee. Each person's month stays separate. The count above is who is present for the selected day."}
+                ? (() => {
+                    const month = `${currentTime.getFullYear()}-${String(currentTime.getMonth() + 1).padStart(2, "0")}`;
+                    const today = `${month}-${String(currentTime.getDate()).padStart(2, "0")}`;
+                    const monthRows = history.filter((row) => String(row.attendanceDate ?? "").startsWith(month));
+                    const todayRow = monthRows.find((row) => String(row.attendanceDate ?? "").slice(0, 10) === today);
+                    const done = monthRows
+                      .filter((row) => dayIsComplete(row, currentTime))
+                      .reduce((sum, row) => sum + clockedWorkMinutes(row, currentTime), 0);
+                    const monthMinutes = monthRows.reduce((sum, row) => sum + clockedWorkMinutes(row, currentTime), 0);
+                    return `${historyPerson.fullName}: today ${formatAsHours(clockedWorkMinutes(todayRow, currentTime))} ${dayIsComplete(todayRow, currentTime) ? "complete" : "still separate"}. Total done ${formatAsHours(done)}. Salary uses this month's ${formatAsHours(monthMinutes)}.`;
+                  })()
+                : "Choose one employee. Each person's month stays separate. Today stays on its own until that day is complete, then it joins the total."}
             </p>
           </div>
         </div>
@@ -1461,7 +1482,7 @@ export default function Attendance() {
                   <td>{formatDate(date)}</td>
                   <td>{row ? formatTime(row.checkInTime) : "—"}</td>
                   <td>{checkOut ? formatTime(checkOut) : row?.checkInTime ? "Still in" : "—"}</td>
-                  <td>{row?.checkInTime ? formatAsHours(clockedWorkMinutes(row, currentTime)) : "No check-in"}</td>
+                  <td>{row?.checkInTime ? `${formatAsHours(clockedWorkMinutes(row, currentTime))} · ${dayIsComplete(row, currentTime) ? "Complete" : "Still in"}` : "No check-in"}</td>
                   <td>
                     {[
                       row?.lateWarning ? "Late" : "",
