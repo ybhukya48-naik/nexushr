@@ -7473,3 +7473,23 @@ textarea {
   line-height: 1.4;
   overflow-wrap: normal;
 }
+
+.attendance-table thead th {
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.attendance-table tbody td,
+.attendance-employee-cell strong,
+.attendance-employee-cell span,
+.attendance-time,
+.attendance-work-duration,
+.attendance-value-normal,
+.attendance-value-warning,
+.attendance-value-positive {
+  font-size: 14px;
+}
+
+.attendance-employee-cell strong {
+  font-size: 15px;
+}

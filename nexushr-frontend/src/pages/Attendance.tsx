@@ -889,19 +889,6 @@ export default function Attendance() {
     return `${hours}h ${minutes}m`;
   }
 
-  function formatClock(totalSeconds: number) {
-    const safe = Math.max(0, totalSeconds);
-    const hours = Math.floor(safe / 3600);
-    const minutes = Math.floor((safe % 3600) / 60);
-    const seconds = safe % 60;
-
-    return [
-      String(hours).padStart(2, "0"),
-      String(minutes).padStart(2, "0"),
-      String(seconds).padStart(2, "0"),
-    ].join(":");
-  }
-
   function elapsedSeconds(record?: AttendanceRecord) {
     if (!record?.checkInTime) {
       return null;
@@ -944,22 +931,22 @@ export default function Attendance() {
         ? 0
         : Math.max(0, Math.floor((currentTime.getTime() - start.getTime()) / 1000));
       return {
-        work: formatClock(Math.max(0, sinceCheckIn - breakSeconds)),
-        breakTime: formatClock(breakSeconds),
+        work: formatAsHours(Math.floor(Math.max(0, sinceCheckIn - breakSeconds) / 60)),
+        breakTime: formatAsHours(Math.floor(breakSeconds / 60)),
       };
     }
 
     if ((record.closedWorkMinutes ?? 0) > 0 || (record.breakMinutes ?? 0) > 0) {
       return {
-        work: formatClock(payable(closedSeconds)),
-        breakTime: formatClock(breakSeconds),
+        work: formatAsHours(Math.floor(payable(closedSeconds) / 60)),
+        breakTime: formatAsHours(Math.floor(breakSeconds / 60)),
       };
     }
 
     const elapsed = elapsedSeconds(record);
     return {
-      work: elapsed == null ? "-" : formatClock(payable(elapsed)),
-      breakTime: formatClock(0),
+      work: elapsed == null ? "-" : formatAsHours(Math.floor(payable(elapsed) / 60)),
+      breakTime: formatAsHours(0),
     };
   }
 
@@ -1367,12 +1354,9 @@ export default function Attendance() {
         {record?.checkOutTime ? (
           <span className="attendance-time">{formatTime(record.checkOutTime)}</span>
         ) : record?.checkInTime ? (
-          <span className="attendance-time">In progress</span>
+          <span className="attendance-time">Still in</span>
         ) : (
           "—"
-        )}
-        {record?.checkInTime && !record.checkOutTime && (
-          <span>Working</span>
         )}
       </td>
 
@@ -1416,7 +1400,7 @@ export default function Attendance() {
             }
           >
             {record.overtimeMinutes > 0
-              ? `${record.overtimeMinutes} min`
+              ? formatAsHours(record.overtimeMinutes)
               : "-"}
           </span>
         ) : (
