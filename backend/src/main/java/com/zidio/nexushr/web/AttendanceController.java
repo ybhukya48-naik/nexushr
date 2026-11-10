@@ -242,7 +242,7 @@ public class AttendanceController {
         if (!WindowsAttendanceClient.allowed(request.getHeader("User-Agent"))) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
-                    "Check-in and check-out work only on a Windows computer.");
+                    "Check-in and check-out work on a Windows or Mac computer. A phone cannot punch.");
         }
     }
 }

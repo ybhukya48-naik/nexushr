@@ -3,7 +3,7 @@ package com.zidio.nexushr.web;
 import java.util.Locale;
 
 /**
- * Office check-in and check-out are for a Windows computer.
+ * Office check-in and check-out are for a Windows or Mac computer.
  * A phone browser is refused. Site selfie punches are a separate path.
  */
 public final class WindowsAttendanceClient {
@@ -24,6 +24,8 @@ public final class WindowsAttendanceClient {
                 || ua.contains("windows phone")) {
             return false;
         }
-        return ua.contains("windows nt");
+        return ua.contains("windows nt")
+                || ua.contains("macintosh")
+                || ua.contains("mac os x");
     }
 }

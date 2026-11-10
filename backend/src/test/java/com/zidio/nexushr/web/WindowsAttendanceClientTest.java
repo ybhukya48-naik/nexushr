@@ -24,9 +24,9 @@ class WindowsAttendanceClientTest {
     }
 
     @Test
-    void macIsRefused() {
+    void macComputerIsAllowed() {
         assertThat(WindowsAttendanceClient.allowed(
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0"))
-                .isFalse();
+                .isTrue();
     }
 }

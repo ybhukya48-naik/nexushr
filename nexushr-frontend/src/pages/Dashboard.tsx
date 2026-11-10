@@ -684,7 +684,7 @@ export default function Dashboard() {
             Check out
           </button>
         </div>
-        {!windowsPunch && <p className="hr-empty">Check in and check out work only on a Windows computer.</p>}
+        {!windowsPunch && <p className="hr-empty">Check in and check out work on a Windows or Mac computer. A phone cannot punch.</p>}
         {punchNote && <p className="hr-empty">{punchNote}</p>}
       </section>
 

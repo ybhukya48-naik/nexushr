@@ -54,6 +54,7 @@ function logoutDeadlineMs(record?: { attendanceDate?: string; checkInTime?: stri
   return Number.isNaN(deadline.getTime()) ? null : deadline.getTime();
 }
 
+/** Office punches work on a Windows or Mac computer. A phone stays blocked. */
 export function isWindowsComputer() {
   if (typeof navigator === "undefined") {
     return false;
@@ -64,9 +65,9 @@ export function isWindowsComputer() {
   }
   const platform = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform;
   if (platform) {
-    return platform === "Windows";
+    return platform === "Windows" || platform === "macOS";
   }
-  return /Windows NT/i.test(ua);
+  return /Windows NT|Macintosh|Mac OS X/i.test(ua);
 }
 
 /** A missed check-out is only after 11:00 PM. Signing out of the site is not a check-out. */
@@ -978,7 +979,7 @@ export default function Attendance() {
         {canPunch && (
         <div className="attendance-actions">
           {!officePunchAllowed && (
-            <p>Check in and check out work only on a Windows computer. A phone cannot punch. Signing out of the site does not check you out.</p>
+            <p>Check in and check out work on a Windows or Mac computer. A phone cannot punch. Signing out of the site does not check you out.</p>
           )}
           {siteVisitor && (
             <label className="secondary-button">
@@ -1052,7 +1053,7 @@ export default function Attendance() {
             }
             title={
               !officePunchAllowed
-                ? "Check-out works only on a Windows computer."
+                ? "Check-out works on a Windows or Mac computer. A phone cannot punch."
                 : !isToday
                 ? "Check-out is available only for today."
                 : !sessionOpen
@@ -1092,7 +1093,7 @@ export default function Attendance() {
             }
             title={
               !officePunchAllowed
-                ? "Lunch check-out works only on a Windows computer."
+                ? "Lunch works on a Windows or Mac computer. A phone cannot punch."
                 : !actionEmployee
                 ? "Select an employee, then check out for lunch."
                 : !sessionOpen

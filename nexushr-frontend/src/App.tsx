@@ -342,11 +342,11 @@ function AppRoutes() {
             <>
               <label>
                 New password
-                <input type="password" value={nextPassword} autoComplete="new-password" onChange={(event) => setNextPassword(event.target.value)} />
+                <PasswordField value={nextPassword} autoComplete="new-password" onChange={setNextPassword} />
               </label>
               <label>
                 Confirm password
-                <input type="password" value={confirmNextPassword} autoComplete="new-password" onChange={(event) => setConfirmNextPassword(event.target.value)} />
+                <PasswordField value={confirmNextPassword} autoComplete="new-password" onChange={setConfirmNextPassword} />
               </label>
             </>
           ) : (
@@ -617,6 +617,51 @@ function AppRoutes() {
     </div>
   );
 }
+function PasswordField({
+  value,
+  onChange,
+  autoComplete,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  autoComplete?: string;
+  placeholder?: string;
+}) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="password-field">
+      <input
+        type={visible ? "text" : "password"}
+        value={value}
+        autoComplete={autoComplete}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <button
+        className="password-toggle"
+        type="button"
+        aria-label={visible ? "Hide password" : "Show password"}
+        onClick={() => setVisible((current) => !current)}
+      >
+        {visible ? (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 3l18 18" />
+            <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+            <path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5.2 0 9.3 3.6 10.5 7-0.5 1.4-1.4 2.7-2.5 3.8" />
+            <path d="M6.1 6.1C4.2 7.3 2.8 9 1.5 12c1.2 3.4 5.3 7 10.5 7 1.6 0 3.1-.3 4.4-.9" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        )}
+      </button>
+    </div>
+  );
+}
+
 function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
   const navigate = useNavigate();
   const employee = kind === "employee";
@@ -847,13 +892,11 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
               <label>
                 <span>Password</span>
                 <div className="login-input-wrap">
-                  <input
-                    type="password"
+                  <PasswordField
                     value={password}
-                    onChange={(event) => setPassword(event.target.value)}
+                    onChange={setPassword}
                     placeholder="Your password"
                     autoComplete="current-password"
-                    required
                   />
                 </div>
               </label>
@@ -869,7 +912,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                   <label>
                     <span>Confirm password</span>
                     <div className="login-input-wrap">
-                      <input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Repeat your password" autoComplete="new-password" required />
+                      <PasswordField value={confirmPassword} onChange={setConfirmPassword} placeholder="Repeat your password" autoComplete="new-password" />
                     </div>
                   </label>
                   <label>
@@ -1319,6 +1362,8 @@ function EmployeeDashboard() {
                         Check out
                       </button>
                     </div>
+                    {!isWindowsComputer() && <em>Check in works on a Windows or Mac computer. A phone cannot punch.</em>}
+                    {punchNote && <em>{punchNote}</em>}
                   </div>
                   <div className="home-lunch-timer">
                     <strong>{formatTimer(lunchSeconds)}</strong>
@@ -1394,7 +1439,7 @@ function EmployeeDashboard() {
                 </div>
               </div>
               {!isWindowsComputer() && (
-                <p>Check in and check out work only on a Windows computer. Signing out of the website does not check you out.</p>
+                <p>Check in and check out work on a Windows or Mac computer. A phone cannot punch. Signing out of the website does not check you out.</p>
               )}
               {punchNote && <p>{punchNote}</p>}
               {notices.length > 0 && (
