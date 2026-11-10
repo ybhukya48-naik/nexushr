@@ -393,7 +393,10 @@ export function HoursTotals({ records, now }: { records: AttendanceRecord[]; now
   const today = `${month}-${String(now.getDate()).padStart(2, "0")}`;
   const todayRow = records.find((row) => String(row.attendanceDate ?? "").slice(0, 10) === today);
   const monthMinutes = records
-    .filter((row) => String(row.attendanceDate ?? "").startsWith(month))
+    .filter((row) => {
+      const date = String(row.attendanceDate ?? "").slice(0, 10);
+      return date >= `${month}-01` && date <= today;
+    })
     .reduce((sum, row) => sum + clockedWorkMinutes(row, now), 0);
   const historyMinutes = records.reduce((sum, row) => sum + clockedWorkMinutes(row, now), 0);
   const asHours = (minutes: number) => `${Math.floor(minutes / 60)}h ${minutes % 60}m`;

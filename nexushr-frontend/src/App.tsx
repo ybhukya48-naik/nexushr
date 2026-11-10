@@ -1411,7 +1411,10 @@ function EmployeeDashboard() {
         const todayRecord = records.find((row) => String(row.attendanceDate ?? "").slice(0, 10) === today);
         const pairs = punchPairs(audit, today, todayRecord);
         const month = today.slice(0, 7);
-        const monthRows = records.filter((row) => String(row.attendanceDate ?? "").startsWith(month));
+        const monthRows = records.filter((row) => {
+          const date = String(row.attendanceDate ?? "").slice(0, 10);
+          return date >= `${month}-01` && date <= today;
+        });
         const todayMinutes = clockedWorkMinutes(todayRecord, clockNow);
         const todayComplete = dayIsComplete(todayRecord, clockNow);
         const doneMinutes = monthRows
@@ -1592,7 +1595,7 @@ function EmployeeDashboard() {
                 <article>
                   <span>Month working hours</span>
                   <strong>{hoursLabel(monthMinutes)}</strong>
-                  <em>Used for this month's salary. Finished days {hoursLabel(doneMinutes)}.</em>
+                  <em>1st through today. Salary uses the finished days, {hoursLabel(doneMinutes)}.</em>
                 </article>
                 <article>
                   <span>History total working hours</span>
