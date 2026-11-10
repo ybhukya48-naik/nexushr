@@ -678,14 +678,15 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
       }
 
       clearWorkspaceCompany();
-      navigate("/", { replace: true });
-      if (response.role === "EMPLOYEE") {
-        void getCurrentEmployee()
-          .then((me) => setWorkspaceCompany(asWorkspaceCompany(me.companyCode)))
-          .catch(() => {
-            // The employee can still open a workspace if this lookup is slow.
-          });
+      try {
+        const me = await getCurrentEmployee();
+        if (me?.companyCode) {
+          setWorkspaceCompany(asWorkspaceCompany(me.companyCode));
+        }
+      } catch {
+        // The company choice stays available if this lookup is slow.
       }
+      navigate("/", { replace: true });
     } catch (err) {
       console.error(err);
 
@@ -730,7 +731,9 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
               <h2>{kind === "employee" ? "Employee sign in" : kind === "manager" ? "Manager sign in" : "HR sign in"}</h2>
 
               <p>
-                {employee
+                {kind === "hr"
+                  ? "Sign in here first. The HR dashboard opens next, and then you can add an employee."
+                  : employee
                   ? "Sign in with your email and password. After that you set a password, create your profile, and then the dashboard opens."
                   : "Sign in with your email and password."}
               </p>
@@ -776,7 +779,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                     type="text"
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
-                    placeholder={employee ? "example@cyond.com" : "Email"}
+                    placeholder={kind === "hr" ? "ybhukya@gmail.com" : employee ? "example@cyond.com" : "Email"}
                     autoComplete="username"
                     required
                   />
@@ -796,6 +799,12 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                   />
                 </div>
               </label>
+
+              {kind === "hr" && (
+                <p className="login-notice">
+                  HR email: ybhukya@gmail.com. Use HR login, not Employee login. The dashboard opens after you sign in.
+                </p>
+              )}
 
               {employee && (
                 <p className="login-notice">
