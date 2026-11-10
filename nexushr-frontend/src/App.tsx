@@ -1325,7 +1325,7 @@ function EmployeeDashboard() {
     setPunching(true);
     setPunchNote("");
     try {
-      await (kind === "out" ? checkOut(signedInEmployee.id) : checkIn(signedInEmployee.id));
+      await (kind === "out" ? checkOut() : checkIn());
       const history = await getEmployeeAttendance(signedInEmployee.id);
       const savedHistory = [...history].sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
       setRecords(savedHistory);
@@ -1369,7 +1369,7 @@ function EmployeeDashboard() {
     setPunching(true);
     setPunchNote("");
     try {
-      await (kind === "out" ? checkOut(signedInEmployee.id) : checkIn(signedInEmployee.id));
+      await (kind === "out" ? checkOut() : checkIn());
       const history = await getEmployeeAttendance(signedInEmployee.id);
       const savedHistory = [...history].sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
       setRecords(savedHistory);

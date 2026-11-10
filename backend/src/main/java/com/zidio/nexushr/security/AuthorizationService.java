@@ -215,10 +215,11 @@ public class AuthorizationService {
 
         String username = authentication.getName();
 
-        return employeeRepository.findByEmail(username)
+        String login = username.trim();
+        return employeeRepository.findByEmailIgnoreCase(login)
                 .orElseGet(() ->
                         employeeRepository
-                                .findByEmployeeCode(username)
+                                .findByEmployeeCodeIgnoreCase(login)
                                 .orElse(null));
     }
 }

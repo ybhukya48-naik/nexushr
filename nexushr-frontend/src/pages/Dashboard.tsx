@@ -196,10 +196,13 @@ export default function Dashboard() {
         }
         setSummary(dashboard);
         setMe(current);
-        setPeople(asList<EmployeeResponse>(employees).filter((employee) =>
-          isCompanyMatch(employee.companyCode, company) && isListedEmployee(employee.roleType)));
+        const listedPeople = asList<EmployeeResponse>(employees).filter((employee) =>
+          isCompanyMatch(employee.companyCode, company) && isListedEmployee(employee.roleType));
+        const listedIds = new Set(listedPeople.map((employee) => employee.id));
+        setPeople(listedPeople);
         setTodayRows(asList<AttendanceRecord>(attendance).filter((row) =>
-          isCompanyMatch(row.employee?.companyCode, company) && isListedEmployee(row.employee?.roleType)));
+          isListedEmployee(row.employee?.roleType)
+          && (isCompanyMatch(row.employee?.companyCode, company) || listedIds.has(row.employee?.id ?? -1))));
         setLeaves(asList<LeaveRequest>(leaveRows).filter((leave) => isCompanyMatch(leave.employee?.companyCode, company)));
         setHolidays(upcomingHolidays(asList<CompanyHoliday>(extraHolidays), company));
         const slips = asList<PayrollRecord>(payroll)

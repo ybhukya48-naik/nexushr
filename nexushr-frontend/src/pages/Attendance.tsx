@@ -217,7 +217,7 @@ async function attendanceRequest<T>(
       message = "Your session has expired. Please log in again.";
     }
 
-    if (response.status === 403) {
+    if (response.status === 403 && message.startsWith("Attendance API failed:")) {
       message = "You do not have permission to perform this action.";
     }
 
@@ -999,7 +999,7 @@ export default function Attendance() {
               void runAction(
                 () => siteVisitor
                   ? siteCheckIn(selfie as File)
-                  : checkIn(actionEmployee?.id),
+                  : checkIn(),
                 "Check-in completed successfully.",
               )
             }
@@ -1037,7 +1037,7 @@ export default function Attendance() {
               void runAction(
                 () => siteVisitor
                   ? siteCheckOut(selfie as File)
-                  : checkOut(actionEmployee?.id),
+                  : checkOut(),
                 "Check-out completed successfully.",
 
               )
@@ -1078,7 +1078,7 @@ export default function Attendance() {
               void runAction(
                 () => siteVisitor && canPunch
                   ? siteCheckOut(selfie as File)
-                  : checkOut(actionEmployee?.id),
+                  : checkOut(),
                 "Lunch started. Working hours are paused.",
               )
             }
@@ -1110,7 +1110,7 @@ export default function Attendance() {
               void runAction(
                 () => siteVisitor && canPunch
                   ? siteCheckIn(selfie as File)
-                  : checkIn(actionEmployee?.id),
+                  : checkIn(),
                 "Lunch ended. Working hours continue.",
               )
             }

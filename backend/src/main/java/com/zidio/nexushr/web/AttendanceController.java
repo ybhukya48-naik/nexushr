@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -36,65 +37,53 @@ public class AttendanceController {
     }
 
     @PostMapping("/check-in")
-    @PreAuthorize("#employeeId == null || @authorizationService.isEmployeeSelfOrManagement(#employeeId, authentication)")
+    @PreAuthorize("isAuthenticated()")
     public AttendanceRecord checkIn(
             @RequestParam(required = false) Long employeeId,
             Authentication authentication,
             HttpServletRequest request) {
 
         requireWindowsComputer(request);
-        Long targetEmployeeId = employeeId != null
-                ? employeeId
-                : attendanceService.findEmployeeIdByUsername(authentication.getName());
-
-        Long actorId = attendanceService.findEmployeeIdIfPresent(authentication.getName());
+        Long actorId = attendanceService.findEmployeeIdByUsername(authentication.getName());
+        Long targetEmployeeId = punchTarget(employeeId, actorId, authentication);
         return attendanceService.checkIn(targetEmployeeId, actorId, false);
     }
 
     @PostMapping("/check-out")
-    @PreAuthorize("#employeeId == null || @authorizationService.isEmployeeSelfOrManagement(#employeeId, authentication)")
+    @PreAuthorize("isAuthenticated()")
     public AttendanceRecord checkOut(
             @RequestParam(required = false) Long employeeId,
             Authentication authentication,
             HttpServletRequest request) {
 
         requireWindowsComputer(request);
-        Long targetEmployeeId = employeeId != null
-                ? employeeId
-                : attendanceService.findEmployeeIdByUsername(authentication.getName());
-
-        Long actorId = attendanceService.findEmployeeIdIfPresent(authentication.getName());
+        Long actorId = attendanceService.findEmployeeIdByUsername(authentication.getName());
+        Long targetEmployeeId = punchTarget(employeeId, actorId, authentication);
         return attendanceService.checkOut(targetEmployeeId, actorId);
     }
 
     @PostMapping("/biometric/check-in")
-    @PreAuthorize("#employeeId == null || @authorizationService.isEmployeeSelfOrManagement(#employeeId, authentication)")
+    @PreAuthorize("isAuthenticated()")
     public AttendanceRecord biometricCheckIn(
             @RequestParam(required = false) Long employeeId,
             Authentication authentication,
             HttpServletRequest request) {
 
         requireWindowsComputer(request);
-        Long targetEmployeeId = employeeId != null
-                ? employeeId
-                : attendanceService.findEmployeeIdByUsername(authentication.getName());
-
-        return attendanceService.biometricCheckIn(targetEmployeeId);
+        Long selfId = attendanceService.findEmployeeIdByUsername(authentication.getName());
+        return attendanceService.biometricCheckIn(punchTarget(employeeId, selfId, authentication));
     }
 
     @PostMapping("/biometric/check-out")
-    @PreAuthorize("#employeeId == null || @authorizationService.isEmployeeSelfOrManagement(#employeeId, authentication)")
+    @PreAuthorize("isAuthenticated()")
     public AttendanceRecord biometricCheckOut(
             @RequestParam(required = false) Long employeeId,
             Authentication authentication,
             HttpServletRequest request) {
 
         requireWindowsComputer(request);
-        Long targetEmployeeId = employeeId != null
-                ? employeeId
-                : attendanceService.findEmployeeIdByUsername(authentication.getName());
-
-        return attendanceService.biometricCheckOut(targetEmployeeId);
+        Long selfId = attendanceService.findEmployeeIdByUsername(authentication.getName());
+        return attendanceService.biometricCheckOut(punchTarget(employeeId, selfId, authentication));
     }
 
     @PostMapping(value = "/site-check-in", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -236,6 +225,29 @@ public class AttendanceController {
             @PathVariable Long employeeId) {
 
         return attendanceService.listByEmployee(employeeId);
+    }
+
+    private Long punchTarget(Long requestedId, Long selfId, Authentication authentication) {
+        if (!isManagement(authentication)) {
+            return selfId;
+        }
+        return requestedId != null ? requestedId : selfId;
+    }
+
+    private boolean isManagement(Authentication authentication) {
+        if (authentication == null || authentication.getAuthorities() == null) {
+            return false;
+        }
+        for (GrantedAuthority authority : authentication.getAuthorities()) {
+            String role = authority.getAuthority();
+            if ("ROLE_HR".equals(role)
+                    || "ROLE_ADMIN".equals(role)
+                    || "ROLE_MANAGER".equals(role)
+                    || "ROLE_SUPER_ADMIN".equals(role)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void requireWindowsComputer(HttpServletRequest request) {

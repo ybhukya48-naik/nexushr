@@ -1355,10 +1355,10 @@ public class AttendanceService {
         }
 
         Employee employee = employeeRepository
-                .findByEmail(username)
+                .findByEmailIgnoreCase(username.trim())
                 .orElseGet(() ->
                         employeeRepository
-                                .findByEmployeeCode(username)
+                                .findByEmployeeCodeIgnoreCase(username.trim())
                                 .orElseThrow(() ->
                                         new ResponseStatusException(
                                                 HttpStatus.NOT_FOUND,
@@ -1374,8 +1374,8 @@ public class AttendanceService {
         if (username == null || username.isBlank()) {
             return null;
         }
-        return employeeRepository.findByEmail(username)
-                .or(() -> employeeRepository.findByEmployeeCode(username))
+        return employeeRepository.findByEmailIgnoreCase(username.trim())
+                .or(() -> employeeRepository.findByEmployeeCodeIgnoreCase(username.trim()))
                 .map(Employee::getId)
                 .orElse(null);
     }
