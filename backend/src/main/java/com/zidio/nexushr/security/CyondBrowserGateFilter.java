@@ -25,7 +25,10 @@ public class CyondBrowserGateFilter extends OncePerRequestFilter {
     static final Set<String> ALLOWED_ORIGINS = Set.of(
             "https://hr.cyond.com",
             "https://cyond.com",
-            "https://www.cyond.com"
+            "https://www.cyond.com",
+            "https://hr.gorle.com",
+            "https://gorle.com",
+            "https://www.gorle.com"
     );
 
     private final boolean browserGate;

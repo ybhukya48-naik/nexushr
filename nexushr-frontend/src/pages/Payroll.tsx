@@ -569,103 +569,51 @@ export default function Payroll() {
               </div>
             )}
 
-            <label>
-              CTC
-              <input
-                min="0"
-                type="number"
-                step="0.01"
-                value={ctc}
-                onChange={(event) => setCtc(event.target.value)}
-                placeholder="Yearly amount"
-              />
-            </label>
-            <p>
-              {(() => {
-                const yearly = Number(ctc);
-                if (!ctc.trim() || !Number.isFinite(yearly) || yearly <= 0) {
-                  return "Enter the yearly CTC. One month is divided into basic 61%, HRA 30%, conveyance 3.6%, medical 2.8% and other allowance 2.6%.";
-                }
-                const month = yearly / 12;
-                const part = (rate: number) => money(month * rate);
-                return `One month ${money(month)}. Basic ${part(0.61)}, HRA ${part(0.3)}, conveyance ${part(0.036)}, medical ${part(0.028)}, other allowance ${part(0.026)}. Actual hours then reduce this month.`;
-              })()}
-            </p>
-
-            <label>
-              Incentives
-              <input
-                min="0"
-                type="number"
-                step="0.01"
-                value={bonus}
-                onChange={(event) => setBonus(event.target.value)}
-                placeholder="Extra, not part of the CTC"
-              />
-            </label>
-
-            <label>
-              PF
-              <input
-                min="0"
-                type="number"
-                step="0.01"
-                value={pf}
-                onChange={(event) => setPf(event.target.value)}
-                placeholder="0"
-              />
-            </label>
-
-            <label>
-              Insurance
-              <input
-                min="0"
-                type="number"
-                step="0.01"
-                value={insurance}
-                onChange={(event) => setInsurance(event.target.value)}
-                placeholder="0"
-              />
-            </label>
-
-            <label>
-              Professional tax
-              <input
-                min="0"
-                type="number"
-                step="0.01"
-                value={professionalTax}
-                onChange={(event) => setProfessionalTax(event.target.value)}
-                placeholder="0"
-              />
-            </label>
-
-            <label>
-              TDS
-              <input
-                min="0"
-                type="number"
-                step="0.01"
-                value={tds}
-                onChange={(event) => setTds(event.target.value)}
-                placeholder="0"
-              />
-            </label>
-
-            <label>
-              Other Deductions
-              <input
-                min="0"
-                type="number"
-                step="0.01"
-                value={otherDeductions}
-                onChange={(event) =>
-                  setOtherDeductions(event.target.value)
-                }
-                placeholder="0"
-              />
-            </label>
           </div>
+          {(() => {
+            const yearly = Number(ctc);
+            const monthAmount = ctc.trim() && Number.isFinite(yearly) && yearly > 0 ? yearly / 12 : 0;
+            const incentiveAmount = Number(bonus) || 0;
+            const deductionAmount = (Number(pf) || 0) + (Number(insurance) || 0) + (Number(professionalTax) || 0) + (Number(tds) || 0) + (Number(otherDeductions) || 0);
+            const shown = (amount: number) => (monthAmount > 0 || amount > 0 ? money(amount) : "₹0.00");
+            return (
+              <div className="pay-columns">
+                <section>
+                  <h3>Gross</h3>
+                  <label>
+                    CTC
+                    <input min="0" type="number" step="0.01" value={ctc} onChange={(event) => setCtc(event.target.value)} placeholder="Yearly amount" />
+                  </label>
+                  <label>
+                    One month
+                    <input readOnly value={shown(monthAmount)} />
+                  </label>
+                </section>
+                <section>
+                  <h3>Earnings</h3>
+                  <label>Basic<input readOnly value={shown(monthAmount * 0.61)} /></label>
+                  <label>HRA<input readOnly value={shown(monthAmount * 0.3)} /></label>
+                  <label>Conveyance<input readOnly value={shown(monthAmount * 0.036)} /></label>
+                  <label>Medical<input readOnly value={shown(monthAmount * 0.028)} /></label>
+                  <label>Other allowance<input readOnly value={shown(monthAmount * 0.026)} /></label>
+                  <label>
+                    Incentives
+                    <input min="0" type="number" step="0.01" value={bonus} onChange={(event) => setBonus(event.target.value)} placeholder="Extra, not part of the CTC" />
+                  </label>
+                  <label>Total earnings<input readOnly value={shown(monthAmount + incentiveAmount)} /></label>
+                </section>
+                <section>
+                  <h3>Deductions</h3>
+                  <label>PF<input min="0" type="number" step="0.01" value={pf} onChange={(event) => setPf(event.target.value)} placeholder="0" /></label>
+                  <label>Insurance<input min="0" type="number" step="0.01" value={insurance} onChange={(event) => setInsurance(event.target.value)} placeholder="0" /></label>
+                  <label>Professional tax<input min="0" type="number" step="0.01" value={professionalTax} onChange={(event) => setProfessionalTax(event.target.value)} placeholder="0" /></label>
+                  <label>TDS<input min="0" type="number" step="0.01" value={tds} onChange={(event) => setTds(event.target.value)} placeholder="0" /></label>
+                  <label>Other deduction<input min="0" type="number" step="0.01" value={otherDeductions} onChange={(event) => setOtherDeductions(event.target.value)} placeholder="0" /></label>
+                  <label>Total deductions<input readOnly value={money(deductionAmount)} /></label>
+                </section>
+              </div>
+            );
+          })()}
 
           <button
             type="submit"

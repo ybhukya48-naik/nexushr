@@ -4,6 +4,9 @@ function resolveApiBase() {
     host === "hr.cyond.com"
     || host === "cyond.com"
     || host === "www.cyond.com"
+    || host === "hr.gorle.com"
+    || host === "gorle.com"
+    || host === "www.gorle.com"
     || host === "localhost"
     || host === "127.0.0.1"
   ) {

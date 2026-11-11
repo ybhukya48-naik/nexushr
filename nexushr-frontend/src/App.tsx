@@ -205,6 +205,10 @@ function AppRoutes() {
   }, [me, role]);
 
   useEffect(() => {
+    if (window.location.hostname === "hr.gorle.com") {
+      setWorkspaceCompany("GORLE");
+      setWorkspace("GORLE");
+    }
     const sync = () => setWorkspace(getWorkspaceCompany());
     window.addEventListener("nexushr-company", sync);
     return () => window.removeEventListener("nexushr-company", sync);
