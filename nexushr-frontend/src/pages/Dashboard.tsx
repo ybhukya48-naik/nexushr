@@ -370,7 +370,21 @@ export default function Dashboard() {
   const offboardingCount = people.filter((person) => person.lifecycleStatus === "OFFBOARDING").length;
   const offboardedCount = people.filter((person) => person.lifecycleStatus === "OFFBOARDED").length;
   const waiting = [...pending].sort((a, b) => String(a.startDate ?? "").localeCompare(String(b.startDate ?? "")));
-  const dutyWaiting = waiting.filter((leave) => DUTY_CHOICES.some((choice) => choice.type === leave.leaveType));
+  const dutyToday = leaves.filter((leave) =>
+    DUTY_CHOICES.some((choice) => choice.type === leave.leaveType)
+    && leave.status !== "REJECTED"
+    && String(leave.startDate ?? "").slice(0, 10) <= today
+    && String(leave.endDate ?? leave.startDate ?? "").slice(0, 10) >= today,
+  );
+  function attendanceTime(employeeId?: number) {
+    const row = todayRows.find((item) => item.employee?.id === employeeId && item.checkInTime);
+    if (!row?.checkInTime) {
+      return "No check-in yet";
+    }
+    const minutes = clockedWorkMinutes(row, clockNow);
+    const checkOut = shownCheckOut(row);
+    return `Check in ${clock(row.checkInTime)} · ${checkOut ? `Check out ${clock(checkOut)}` : "Still in"} · ${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  }
   const idleWarnings = todayRows.filter((row) => row.yellowFlag).length;
   const maxPresent = Math.max(1, ...week.map((day) => day.present));
   const now = new Date();
@@ -559,26 +573,32 @@ export default function Dashboard() {
                 }}
               >
                 <strong>{choice.label}</strong>
-                <em>{dutyBusy === choice.type ? "Sending..." : status}</em>
+                <em>{dutyBusy === choice.type ? "Sending..." : sent ? `${status} · ${attendanceTime(me?.id)}` : status}</em>
               </button>
             );
           })}
         </div>
         {dutyNote && <p>{dutyNote}</p>}
-        <h3>Waiting for approval</h3>
-        {dutyWaiting.length === 0 ? (
-          <p className="hr-empty">No work from home or site visit is waiting.</p>
+        <h3>Today</h3>
+        {dutyToday.length === 0 ? (
+          <p className="hr-empty">Nobody is on work from home or a site visit today.</p>
         ) : (
           <ul className="hr-approvals">
-            {dutyWaiting.map((leave) => (
+            {dutyToday.map((leave) => (
               <li key={leave.id}>
-                <span>{dutyName(leave.leaveType)} · {leave.employee?.fullName || "Employee"} · {displayDate(leave.startDate)}</span>
-                <button type="button" onClick={() => void updateLeaveStatus(leave.id!, "APPROVED").then(() => setRefreshTick((value) => value + 1))}>Approve</button>
-                <button type="button" onClick={() => {
-                  if (window.confirm("Reject this request?")) {
-                    void updateLeaveStatus(leave.id!, "REJECTED").then(() => setRefreshTick((value) => value + 1));
-                  }
-                }}>Reject</button>
+                <span>
+                  {dutyName(leave.leaveType)} · {leave.employee?.fullName || "Employee"} · {leave.status === "APPROVED" ? "Approved" : "Waiting for HR"} · {attendanceTime(leave.employee?.id)}
+                </span>
+                {leave.status === "PENDING" && (
+                  <>
+                    <button type="button" onClick={() => void updateLeaveStatus(leave.id!, "APPROVED").then(() => setRefreshTick((value) => value + 1))}>Approve</button>
+                    <button type="button" onClick={() => {
+                      if (window.confirm("Reject this request?")) {
+                        void updateLeaveStatus(leave.id!, "REJECTED").then(() => setRefreshTick((value) => value + 1));
+                      }
+                    }}>Reject</button>
+                  </>
+                )}
               </li>
             ))}
           </ul>
@@ -849,7 +869,13 @@ export default function Dashboard() {
                       <button type="button" className="panel-link" onClick={() => openEmployeeMonth(person.id)}>
                         {person.fullName}
                       </button>
-                      <span>{person.email}{person.designation ? ` · ${person.designation}` : ""}</span>
+                      <span>
+                        {person.email}{person.designation ? ` · ${person.designation}` : ""}
+                        {person.siteVisitor ? " · Site" : ""}
+                        {dutyToday.some((leave) => leave.employee?.id === person.id)
+                          ? ` · ${dutyToday.filter((leave) => leave.employee?.id === person.id).map((leave) => dutyName(leave.leaveType)).join(", ")}`
+                          : ""}
+                      </span>
                     </td>
                     <td>{row?.checkInTime ? clock(row.checkInTime) : "—"}</td>
                     <td>{checkOut ? clock(checkOut) : row?.checkInTime ? "Still in" : "—"}</td>

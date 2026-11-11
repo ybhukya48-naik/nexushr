@@ -1571,7 +1571,14 @@ function EmployeeDashboard() {
                     && String(leave.startDate).slice(0, 10) === today
                     && leave.status !== "REJECTED",
                   );
-                  const status = sent?.status === "APPROVED" ? "Approved" : sent ? "Waiting for HR" : "Ask HR";
+                  const timeLine = !todayRecord?.checkInTime
+                    ? "No check-in yet"
+                    : `Check in ${formatClock(todayRecord.checkInTime)} · ${todayRecord.checkOutTime ? `Check out ${formatClock(todayRecord.checkOutTime)}` : "Still in"} · ${hoursLabel(todayMinutes)}`;
+                  const status = sent?.status === "APPROVED"
+                    ? `Approved · ${timeLine}`
+                    : sent
+                    ? `Waiting for HR · ${timeLine}`
+                    : "Ask HR";
                   return (
                     <button
                       key={choice.type}
