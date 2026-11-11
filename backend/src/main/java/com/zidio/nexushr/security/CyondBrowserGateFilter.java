@@ -28,7 +28,10 @@ public class CyondBrowserGateFilter extends OncePerRequestFilter {
             "https://www.cyond.com",
             "https://hr.gorle.com",
             "https://gorle.com",
-            "https://www.gorle.com"
+            "https://www.gorle.com",
+            "https://hr.gorlegroup.com",
+            "https://gorlegroup.com",
+            "https://www.gorlegroup.com"
     );
 
     private final boolean browserGate;

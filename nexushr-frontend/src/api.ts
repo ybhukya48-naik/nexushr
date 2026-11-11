@@ -7,6 +7,9 @@ function resolveApiBase() {
     || host === "hr.gorle.com"
     || host === "gorle.com"
     || host === "www.gorle.com"
+    || host === "hr.gorlegroup.com"
+    || host === "gorlegroup.com"
+    || host === "www.gorlegroup.com"
     || host === "localhost"
     || host === "127.0.0.1"
   ) {

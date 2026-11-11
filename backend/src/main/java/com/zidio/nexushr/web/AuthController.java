@@ -477,7 +477,7 @@ public class AuthController {
     }
 
     private static String signInLink(RoleType role, boolean gorle) {
-        String host = gorle ? "https://hr.gorle.com" : "https://hr.cyond.com";
+        String host = gorle ? "https://hr.gorlegroup.com" : "https://hr.cyond.com";
         if (role == RoleType.HR || role == RoleType.ADMIN || role == RoleType.SUPER_ADMIN) {
             return host + "/login";
         }

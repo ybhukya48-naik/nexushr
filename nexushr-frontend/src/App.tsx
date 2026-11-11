@@ -205,7 +205,7 @@ function AppRoutes() {
   }, [me, role]);
 
   useEffect(() => {
-    if (window.location.hostname === "hr.gorle.com") {
+    if (window.location.hostname === "hr.gorle.com" || window.location.hostname === "hr.gorlegroup.com") {
       setWorkspaceCompany("GORLE");
       setWorkspace("GORLE");
     }
