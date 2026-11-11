@@ -728,6 +728,7 @@ export default function Notifications() {
             {visibleNotifications.map((notification) => (
               <article
                 key={notification.id}
+                className="notification-card"
                 style={{
                   display: "grid",
                   gridTemplateColumns: "46px minmax(0, 1fr) auto",

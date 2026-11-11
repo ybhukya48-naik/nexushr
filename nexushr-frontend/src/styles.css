@@ -192,12 +192,43 @@ button,
 }
 
 .notification-row-actions .quiet-button {
-  min-height: 36px;
-  padding: 0 12px;
+  min-height: 32px;
+  padding: 0 10px;
   border: 1px solid #fecdca;
   border-radius: 8px;
   background: #fff;
   color: #b42318;
+  font-size: 12px;
+}
+
+.notification-card strong {
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.notification-card p {
+  margin: 4px 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #475467;
+}
+
+.notification-card small {
+  font-size: 11px;
+  line-height: 1.35;
+  color: #667085;
+}
+
+.notification-card .badge {
+  font-size: 10px;
+}
+
+.notification-card .primary-button,
+.notification-card .quiet-button {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
 }
 
 .user-area span {
@@ -7963,9 +7994,9 @@ textarea {
 }
 
 .sidebar .nav-link {
-  min-height: 44px;
-  padding: 10px 12px;
-  font-size: 15px;
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 13px;
   line-height: 1.3;
   align-items: center;
 }
@@ -7987,7 +8018,7 @@ textarea {
 .app-shell .panel-header h2,
 .app-shell .employees-header h2 {
   margin: 0;
-  font-size: 26px;
+  font-size: 22px;
   line-height: 1.25;
   letter-spacing: 0;
   color: #101828;
@@ -7996,7 +8027,7 @@ textarea {
 .app-shell .page-heading p,
 .app-shell .panel-header p,
 .app-shell .content p {
-  font-size: 15px;
+  font-size: 13px;
   line-height: 1.45;
 }
 
@@ -8004,7 +8035,7 @@ textarea {
 .app-shell .content label {
   align-items: stretch;
   text-align: left;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.35;
   color: #344054;
 }
@@ -8013,7 +8044,7 @@ textarea {
 .app-shell .content select,
 .app-shell .content textarea,
 .app-shell .content button {
-  font-size: 15px;
+  font-size: 13px;
   line-height: 1.35;
 }
 
@@ -8024,10 +8055,41 @@ textarea {
 }
 
 .app-shell .employees-table td {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.4;
   text-align: left;
   vertical-align: middle;
+}
+
+.app-shell .content .notification-card strong {
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.app-shell .content .notification-card p {
+  margin: 3px 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #475467;
+}
+
+.app-shell .content .notification-card small,
+.app-shell .content .notification-card .badge {
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.app-shell .content .notification-card .primary-button,
+.app-shell .content .notification-card .quiet-button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.app-shell .panel-header h3 {
+  font-size: 16px;
+  line-height: 1.3;
 }
 
 .site-card,
