@@ -7676,12 +7676,22 @@ textarea {
   color: #667085;
 }
 
-/* Keep every word inside its box. Letters stay upright and are not cut off. */
+/* Solid upright letters. No line through the words. */
 .app-shell :is(h1, h2, h3, h4, p, label, button, td, th, a, strong, span, li, input, select),
-.login-page :is(h1, h2, h3, p, label, button, span, strong, input) {
+.login-page,
+.login-page :is(h1, h2, h3, p, label, button, span, strong, input, div) {
   letter-spacing: 0;
   font-style: normal;
-  text-decoration-thickness: auto;
+  text-shadow: none;
+  -webkit-text-stroke: 0;
+  text-decoration-line: none;
+}
+
+.main-area .employee-profile-link,
+.main-area .panel-link,
+.attendance-employee-cell .panel-link {
+  text-decoration-line: underline;
+  text-underline-offset: 3px;
 }
 
 .login-page {
@@ -7740,4 +7750,93 @@ textarea {
   white-space: normal;
   line-height: 1.45;
   color: #1d2939;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.login-page {
+  min-height: 100vh;
+  padding: 16px 0 28px;
+}
+
+.login-card {
+  padding: 22px 22px 16px;
+}
+
+.login-card-header,
+.login-card-brand {
+  margin-bottom: 12px;
+}
+
+.login-card,
+.login-card :is(p, label, span, strong, button, input) {
+  color: #101828;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.login-card h2 {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #101828;
+}
+
+.login-card input,
+.login-input-wrap input {
+  font-size: 16px;
+  font-weight: 500;
+  color: #101828;
+}
+
+.login-submit,
+.login-submit span {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.login-door.active {
+  color: #6941c6;
+}
+
+.login-page .login-card-header p,
+.login-page .login-card-header > p:last-child,
+.login-page .login-card > p:not(.eyebrow),
+.login-page .login-fields label > span,
+.login-page .login-card label,
+.login-page .login-card label span {
+  color: #101828;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.login-card-brand img,
+.login-brand-logos img,
+.login-brand-logos .brand-logo-large {
+  max-height: 52px;
+}
+
+.login-card input,
+.login-input-wrap input {
+  min-height: 42px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.login-fields label {
+  margin-bottom: 10px;
+  gap: 4px;
+}
+
+.login-notice {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+}
+
+.login-submit {
+  min-height: 44px;
 }
