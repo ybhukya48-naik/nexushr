@@ -929,10 +929,10 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
             <div className="login-card-brand">
               <div className="login-brand-logos">
                 <div className="login-logo-slot">
-                  <img className="login-logo-cyond" src="/images/cyond-logo.jpeg" alt="cyond" />
+                  <img className="login-logo-cyond" src="/images/cyond-logo.png" alt="cyond" />
                 </div>
                 <div className="login-logo-slot">
-                  <img className="login-logo-gorle" src="/images/gorle-group-emblem.jpg" alt="Gorle Group" />
+                  <img className="login-logo-gorle" src="/images/gorle-group-emblem.png" alt="Gorle Group" />
                 </div>
               </div>
             </div>
