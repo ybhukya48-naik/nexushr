@@ -373,10 +373,12 @@ public class EmployeeService {
 
     public Employee findAccountForPasswordHelp(String email) {
         if (email == null || email.isBlank()) {
-            throw new IllegalArgumentException("Enter your email");
+            throw new IllegalArgumentException("Enter the CYOND email or the Gorle employee code");
         }
-        Employee employee = employeeRepository.findByEmailIgnoreCase(email.trim())
-                .orElseThrow(() -> new IllegalArgumentException("No account uses this email"));
+        String typed = email.trim();
+        Employee employee = employeeRepository.findByEmailIgnoreCase(typed)
+                .or(() -> employeeRepository.findByEmployeeCodeIgnoreCase(typed))
+                .orElseThrow(() -> new IllegalArgumentException("No account uses that email or employee code"));
         if (!employee.isActive()
                 || employee.getLifecycleStatus() == EmployeeLifecycleStatus.OFFBOARDED
                 || employee.getLifecycleStatus() == EmployeeLifecycleStatus.OFFBOARDING) {

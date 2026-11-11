@@ -179,7 +179,8 @@ class AuthControllerTest {
                         "EMPLOYEE",
                         true,
                         "ACTIVE",
-                        "Staff Name"
+                        "Staff Name",
+                        "GORLE"
                 }));
         when(jwtTokenService.generate(anyString(), anyMap()))
                 .thenReturn("employee-token");

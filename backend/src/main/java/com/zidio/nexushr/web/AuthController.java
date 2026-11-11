@@ -334,6 +334,10 @@ public class AuthController {
                 if (name == null || name.isBlank()) {
                     name = email;
                 }
+                String identifierError = signInIdentifierError(text(row, 7), text(row, 2), normalizedUsername);
+                if (identifierError != null) {
+                    return ResponseEntity.status(401).body(Map.of("message", identifierError));
+                }
 
                 String token = jwtTokenService.generate(email, Map.of("role", role));
                 Employee signedIn = employeeRepository.findByEmailIgnoreCase(email).orElse(null);
@@ -343,10 +347,10 @@ public class AuthController {
             }
 
             String message = rows.isEmpty()
-                    ? "That email is not saved yet. Ask HR to add this account, then sign in here."
+                    ? "That account is not saved yet. CYOND signs in with the email. Gorle Group signs in with the employee code."
                     : sawInactive
                     ? "This employee account is not active."
-                    : "Password does not match. Sign in with the email and password you saved.";
+                    : "Password does not match. CYOND uses the email. Gorle Group uses the employee code.";
             return ResponseEntity.status(401).body(Map.of("message", message));
         } catch (Exception ex) {
             log.error("LOGIN_FAILED", ex);
@@ -355,6 +359,16 @@ public class AuthController {
                     "Sign-in could not check this account. Use the employee email and the new password."
             ));
         }
+    }
+
+    static String signInIdentifierError(String companyCode, String employeeCode, String typed) {
+        String value = typed == null ? "" : typed.trim();
+        boolean email = value.contains("@");
+        boolean code = employeeCode != null && employeeCode.equalsIgnoreCase(value);
+        if ("GORLE".equalsIgnoreCase(companyCode)) {
+            return code ? null : "Gorle Group signs in with the employee code, not the email.";
+        }
+        return email ? null : "CYOND signs in with the email, not the employee code.";
     }
 
     private boolean passwordMatches(String rawPassword, String storedHash) {
@@ -419,15 +433,17 @@ public class AuthController {
             String email = request == null ? "" : request.email();
             Employee employee = employeeService.findAccountForPasswordHelp(email);
             String temporary = employeeService.newSignInPassword();
+            boolean gorle = employee.getCompany() != null
+                    && "GORLE".equalsIgnoreCase(employee.getCompany().getCode());
             String body = """
                     Your NexusHR password was reset.
 
-                    Sign in with this email and the password below. The site will then ask you to set a new password.
+                    Sign in with %s and the password below. The site will then ask you to set a new password.
 
                     Password: %s
 
                     Sign in: %s
-                    """.formatted(temporary, signInLink(employee.getRoleType()));
+                    """.formatted(gorle ? "your employee code" : "your email", temporary, signInLink(employee.getRoleType()));
             try {
                 String sent = resendEmailService.sendTextEmail(
                         employee.getEmail(),

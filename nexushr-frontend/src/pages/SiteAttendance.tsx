@@ -139,10 +139,11 @@ export default function SiteAttendance() {
         {!signedIn && (
           <form onSubmit={(event) => void handleLogin(event)}>
             <label>
-              Employee code or email
+              CYOND email or Gorle employee code
               <input
                 type="text"
                 autoComplete="username"
+                placeholder="name@cyond.com or Gorle code"
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
               />

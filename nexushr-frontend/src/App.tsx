@@ -933,14 +933,12 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
 
               <p>
                 {passwordHelp === "change"
-                  ? "Enter the password you use now, then choose a new one."
+                  ? "CYOND uses the email. Gorle Group uses the employee code. Enter the password you use now, then choose a new one."
                   : passwordHelp === "forgot"
-                  ? "Enter the email on your account. A sign-in password will be sent there."
+                  ? "CYOND enters the email. Gorle Group enters the employee code. The new password is sent to the account email."
                   : creating
-                  ? "Use your own email and password. HR does not add this profile."
-                  : kind === "hr" || kind === "manager"
-                  ? "Sign in with your own email and password. Create your profile next, then the dashboard opens."
-                  : "Sign in with your own email and password. The first time, create your profile here."}
+                  ? "Use your own email and password. CYOND signs in with that email. Gorle Group signs in with the employee code."
+                  : "CYOND signs in with the email. Gorle Group signs in with the employee code."}
               </p>
 
             </div>
@@ -987,13 +985,13 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
               )}
 
               <label>
-                <span>Email</span>
+                <span>{passwordHelp === "forgot" ? "CYOND email or Gorle employee code" : "Email or employee code"}</span>
                 <div className="login-input-wrap">
                   <input
                     type="text"
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
-                    placeholder="Your email"
+                    placeholder="name@cyond.com or Gorle code"
                     autoComplete="username"
                     required
                   />
@@ -1039,7 +1037,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
 
               {(kind === "hr" || kind === "manager") && (
                 <p className="login-notice">
-                  Each {kind === "hr" ? "HR person" : "manager"} uses their own email and password. One shared login is not used.
+                  Each {kind === "hr" ? "HR person" : "manager"} uses their own sign-in. CYOND uses the email. Gorle Group uses the employee code. One shared login is not used.
                 </p>
               )}
 
@@ -1071,7 +1069,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
 
               {employee && !creating && (
                 <p className="login-notice">
-                  Use your own email and password. If you are new, create your profile. HR does not add it.
+                  CYOND uses the email. Gorle Group uses the employee code. If you are new, create your profile. HR does not add it.
                 </p>
               )}
 

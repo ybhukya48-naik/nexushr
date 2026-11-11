@@ -24,13 +24,14 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     Optional<Employee> findByEmailIgnoreCase(String email);
 
     @Query(value = """
-            SELECT email, password, employee_code, role_type, active, lifecycle_status, full_name
-            FROM employees
-            WHERE lower(trim(employee_code)) = lower(trim(:login))
-               OR lower(trim(email)) = lower(trim(:login))
+            SELECT e.email, e.password, e.employee_code, e.role_type, e.active, e.lifecycle_status, e.full_name, c.code
+            FROM employees e
+            LEFT JOIN companies c ON c.id = e.company_id
+            WHERE lower(trim(e.employee_code)) = lower(trim(:login))
+               OR lower(trim(e.email)) = lower(trim(:login))
                OR (
                     length(right(regexp_replace(:login, '[^0-9]', '', 'g'), 10)) = 10
-                    AND right(regexp_replace(coalesce(phone, ''), '[^0-9]', '', 'g'), 10)
+                    AND right(regexp_replace(coalesce(e.phone, ''), '[^0-9]', '', 'g'), 10)
                         = right(regexp_replace(:login, '[^0-9]', '', 'g'), 10)
                   )
             """, nativeQuery = true)

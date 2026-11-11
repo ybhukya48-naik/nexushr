@@ -7840,3 +7840,119 @@ textarea {
 .login-submit {
   min-height: 44px;
 }
+
+/* One alignment and type scale on every page. */
+.sidebar .brand {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 2px 6px 16px;
+}
+
+.sidebar .brand-logo {
+  width: 100%;
+  height: 58px;
+  max-width: none;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.sidebar .brand strong {
+  font-size: 16px;
+  line-height: 1.3;
+  color: #ffffff;
+}
+
+.sidebar .brand span,
+.sidebar-company span {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.sidebar .nav-link {
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 15px;
+  line-height: 1.3;
+  align-items: center;
+}
+
+.app-shell .content {
+  padding: 28px 32px 48px;
+  text-align: left;
+}
+
+.app-shell .page-heading,
+.app-shell .panel-header,
+.app-shell .employees-header {
+  align-items: flex-start;
+  text-align: left;
+  gap: 12px;
+}
+
+.app-shell .page-heading h2,
+.app-shell .panel-header h2,
+.app-shell .employees-header h2 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.25;
+  letter-spacing: 0;
+  color: #101828;
+}
+
+.app-shell .page-heading p,
+.app-shell .panel-header p,
+.app-shell .content p {
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.app-shell form label,
+.app-shell .content label {
+  align-items: stretch;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.35;
+  color: #344054;
+}
+
+.app-shell .content input,
+.app-shell .content select,
+.app-shell .content textarea,
+.app-shell .content button {
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.app-shell .employees-table th {
+  font-size: 12px;
+  letter-spacing: 0;
+  text-align: left;
+}
+
+.app-shell .employees-table td {
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.site-card,
+.site-card label,
+.site-card p,
+.site-card h1 {
+  text-align: left;
+  color: #f4f7fb;
+}
+
+.site-card h1 {
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.site-card label,
+.site-card p {
+  font-size: 16px;
+  line-height: 1.45;
+}
