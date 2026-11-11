@@ -960,6 +960,8 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                   ? "cyond enters the email. Gorle Group enters the employee code. The new password is sent to the account email."
                   : creating
                   ? "Use your own email and password. cyond signs in with that email. Gorle Group signs in with the employee code."
+                  : kind === "manager"
+                  ? "A cyond manager signs in with their own email and password. A Gorle manager signs in with the employee code and password."
                   : "cyond signs in with the email. Gorle Group signs in with the employee code."}
               </p>
 
