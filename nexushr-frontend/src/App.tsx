@@ -924,12 +924,24 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                 <img className="brand-logo-large" src="/images/cyond-logo.jpeg" alt="CYOND logo" />
                 <img className="brand-logo-large" src="/images/gorle-group-logo.jpeg" alt="Gorle Group logo" />
               </div>
-              <strong>CYOND and Gorle Group</strong>
+              <strong><span className="login-brand-cyond">CYOND</span> and <span className="login-brand-gorle">gorle group</span></strong>
             </div>
 
             <div className="login-card-header">
 
-              <h2>{passwordHelp === "change" ? "Change password" : passwordHelp === "forgot" ? "Forgot password" : creating ? "Create your profile" : kind === "employee" ? "Employee sign in" : kind === "manager" ? "Manager sign in" : "HR sign in"}</h2>
+              <h2>
+                {passwordHelp === "change"
+                  ? <>Change <span className="login-title-rest">password</span></>
+                  : passwordHelp === "forgot"
+                    ? <>Forgot <span className="login-title-rest">password</span></>
+                    : creating
+                      ? <>Create <span className="login-title-rest">your profile</span></>
+                      : kind === "employee"
+                        ? <>Employee <span className="login-title-rest">sign in</span></>
+                        : kind === "manager"
+                          ? <>Manager <span className="login-title-rest">sign in</span></>
+                          : <>HR <span className="login-title-rest">sign in</span></>}
+              </h2>
 
               <p>
                 {passwordHelp === "change"
@@ -1035,12 +1047,6 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                 </>
               )}
 
-              {(kind === "hr" || kind === "manager") && (
-                <p className="login-notice">
-                  Each {kind === "hr" ? "HR person" : "manager"} uses their own sign-in. CYOND uses the email. Gorle Group uses the employee code. One shared login is not used.
-                </p>
-              )}
-
               {creating && (
                 <>
                   <label>
@@ -1124,34 +1130,6 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
               <button className={kind === "manager" ? "login-door active" : "login-door"} type="button" onClick={() => navigate("/manager-login")}>
                 Manager login
               </button>
-            </div>
-
-            {/* SECURITY */}
-            <div className="login-security">
-
-              <span className="login-security-dot"></span>
-
-              <span>
-                Protected enterprise workspace
-              </span>
-
-            </div>
-
-            {/* FOOTER */}
-            <div className="login-footer">
-
-              <span>
-                Gorle Group Business Solution
-              </span>
-
-              <span>
-                Secure enterprise workspace
-              </span>
-
-              <span>
-                Waterproofing Diagnosis &amp; Repair Experts
-              </span>
-
             </div>
 
           </form>

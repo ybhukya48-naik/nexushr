@@ -7841,6 +7841,75 @@ textarea {
   min-height: 44px;
 }
 
+.login-page .login-card-brand {
+  align-items: stretch;
+  width: 100%;
+  text-align: center;
+}
+
+.login-page .login-brand-logos {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: nowrap;
+}
+
+.login-page .login-card-brand img,
+.login-page .login-brand-logos img,
+.login-page .login-brand-logos .brand-logo-large {
+  width: 46%;
+  max-width: 180px;
+  height: 68px;
+  max-height: 68px;
+  object-fit: contain;
+  object-position: center;
+}
+
+.login-page .login-brand-cyond {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #101828;
+}
+
+.login-page .login-brand-gorle {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: lowercase;
+  color: #101828;
+}
+
+.login-page .login-card-header,
+.login-page .login-card-header h2,
+.login-page .login-card-header p {
+  text-align: center;
+}
+
+.login-page .login-card-header h2 {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #101828;
+}
+
+.login-page .login-card-header h2 .login-title-rest {
+  font-size: 22px;
+  font-weight: 500;
+  text-transform: lowercase;
+}
+
+.login-page .login-card-header p,
+.login-page .login-card-header > p:last-child {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #344054;
+}
+
 /* One alignment and type scale on every page. */
 .sidebar .brand {
   display: flex;
