@@ -22,8 +22,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -250,7 +253,17 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(
-            @RequestBody AuthDtos.LoginRequest request) {
+            @RequestBody AuthDtos.LoginRequest request,
+            HttpServletRequest httpRequest,
+            @RequestHeader(value = "X-NexusHR-Client", required = false) String client) {
+
+        boolean siteCheckIn = "site".equalsIgnoreCase(client);
+        if (!siteCheckIn && !WindowsAttendanceClient.allowed(httpRequest.getHeader("User-Agent"))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "message",
+                    "Sign in works on a Windows or Mac computer. A phone cannot sign in."
+            ));
+        }
 
         if (request == null ||
                 request.username() == null ||

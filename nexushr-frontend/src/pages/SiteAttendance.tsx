@@ -75,7 +75,7 @@ export default function SiteAttendance() {
     }
     setLoading(true);
     try {
-      const response = await login(username.trim(), password);
+      const response = await login(username.trim(), password, true);
       localStorage.setItem("nexushr_token", response.accessToken);
       localStorage.setItem("nexushr_user", response.username);
       localStorage.setItem("nexushr_role", response.role);

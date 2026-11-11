@@ -333,6 +333,18 @@ function AppRoutes() {
     setWorkspace(company);
   }
 
+  if (!isWindowsComputer()) {
+    return (
+      <div className="login-page">
+        <form className="login-card" onSubmit={(event) => event.preventDefault()}>
+          <h2>Use a computer</h2>
+          <p>This workspace opens on a Windows or Mac computer. A phone cannot sign in. Site check-in is the phone page.</p>
+          <button className="primary-button" type="button" onClick={() => navigate("/site")}>Site check-in</button>
+        </form>
+      </div>
+    );
+  }
+
   if (accountStep !== "done") {
     return (
       <div className="login-page">
@@ -736,6 +748,11 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
     setError("");
     setNotice("");
 
+    if (!isWindowsComputer()) {
+      setError("Sign in works on a Windows or Mac computer. A phone cannot sign in.");
+      return;
+    }
+
     if (!username.trim() || !password) {
       setError(
         "Please enter your employee code or email and password.",
@@ -870,6 +887,18 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!isWindowsComputer()) {
+    return (
+      <div className="login-page">
+        <form className="login-card" onSubmit={(event) => event.preventDefault()}>
+          <h2>Use a computer</h2>
+          <p>Sign in works on a Windows or Mac computer. A phone cannot sign in. Site check-in is the phone page.</p>
+          <button className="primary-button" type="button" onClick={() => navigate("/site")}>Site check-in</button>
+        </form>
+      </div>
+    );
   }
 
   return (

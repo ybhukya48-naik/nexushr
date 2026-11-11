@@ -257,11 +257,12 @@ export async function createPassword(
   return response.json();
 }
 
-async function postLogin(username: string, password: string): Promise<Response> {
+async function postLogin(username: string, password: string, site = false): Promise<Response> {
   const send = () => fetch(`${API_BASE}/auth/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...(site ? { "X-NexusHR-Client": "site" } : {}),
     },
     body: JSON.stringify({ username, password }),
   });
@@ -280,8 +281,9 @@ async function postLogin(username: string, password: string): Promise<Response> 
 export async function login(
   username: string,
   password: string,
+  site = false,
 ): Promise<LoginResponse> {
-  const response = await postLogin(username, password);
+  const response = await postLogin(username, password, site);
 
   if (!response.ok) {
     let message = "Invalid username or password";
