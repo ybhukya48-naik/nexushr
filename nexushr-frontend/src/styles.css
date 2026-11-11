@@ -1,5 +1,5 @@
 :root {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #172033;
   background: #f5f7fb;
   font-synthesis: none;
@@ -7674,4 +7674,70 @@ textarea {
   font-size: 12px;
   font-style: normal;
   color: #667085;
+}
+
+/* Keep every word inside its box. Letters stay upright and are not cut off. */
+.app-shell :is(h1, h2, h3, h4, p, label, button, td, th, a, strong, span, li, input, select),
+.login-page :is(h1, h2, h3, p, label, button, span, strong, input) {
+  letter-spacing: 0;
+  font-style: normal;
+  text-decoration-thickness: auto;
+}
+
+.login-page {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.login-layout,
+.login-layout-single {
+  width: min(480px, calc(100vw - 28px));
+  max-width: calc(100vw - 28px);
+  grid-template-columns: minmax(0, 1fr);
+  justify-content: center;
+  margin: 24px auto;
+  box-sizing: border-box;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.login-brand-logos {
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.login-card-brand img,
+.login-brand-logos img,
+.login-brand-logos .brand-logo-large {
+  width: min(168px, 46%);
+  height: auto;
+  max-height: 64px;
+}
+
+.login-help-button,
+.login-door {
+  white-space: normal;
+  overflow: visible;
+  line-height: 1.25;
+  height: auto;
+  min-height: 40px;
+  text-align: center;
+}
+
+.login-security,
+.login-security span,
+.login-footer,
+.login-footer span {
+  display: block;
+  max-width: 100%;
+  overflow: visible;
+  white-space: normal;
+  line-height: 1.45;
+  color: #1d2939;
 }
