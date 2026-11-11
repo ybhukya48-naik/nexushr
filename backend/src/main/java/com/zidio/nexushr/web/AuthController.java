@@ -443,7 +443,7 @@ public class AuthController {
                     Password: %s
 
                     Sign in: %s
-                    """.formatted(gorle ? "your employee code" : "your email", temporary, signInLink(employee.getRoleType()));
+                    """.formatted(gorle ? "your employee code" : "your email", temporary, signInLink(employee.getRoleType(), gorle));
             try {
                 String sent = resendEmailService.sendTextEmail(
                         employee.getEmail(),
@@ -476,14 +476,15 @@ public class AuthController {
         }
     }
 
-    private static String signInLink(RoleType role) {
+    private static String signInLink(RoleType role, boolean gorle) {
+        String host = gorle ? "https://hr.gorle.com" : "https://hr.cyond.com";
         if (role == RoleType.HR || role == RoleType.ADMIN || role == RoleType.SUPER_ADMIN) {
-            return "https://hr.cyond.com/login";
+            return host + "/login";
         }
         if (role == RoleType.MANAGER) {
-            return "https://hr.cyond.com/manager-login";
+            return host + "/manager-login";
         }
-        return "https://hr.cyond.com/employee-login";
+        return host + "/employee-login";
     }
 
     @PostMapping("/create-password")
