@@ -39,6 +39,14 @@ public class NotificationController {
                 notificationService.getUnreadNotificationsForEmployee(employeeId));
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("@authorizationService.canAccessNotification(#id, authentication)")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        return notificationService.delete(id)
+                ? ResponseEntity.noContent().build()
+                : ResponseEntity.notFound().build();
+    }
+
     @PatchMapping("/{id}/read")
     @PreAuthorize("@authorizationService.canAccessNotification(#id, authentication)")
     public ResponseEntity<Notification> markAsRead(

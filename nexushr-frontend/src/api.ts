@@ -828,6 +828,10 @@ export function getUnreadEmployeeNotifications(employeeId: number) {
   );
 }
 
+export function deleteNotification(id: number) {
+  return request<void>(`/notifications/${id}`, { method: "DELETE" });
+}
+
 export function markNotificationAsRead(id: number) {
   return request<NotificationResponse>(
     `/notifications/${id}/read`,

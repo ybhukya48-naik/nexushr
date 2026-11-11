@@ -218,6 +218,14 @@ public class NotificationService {
                 .findByEmployeeIdAndReadFalseOrderByCreatedAtDesc(employeeId);
     }
 
+    public boolean delete(Long id) {
+        if (id == null || !notificationRepository.existsById(id)) {
+            return false;
+        }
+        notificationRepository.deleteById(id);
+        return true;
+    }
+
     public Notification markAsRead(Long id) {
         Notification notification =
                 notificationRepository.findById(id).orElse(null);

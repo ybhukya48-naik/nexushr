@@ -3,6 +3,7 @@ import { getWorkspaceCompany } from "../utils/workspace";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import "./Notifications.css";
 import {
+  deleteNotification,
   getCurrentEmployee,
   getEmployeeNotifications,
   getEmployees,
@@ -353,6 +354,17 @@ export default function Notifications() {
       );
     } finally {
       setSending(false);
+    }
+  }
+
+  async function handleDelete(id: number) {
+    try {
+      await deleteNotification(id);
+      setNotifications((current) => current.filter((item) => item.id !== id));
+      setError("");
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Unable to delete the notification.");
     }
   }
 
@@ -763,14 +775,24 @@ export default function Notifications() {
                   </small>
                 </div>
 
-                {!notification.read && (
+                <div className="notification-row-actions">
+                  {!notification.read && (
+                    <button
+                      className="primary-button"
+                      type="button"
+                      onClick={() => void handleMarkRead(notification.id)}
+                    >
+                      Mark read
+                    </button>
+                  )}
                   <button
-                    className="primary-button"
-                    onClick={() => void handleMarkRead(notification.id)}
+                    className="quiet-button"
+                    type="button"
+                    onClick={() => void handleDelete(notification.id)}
                   >
-                    Mark read
+                    Delete
                   </button>
-                )}
+                </div>
               </article>
             ))}
           </div>

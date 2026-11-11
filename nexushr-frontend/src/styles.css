@@ -184,6 +184,22 @@ button,
   cursor: pointer;
 }
 
+.notification-row-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.notification-row-actions .quiet-button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #fecdca;
+  border-radius: 8px;
+  background: #fff;
+  color: #b42318;
+}
+
 .user-area span {
   color: #667085;
 }
