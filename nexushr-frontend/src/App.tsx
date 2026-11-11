@@ -249,10 +249,16 @@ function AppRoutes() {
 
   function handleLogout() {
     // Logging out only clears this browser session. It does not delete attendance.
+    const signedInRole = (localStorage.getItem("nexushr_role") || "").toUpperCase();
+    const door = signedInRole === "MANAGER"
+      ? "/manager-login"
+      : signedInRole === "EMPLOYEE"
+        ? "/employee-login"
+        : "/login";
     void fetch(`${API_BASE}/auth/logout`, { method: "POST" }).catch(() => undefined);
     clearWebsiteSession();
     clearWorkspaceCompany();
-    navigate("/login", { replace: true });
+    navigate(door, { replace: true });
   }
 
   async function saveNewPassword(event: FormEvent<HTMLFormElement>) {
@@ -394,7 +400,7 @@ function AppRoutes() {
               Reset password
             </button>
           )}
-          <button className="quiet-button" type="button" onClick={handleLogout}>Sign out</button>
+          <button className="quiet-button" type="button" onClick={handleLogout}>Logout</button>
         </form>
       </div>
     );
@@ -586,7 +592,8 @@ function AppRoutes() {
             </button>
 
             <button
-              className="quiet-button"
+              className="quiet-button logout-button"
+              type="button"
               onClick={handleLogout}
             >
               Logout
