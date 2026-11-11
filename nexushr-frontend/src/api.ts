@@ -847,6 +847,7 @@ export interface PayrollRequest {
   pf?: number;
   esi?: number;
   pt?: number;
+  tds?: number;
   leaveDeduction?: number;
   otherDeductions?: number;
   autoFromAttendance?: boolean;
@@ -948,6 +949,13 @@ export interface PayslipResponse {
   deductions: number;
   netSalary: number;
   status: PayrollStatus;
+  conveyance?: number;
+  medical?: number;
+  otherAllowance?: number;
+  esi?: number;
+  pt?: number;
+  workedMinutes?: number;
+  expectedWorkMinutes?: number;
 }
 
 export function getPayrollRecords() {

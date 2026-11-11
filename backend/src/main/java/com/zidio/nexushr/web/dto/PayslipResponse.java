@@ -28,6 +28,13 @@ public class PayslipResponse {
     private final BigDecimal netSalary;
 
     private final String status;
+    private final BigDecimal conveyance;
+    private final BigDecimal medical;
+    private final BigDecimal otherAllowance;
+    private final BigDecimal esi;
+    private final BigDecimal pt;
+    private final Integer workedMinutes;
+    private final Integer expectedWorkMinutes;
 
     public PayslipResponse(
             Long payrollId,
@@ -49,7 +56,14 @@ public class PayslipResponse {
             BigDecimal otherDeductions,
             BigDecimal deductions,
             BigDecimal netSalary,
-            String status) {
+            String status,
+            BigDecimal conveyance,
+            BigDecimal medical,
+            BigDecimal otherAllowance,
+            BigDecimal esi,
+            BigDecimal pt,
+            Integer workedMinutes,
+            Integer expectedWorkMinutes) {
 
         this.payrollId = payrollId;
         this.employeeId = employeeId;
@@ -71,6 +85,13 @@ public class PayslipResponse {
         this.deductions = deductions;
         this.netSalary = netSalary;
         this.status = status;
+        this.conveyance = conveyance;
+        this.medical = medical;
+        this.otherAllowance = otherAllowance;
+        this.esi = esi;
+        this.pt = pt;
+        this.workedMinutes = workedMinutes;
+        this.expectedWorkMinutes = expectedWorkMinutes;
     }
 
     public Long getPayrollId() { return payrollId; }
@@ -112,4 +133,18 @@ public class PayslipResponse {
     public BigDecimal getNetSalary() { return netSalary; }
 
     public String getStatus() { return status; }
+
+    public BigDecimal getConveyance() { return conveyance; }
+
+    public BigDecimal getMedical() { return medical; }
+
+    public BigDecimal getOtherAllowance() { return otherAllowance; }
+
+    public BigDecimal getEsi() { return esi; }
+
+    public BigDecimal getPt() { return pt; }
+
+    public Integer getWorkedMinutes() { return workedMinutes; }
+
+    public Integer getExpectedWorkMinutes() { return expectedWorkMinutes; }
 }

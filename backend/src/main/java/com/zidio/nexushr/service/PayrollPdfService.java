@@ -243,7 +243,7 @@ public class PayrollPdfService {
 
             com.lowagie.text.Paragraph title =
                     new com.lowagie.text.Paragraph(
-                            "EMPLOYEE PAYSLIP",
+                            "PAY SLIP FOR THE MONTH OF " + monthName(payMonth),
                             TITLE_FONT
                     );
 
@@ -357,6 +357,36 @@ public class PayrollPdfService {
 
             addInfoRow(
                     employeeTable,
+                    "Designation",
+                    safe(employee.getDesignation())
+            );
+
+            addInfoRow(
+                    employeeTable,
+                    "Department",
+                    safe(employee.getDepartment())
+            );
+
+            addInfoRow(
+                    employeeTable,
+                    "Date of Joining",
+                    employee.getJoiningDate() == null ? "—" : employee.getJoiningDate().toString()
+            );
+
+            addInfoRow(
+                    employeeTable,
+                    "Actual working days",
+                    workedDay(payroll.getExpectedWorkMinutes())
+            );
+
+            addInfoRow(
+                    employeeTable,
+                    "Worked days",
+                    workedDay(payroll.getWorkedMinutes())
+            );
+
+            addInfoRow(
+                    employeeTable,
                     "Pay Month",
                     payMonth
             );
@@ -415,35 +445,55 @@ public class PayrollPdfService {
 
             addSalaryPair(
                     salaryTable,
-                    "Basic Salary",
+                    "Basic",
                     money(payroll.getBasicSalary()),
-                    "Tax",
-                    money(payroll.getTaxAmount())
+                    "PF (employee)",
+                    money(payroll.getPf())
             );
 
             addSalaryPair(
                     salaryTable,
                     "HRA",
                     money(payroll.getHra()),
-                    "PF",
-                    money(payroll.getPf())
+                    "Insurance",
+                    money(payroll.getEsi())
             );
 
             addSalaryPair(
                     salaryTable,
-                    "Bonus",
+                    "Conveyance Allowance",
+                    money(payroll.getConveyance()),
+                    "Professional Tax",
+                    money(payroll.getPt())
+            );
+
+            addSalaryPair(
+                    salaryTable,
+                    "Medical Allowance",
+                    money(payroll.getMedical()),
+                    "TDS",
+                    money(payroll.getTaxAmount())
+            );
+
+            addSalaryPair(
+                    salaryTable,
+                    "Other Allowance",
+                    money(payroll.getOthers()),
+                    "Other Deduction",
+                    money(payroll.getOtherDeductions())
+            );
+
+            addSalaryPair(
+                    salaryTable,
+                    "Incentives",
                     money(payroll.getBonus()),
-                    "Leave Deduction",
-                    money(payroll.getLeaveDeduction())
+                    "",
+                    ""
             );
-
-            /*
-             * Overtime and Other Deductions intentionally removed.
-             */
 
             addSalaryPair(
                     salaryTable,
-                    "Gross Salary",
+                    "Total Earnings",
                     money(payroll.getGrossSalary()),
                     "Total Deductions",
                     money(payroll.getDeductions())
@@ -478,7 +528,7 @@ public class PayrollPdfService {
             PdfPCell netLabel =
                     new PdfPCell(
                             new Phrase(
-                                    "NET SALARY",
+                                    "NET PAY",
                                     NET_FONT
                             )
                     );
@@ -836,6 +886,24 @@ public class PayrollPdfService {
         table.addCell(earningValueCell);
         table.addCell(deductionLabelCell);
         table.addCell(deductionValueCell);
+    }
+
+    private String monthName(String payMonth) {
+        try {
+            java.time.YearMonth month = java.time.YearMonth.parse(payMonth);
+            return month.getMonth().name().substring(0, 1)
+                    + month.getMonth().name().substring(1).toLowerCase()
+                    + " " + month.getYear();
+        } catch (Exception ex) {
+            return payMonth == null ? "" : payMonth;
+        }
+    }
+
+    private String workedDay(Integer minutes) {
+        int value = minutes == null ? 0 : Math.max(0, minutes);
+        BigDecimal days = BigDecimal.valueOf(value)
+                .divide(BigDecimal.valueOf(480), 1, RoundingMode.HALF_UP);
+        return days.stripTrailingZeros().toPlainString();
     }
 
     private String money(

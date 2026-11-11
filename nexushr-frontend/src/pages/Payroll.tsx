@@ -61,7 +61,7 @@ export default function Payroll() {
   const [pf, setPf] = useState("");
   const [insurance, setInsurance] = useState("");
   const [professionalTax, setProfessionalTax] = useState("");
-  const [leaveDeduction, setLeaveDeduction] = useState("");
+  const [tds, setTds] = useState("");
   const [otherDeductions, setOtherDeductions] = useState("");
   const [autoFromAttendance, setAutoFromAttendance] = useState(true);
 
@@ -179,8 +179,7 @@ export default function Payroll() {
       setAutoComponents(components);
 
       if (autoFromAttendance) {
-        setOvertime(String(components.overtimeAmount));
-        setLeaveDeduction(String(components.leaveDeduction));
+        setOvertime("");
       }
     } catch (err) {
       console.error("Auto payroll component load failed:", err);
@@ -247,7 +246,7 @@ export default function Payroll() {
         pf: toOptionalNumber(pf),
         esi: toOptionalNumber(insurance),
         pt: toOptionalNumber(professionalTax),
-        leaveDeduction: toOptionalNumber(leaveDeduction),
+        tds: toOptionalNumber(tds),
         otherDeductions: toOptionalNumber(otherDeductions),
       });
 
@@ -260,7 +259,7 @@ export default function Payroll() {
       setPf("");
       setInsurance("");
       setProfessionalTax("");
-      setLeaveDeduction("");
+      setTds("");
       setOtherDeductions("");
 
       await loadData();
@@ -442,7 +441,7 @@ export default function Payroll() {
               <p className="page-eyebrow">Payroll</p>
             <h2>Create Salary Record</h2>
             <p>
-              Pay for {payMonth} uses the working hours from the 1st through the last day. Today stays separate until that day is complete, then those hours join the month total used for the CTC.
+              CTC is the yearly amount. One month is that amount divided by 12, then split the same way for everyone: basic 61%, HRA 30%, conveyance 3.6%, medical 2.8%, other allowance 2.6%. Incentives are extra. Those earnings are then paid from the actual working hours.
             </p>
           </div>
         </div>
@@ -563,7 +562,7 @@ export default function Payroll() {
                       {ctc.trim() ? ` Yearly CTC ${money(Number(ctc))}. One month is ${money(Number(ctc) / 12)}.` : selectedEmployeeData?.baseSalary ? ` Monthly amount ${money(selectedEmployeeData.baseSalary)}.` : " Enter a yearly CTC, or save a base salary, before pay can be calculated."}
                     </span>
                     <span>
-                      This amount goes into Leave Deduction {money(autoComponents.leaveDeduction)} and Overtime {money(autoComponents.overtimeAmount)}.
+                      Earnings use these hours. Extra time after the day is not added to the CTC.
                     </span>
                   </div>
                 )}
@@ -581,41 +580,27 @@ export default function Payroll() {
                 placeholder="Yearly amount"
               />
             </label>
-            <p>Yearly CTC. When base salary is empty, one month of pay is this amount divided by 12.</p>
+            <p>
+              {(() => {
+                const yearly = Number(ctc);
+                if (!ctc.trim() || !Number.isFinite(yearly) || yearly <= 0) {
+                  return "Enter the yearly CTC. One month is divided into basic 61%, HRA 30%, conveyance 3.6%, medical 2.8% and other allowance 2.6%.";
+                }
+                const month = yearly / 12;
+                const part = (rate: number) => money(month * rate);
+                return `One month ${money(month)}. Basic ${part(0.61)}, HRA ${part(0.3)}, conveyance ${part(0.036)}, medical ${part(0.028)}, other allowance ${part(0.026)}. Actual hours then reduce this month.`;
+              })()}
+            </p>
 
             <label>
-              HRA
-              <input
-                min="0"
-                type="number"
-                step="0.01"
-                value={hra}
-                onChange={(event) => setHra(event.target.value)}
-                placeholder="0"
-              />
-            </label>
-
-            <label>
-              Bonus
+              Incentives
               <input
                 min="0"
                 type="number"
                 step="0.01"
                 value={bonus}
                 onChange={(event) => setBonus(event.target.value)}
-                placeholder="0"
-              />
-            </label>
-
-            <label>
-              Overtime
-              <input
-                min="0"
-                type="number"
-                step="0.01"
-                value={overtime}
-                onChange={(event) => setOvertime(event.target.value)}
-                placeholder="0"
+                placeholder="Extra, not part of the CTC"
               />
             </label>
 
@@ -656,15 +641,13 @@ export default function Payroll() {
             </label>
 
             <label>
-              Leave Deduction
+              TDS
               <input
                 min="0"
                 type="number"
                 step="0.01"
-                value={leaveDeduction}
-                onChange={(event) =>
-                  setLeaveDeduction(event.target.value)
-                }
+                value={tds}
+                onChange={(event) => setTds(event.target.value)}
                 placeholder="0"
               />
             </label>
@@ -935,59 +918,64 @@ export default function Payroll() {
             </div>
           </div>
 
+          <p>
+            Worked {((payslip.workedMinutes || 0) / 60).toFixed(1)}h of {((payslip.expectedWorkMinutes || 0) / 60).toFixed(1)}h. Earnings follow those hours.
+          </p>
           <div className="employee-summary-grid">
             <div className="employee-summary-card">
-              <span>Basic Salary</span>
+              <span>Basic</span>
               <strong>{money(payslip.basicSalary)}</strong>
             </div>
-
             <div className="employee-summary-card">
               <span>HRA</span>
               <strong>{money(payslip.hra)}</strong>
             </div>
-
             <div className="employee-summary-card">
-              <span>Bonus</span>
+              <span>Conveyance</span>
+              <strong>{money(payslip.conveyance || 0)}</strong>
+            </div>
+            <div className="employee-summary-card">
+              <span>Medical</span>
+              <strong>{money(payslip.medical || 0)}</strong>
+            </div>
+            <div className="employee-summary-card">
+              <span>Other allowance</span>
+              <strong>{money(payslip.otherAllowance || 0)}</strong>
+            </div>
+            <div className="employee-summary-card">
+              <span>Incentives</span>
               <strong>{money(payslip.bonus)}</strong>
             </div>
-
             <div className="employee-summary-card">
-              <span>Overtime</span>
-              <strong>{money(payslip.overtime)}</strong>
-            </div>
-
-            <div className="employee-summary-card">
-              <span>Gross Salary</span>
+              <span>Total earnings</span>
               <strong>{money(payslip.grossSalary)}</strong>
             </div>
-
-            <div className="employee-summary-card">
-              <span>Tax</span>
-              <strong>{money(payslip.taxAmount)}</strong>
-            </div>
-
             <div className="employee-summary-card">
               <span>PF</span>
               <strong>{money(payslip.pf)}</strong>
             </div>
-
             <div className="employee-summary-card">
-              <span>Leave Deduction</span>
-              <strong>{money(payslip.leaveDeduction)}</strong>
+              <span>Insurance</span>
+              <strong>{money(payslip.esi || 0)}</strong>
             </div>
-
             <div className="employee-summary-card">
-              <span>Other Deductions</span>
+              <span>Professional tax</span>
+              <strong>{money(payslip.pt || 0)}</strong>
+            </div>
+            <div className="employee-summary-card">
+              <span>TDS</span>
+              <strong>{money(payslip.taxAmount)}</strong>
+            </div>
+            <div className="employee-summary-card">
+              <span>Other deduction</span>
               <strong>{money(payslip.otherDeductions)}</strong>
             </div>
-
             <div className="employee-summary-card">
-              <span>Total Deductions</span>
+              <span>Total deductions</span>
               <strong>{money(payslip.deductions)}</strong>
             </div>
-
             <div className="employee-summary-card">
-              <span>Net Salary</span>
+              <span>Net pay</span>
               <strong>{money(payslip.netSalary)}</strong>
             </div>
           </div>

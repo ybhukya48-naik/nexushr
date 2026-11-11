@@ -1010,27 +1010,7 @@ public class AttendanceService {
                     ? employee.getBaseSalary()
                     : BigDecimal.ZERO;
 
-            BigDecimal expectedMinutesVal = BigDecimal.valueOf(Math.max(1, expectedWorkMinutes));
-            int payableMinutes = Math.max(0, expectedWorkMinutes - shortfallMinutes);
-            BigDecimal earnedSalary = expectedWorkMinutes <= 0
-                    ? baseSalary
-                    : baseSalary
-                    .multiply(BigDecimal.valueOf(payableMinutes))
-                    .divide(expectedMinutesVal, 2, RoundingMode.HALF_UP);
-            BigDecimal perMinuteRate = baseSalary.divide(expectedMinutesVal, 8, RoundingMode.HALF_UP);
-
-            BigDecimal leaveDeduction = baseSalary.subtract(earnedSalary).max(BigDecimal.ZERO);
-
-            BigDecimal overtimeAmount = perMinuteRate
-                    .multiply(BigDecimal.valueOf(overtimeMinutes))
-                    .setScale(2, RoundingMode.HALF_UP);
-
-            BigDecimal basicSalary = earnedSalary.multiply(BigDecimal.valueOf(0.60)).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal hra = earnedSalary.multiply(BigDecimal.valueOf(0.40)).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal grossSalary = earnedSalary.add(overtimeAmount);
-
-            BigDecimal pf = basicSalary.multiply(BigDecimal.valueOf(0.12)).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal taxAmount = grossSalary.multiply(BigDecimal.valueOf(0.10)).setScale(2, RoundingMode.HALF_UP);
+            CtcSalarySplit.Parts parts = CtcSalarySplit.split(baseSalary, workedMinutes, expectedWorkMinutes);
 
             PayrollRecord payroll = existingPayrollMap.get(employee.getId());
             if (payroll == null) {
@@ -1041,22 +1021,31 @@ public class AttendanceService {
                 existingPayrollMap.put(employee.getId(), payroll);
             }
 
+            BigDecimal incentives = payroll.getBonus() == null ? BigDecimal.ZERO : payroll.getBonus();
+            BigDecimal grossSalary = parts.earnings().add(incentives).setScale(2, RoundingMode.HALF_UP);
             payroll.setCtc(baseSalary.multiply(BigDecimal.valueOf(12)));
             payroll.setGrossSalary(grossSalary);
-            payroll.setBasicSalary(basicSalary);
-            payroll.setHra(hra);
-            payroll.setBonus(BigDecimal.ZERO);
-            payroll.setOvertime(overtimeAmount);
+            payroll.setBasicSalary(parts.basic());
+            payroll.setHra(parts.hra());
+            payroll.setConveyance(parts.conveyance());
+            payroll.setMedical(parts.medical());
+            payroll.setOthers(parts.otherAllowance());
+            payroll.setEarnedGross(parts.earnings());
+            payroll.setBonus(incentives);
+            payroll.setOvertime(BigDecimal.ZERO);
+            BigDecimal pf = payroll.getPf() == null ? BigDecimal.ZERO : payroll.getPf();
             BigDecimal insurance = payroll.getEsi() == null ? BigDecimal.ZERO : payroll.getEsi();
             BigDecimal professionalTax = payroll.getPt() == null ? BigDecimal.ZERO : payroll.getPt();
-            BigDecimal deductions = pf.add(taxAmount).add(insurance).add(professionalTax);
+            BigDecimal taxAmount = payroll.getTaxAmount() == null ? BigDecimal.ZERO : payroll.getTaxAmount();
+            BigDecimal otherDeductions = payroll.getOtherDeductions() == null ? BigDecimal.ZERO : payroll.getOtherDeductions();
+            BigDecimal deductions = pf.add(taxAmount).add(insurance).add(professionalTax).add(otherDeductions);
             BigDecimal netSalary = grossSalary.subtract(deductions).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
             payroll.setPf(pf);
             payroll.setEsi(insurance);
             payroll.setPt(professionalTax);
             payroll.setTaxAmount(taxAmount);
-            payroll.setLeaveDeduction(leaveDeduction);
-            payroll.setOtherDeductions(BigDecimal.ZERO);
+            payroll.setLeaveDeduction(BigDecimal.ZERO);
+            payroll.setOtherDeductions(otherDeductions);
             payroll.setDeductions(deductions);
             payroll.setNetSalary(netSalary);
 

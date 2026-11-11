@@ -144,67 +144,49 @@ public class PayrollService {
             );
         }
 
-        BigDecimal basicSalary = amount(
-                request.getBasicSalary() != null
-                        ? request.getBasicSalary()
-                        : hasBase
-                        ? employee.getBaseSalary()
-                        : requestedCtc.divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP)
-        );
+        BigDecimal monthlyCtc = requestedCtc.compareTo(ZERO) > 0
+                ? requestedCtc.divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP)
+                : hasBase
+                ? employee.getBaseSalary()
+                : amount(request.getBasicSalary());
         BigDecimal yearlyCtc = requestedCtc.compareTo(ZERO) > 0
                 ? requestedCtc
-                : basicSalary.multiply(BigDecimal.valueOf(12)).setScale(2, RoundingMode.HALF_UP);
+                : monthlyCtc.multiply(BigDecimal.valueOf(12)).setScale(2, RoundingMode.HALF_UP);
 
-        boolean autoFromAttendance = Boolean.TRUE.equals(
-                request.getAutoFromAttendance()
+        PayrollAutoComponentsResponse hours = calculateAutoComponents(
+                employee,
+                request.getPayMonth(),
+                monthlyCtc
         );
-
-        PayrollAutoComponentsResponse autoComponents = autoFromAttendance
-                ? calculateAutoComponents(employee, request.getPayMonth(), basicSalary)
-                : null;
-
-        BigDecimal hra = amount(request.getHra());
-        BigDecimal bonus = amount(request.getBonus());
-        BigDecimal overtime = amount(
-                request.getOvertime() == null && autoComponents != null
-                        ? autoComponents.overtimeAmount()
-                        : request.getOvertime()
+        CtcSalarySplit.Parts parts = CtcSalarySplit.split(
+                monthlyCtc,
+                hours.workedMinutes(),
+                hours.expectedWorkMinutes()
         );
+        BigDecimal basicSalary = parts.basic();
+        BigDecimal hra = parts.hra();
+        BigDecimal incentives = amount(request.getBonus());
         BigDecimal pf = amount(request.getPf());
         BigDecimal esi = amount(request.getEsi());
         BigDecimal professionalTax = amount(request.getPt());
-        BigDecimal leaveDeduction = amount(
-                request.getLeaveDeduction() == null && autoComponents != null
-                        ? autoComponents.leaveDeduction()
-                        : request.getLeaveDeduction()
-        );
+        BigDecimal taxAmount = amount(request.getTds());
         BigDecimal otherDeductions = amount(request.getOtherDeductions());
 
-        validateNonNegative("Basic salary", basicSalary);
-        validateNonNegative("HRA", hra);
-        validateNonNegative("Bonus", bonus);
-        validateNonNegative("Overtime", overtime);
+        validateNonNegative("Incentives", incentives);
         validateNonNegative("PF", pf);
         validateNonNegative("Insurance", esi);
         validateNonNegative("Professional tax", professionalTax);
-        validateNonNegative("Leave deduction", leaveDeduction);
+        validateNonNegative("TDS", taxAmount);
         validateNonNegative("Other deductions", otherDeductions);
 
-        BigDecimal grossSalary = basicSalary
-                .add(hra)
-                .add(bonus)
-                .add(overtime)
-                .setScale(2, RoundingMode.HALF_UP);
-
-        BigDecimal taxAmount = grossSalary
-                .multiply(taxRate)
+        BigDecimal grossSalary = parts.earnings()
+                .add(incentives)
                 .setScale(2, RoundingMode.HALF_UP);
 
         BigDecimal deductions = taxAmount
                 .add(pf)
                 .add(esi)
                 .add(professionalTax)
-                .add(leaveDeduction)
                 .add(otherDeductions)
                 .setScale(2, RoundingMode.HALF_UP);
 
@@ -227,35 +209,32 @@ public class PayrollService {
         payrollRecord.setCtc(yearlyCtc);
         payrollRecord.setBasicSalary(basicSalary);
         payrollRecord.setHra(hra);
-        payrollRecord.setBonus(bonus);
-        payrollRecord.setOvertime(overtime);
+        payrollRecord.setConveyance(parts.conveyance());
+        payrollRecord.setMedical(parts.medical());
+        payrollRecord.setOthers(parts.otherAllowance());
+        payrollRecord.setEarnedGross(parts.earnings());
+        payrollRecord.setBonus(incentives);
+        payrollRecord.setOvertime(ZERO.setScale(2, RoundingMode.HALF_UP));
+        payrollRecord.setWorkingDays(hours.businessDays());
+        payrollRecord.setActualHours(BigDecimal.valueOf(hours.workedMinutes())
+                .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP));
+        payrollRecord.setRequiredHours(BigDecimal.valueOf(8));
 
         payrollRecord.setGrossSalary(grossSalary);
         payrollRecord.setTaxAmount(taxAmount);
         payrollRecord.setPf(pf);
         payrollRecord.setEsi(esi);
         payrollRecord.setPt(professionalTax);
-        payrollRecord.setLeaveDeduction(leaveDeduction);
+        payrollRecord.setLeaveDeduction(ZERO.setScale(2, RoundingMode.HALF_UP));
         payrollRecord.setOtherDeductions(otherDeductions);
 
         payrollRecord.setDeductions(deductions);
         payrollRecord.setNetSalary(netSalary);
 
-        // Store the exact attendance calculation used for this payroll.
-        if (autoComponents != null) {
-            payrollRecord.setExpectedWorkMinutes(
-                    autoComponents.expectedWorkMinutes()
-            );
-            payrollRecord.setWorkedMinutes(
-                    autoComponents.workedMinutes()
-            );
-            payrollRecord.setShortfallMinutes(
-                    autoComponents.shortfallMinutes()
-            );
-            payrollRecord.setOvertimeMinutes(
-                    autoComponents.overtimeMinutes()
-            );
-        }
+        payrollRecord.setExpectedWorkMinutes(hours.expectedWorkMinutes());
+        payrollRecord.setWorkedMinutes(hours.workedMinutes());
+        payrollRecord.setShortfallMinutes(hours.shortfallMinutes());
+        payrollRecord.setOvertimeMinutes(0);
 
         payrollRecord.setStatus(PayrollStatus.GENERATED);
 
@@ -282,18 +261,14 @@ public class PayrollService {
                         "Employee not found: " + employeeId
                 ));
 
-        if (employee.getBaseSalary() == null
-                || employee.getBaseSalary().compareTo(ZERO) <= 0) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Employee base salary must be greater than zero"
-            );
-        }
+        BigDecimal monthly = employee.getBaseSalary() == null
+                ? ZERO
+                : employee.getBaseSalary().max(ZERO);
 
         return calculateAutoComponents(
                 employee,
                 payMonth,
-                employee.getBaseSalary()
+                monthly
         );
     }
 
@@ -386,7 +361,14 @@ public class PayrollService {
                 payroll.getOtherDeductions(),
                 payroll.getDeductions(),
                 payroll.getNetSalary(),
-                payroll.getStatus().name()
+                payroll.getStatus().name(),
+                payroll.getConveyance(),
+                payroll.getMedical(),
+                payroll.getOthers(),
+                payroll.getEsi(),
+                payroll.getPt(),
+                payroll.getWorkedMinutes(),
+                payroll.getExpectedWorkMinutes()
         );
     }
 

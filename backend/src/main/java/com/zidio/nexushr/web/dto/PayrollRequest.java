@@ -21,6 +21,7 @@ public class PayrollRequest {
     private BigDecimal pf;
     private BigDecimal esi;
     private BigDecimal pt;
+    private BigDecimal tds;
     private BigDecimal leaveDeduction;
     private BigDecimal otherDeductions;
     private Boolean autoFromAttendance;
@@ -95,6 +96,14 @@ public class PayrollRequest {
 
     public void setEsi(BigDecimal esi) {
         this.esi = esi;
+    }
+
+    public BigDecimal getTds() {
+        return tds;
+    }
+
+    public void setTds(BigDecimal tds) {
+        this.tds = tds;
     }
 
     public BigDecimal getPt() {
