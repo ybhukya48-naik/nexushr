@@ -293,15 +293,44 @@ async function attendanceRequest<T>(
 
   return response.json();
 }
-export async function checkIn(employeeId?: number) {
-  const endpoint =
-    employeeId != null
-      ? `/attendance/check-in?employeeId=${encodeURIComponent(String(employeeId))}`
-      : "/attendance/check-in";
-
-  return attendanceRequest<AttendanceRecord>(endpoint, {
+export async function checkIn(
+  employeeId?: number,
+  place?: { latitude: number; longitude: number } | null,
+) {
+  const params = new URLSearchParams();
+  if (employeeId != null) {
+    params.set("employeeId", String(employeeId));
+  }
+  if (place) {
+    params.set("latitude", String(place.latitude));
+    params.set("longitude", String(place.longitude));
+  }
+  const query = params.toString();
+  return attendanceRequest<AttendanceRecord>(`/attendance/check-in${query ? `?${query}` : ""}`, {
     method: "POST",
   });
+}
+
+export function readOfficeLocation() {
+  return new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
+    if (!navigator.geolocation) {
+      resolve(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => resolve({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
+    );
+  });
+}
+
+export async function officeCheckIn(employeeId?: number) {
+  const place = await readOfficeLocation();
+  return checkIn(employeeId, place);
 }
 
 export async function checkOut(employeeId?: number) {
@@ -1084,7 +1113,7 @@ export default function Attendance() {
               void runAction(
                 () => siteVisitor
                   ? siteCheckIn(selfie as File)
-                  : checkIn(),
+                  : officeCheckIn(),
                 "Check-in completed successfully.",
               )
             }
@@ -1195,7 +1224,7 @@ export default function Attendance() {
               void runAction(
                 () => siteVisitor && canPunch
                   ? siteCheckIn(selfie as File)
-                  : checkIn(),
+                  : officeCheckIn(),
                 "Lunch ended. Working hours continue.",
               )
             }

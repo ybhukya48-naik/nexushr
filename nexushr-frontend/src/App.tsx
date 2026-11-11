@@ -35,8 +35,8 @@ import {
   type NotificationResponse,
 } from "./api";
 import {
-  checkIn,
   checkOut,
+  officeCheckIn,
   getAttendanceAudit,
   getEmployeeAttendance,
   createLeave,
@@ -923,11 +923,9 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
               <div className="login-brand-logos">
                 <div className="login-logo-slot">
                   <img className="login-logo-cyond" src="/images/cyond-logo.jpeg" alt="CYOND" />
-                  <span>CYOND</span>
                 </div>
                 <div className="login-logo-slot">
-                  <img className="login-logo-gorle" src="/images/gorle-group-logo.jpeg" alt="Gorle Group" />
-                  <span>GORLE GROUP</span>
+                  <img className="login-logo-gorle" src="/images/gorle-group-emblem.jpg" alt="Gorle Group" />
                 </div>
               </div>
             </div>
@@ -1349,7 +1347,7 @@ function EmployeeDashboard() {
     setPunching(true);
     setPunchNote("");
     try {
-      await (kind === "out" ? checkOut() : checkIn());
+      await (kind === "out" ? checkOut() : officeCheckIn());
       const history = await getEmployeeAttendance(signedInEmployee.id);
       const savedHistory = [...history].sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
       setRecords(savedHistory);
@@ -1393,7 +1391,7 @@ function EmployeeDashboard() {
     setPunching(true);
     setPunchNote("");
     try {
-      await (kind === "out" ? checkOut() : checkIn());
+      await (kind === "out" ? checkOut() : officeCheckIn());
       const history = await getEmployeeAttendance(signedInEmployee.id);
       const savedHistory = [...history].sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
       setRecords(savedHistory);
@@ -1482,6 +1480,15 @@ function EmployeeDashboard() {
           present: records.some((row) => String(row.attendanceDate ?? "").slice(0, 10) === date && row.checkInTime),
         }));
         const checkedIn = Boolean(todayRecord?.checkInTime && !todayRecord?.checkOutTime);
+        const wfhLeave = savedLeaves.find((leave) =>
+          leave.leaveType === "WFH"
+          && leave.status !== "REJECTED"
+          && String(leave.startDate).slice(0, 10) <= today
+          && String(leave.endDate || leave.startDate).slice(0, 10) >= today,
+        );
+        const wfhTime = !todayRecord?.checkInTime
+          ? "No check-in yet"
+          : `Check in ${formatClock(todayRecord.checkInTime)} · ${todayRecord.checkOutTime ? `Check out ${formatClock(todayRecord.checkOutTime)}` : "Still in"} · ${hoursLabel(todayMinutes)}`;
         const onLunch = Boolean(todayRecord?.checkInTime && todayRecord?.checkOutTime);
         const lunchStarted = onLunch ? new Date(String(todayRecord?.checkOutTime)).getTime() : 0;
         const lunchSeconds = lunchStarted
@@ -1503,6 +1510,7 @@ function EmployeeDashboard() {
                       </button>
                     </div>
                     {!isWindowsComputer() && <em>Check in works on a Windows or Mac computer. A phone cannot punch.</em>}
+                    <em>Office check-in uses your location at Mayfair Garden, Banjara Hills. Work from home needs HR approval.</em>
                     {punchNote && <em>{punchNote}</em>}
                   </div>
                   <div className="home-lunch-timer">
@@ -1521,6 +1529,13 @@ function EmployeeDashboard() {
                 </div>
               </article>
               <article className="home-side">
+                {wfhLeave && (
+                  <>
+                    <span>Work from home</span>
+                    <strong>{wfhLeave.status === "APPROVED" ? "Approved" : "Waiting for HR"}</strong>
+                    <em>{wfhTime}</em>
+                  </>
+                )}
                 <span>Pending on you</span>
                 {notices.length === 0 ? <em>Nothing is waiting.</em> : notices.map((notice) => <em key={notice}>{notice}</em>)}
               </article>

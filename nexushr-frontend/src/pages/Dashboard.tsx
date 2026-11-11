@@ -14,8 +14,8 @@ import {
   type EmployeeResponse,
 } from "../api";
 import {
-  checkIn,
   checkOut,
+  officeCheckIn,
   createLeave,
   updateLeaveStatus,
   getAttendanceByDate,
@@ -430,7 +430,7 @@ export default function Dashboard() {
     setPunching(true);
     setPunchNote("");
     try {
-      await (kind === "out" ? checkOut(me.id) : checkIn(me.id));
+      await (kind === "out" ? checkOut(me.id) : officeCheckIn(me.id));
       setPunchNote(kind === "out" ? "Checked out. The lunch hour can be any time." : "Checked in. Working hours continue.");
       setRefreshTick((value) => value + 1);
     } catch (err) {
@@ -770,7 +770,7 @@ export default function Dashboard() {
       <section className="hr-card hr-lunch">
         <div>
           <strong>Check in and check out</strong>
-          <p className="hr-empty">The lunch hour is flexible. Check out when you leave, and check in when you are back. It can be any hour.</p>
+          <p className="hr-empty">The lunch hour is flexible. Office check-in uses your location at Mayfair Garden, Banjara Hills. Work from home needs HR approval.</p>
         </div>
         <div className="hr-timer" aria-live="polite">
           <span>{selfOut ? "Lunch timer" : "Work timer"}</span>
@@ -873,7 +873,11 @@ export default function Dashboard() {
                         {person.email}{person.designation ? ` · ${person.designation}` : ""}
                         {person.siteVisitor ? " · Site" : ""}
                         {dutyToday.some((leave) => leave.employee?.id === person.id)
-                          ? ` · ${dutyToday.filter((leave) => leave.employee?.id === person.id).map((leave) => dutyName(leave.leaveType)).join(", ")}`
+                          ? ` · ${dutyToday.filter((leave) => leave.employee?.id === person.id).map((leave) =>
+                            leave.leaveType === "WFH"
+                              ? `Work from home · ${attendanceTime(person.id)}`
+                              : dutyName(leave.leaveType),
+                          ).join(", ")}`
                           : ""}
                       </span>
                     </td>

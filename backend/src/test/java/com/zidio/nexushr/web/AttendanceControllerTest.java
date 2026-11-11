@@ -21,6 +21,7 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -60,7 +61,7 @@ class AttendanceControllerTest {
                 "employee@example.com"))
                 .thenReturn(100L);
 
-        when(attendanceService.checkIn(100L, 100L, false))
+        when(attendanceService.checkIn(eq(100L), eq(100L), eq(false), nullable(Double.class), nullable(Double.class)))
                 .thenReturn(record);
 
         mockMvc.perform(

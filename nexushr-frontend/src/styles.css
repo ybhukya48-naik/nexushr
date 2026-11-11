@@ -7911,15 +7911,6 @@ textarea {
   gap: 6px;
 }
 
-.login-page .login-logo-slot span {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  line-height: 1.2;
-  text-transform: uppercase;
-  color: #101828;
-}
-
 .login-page .login-logo-cyond,
 .login-page .login-logo-gorle {
   width: 100%;
@@ -7932,7 +7923,8 @@ textarea {
 }
 
 .login-page .login-logo-gorle {
-  height: 78px;
+  height: 112px;
+  max-height: 112px;
   object-fit: contain;
   object-position: center;
 }

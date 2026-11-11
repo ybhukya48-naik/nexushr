@@ -40,13 +40,15 @@ public class AttendanceController {
     @PreAuthorize("isAuthenticated()")
     public AttendanceRecord checkIn(
             @RequestParam(required = false) Long employeeId,
+            @RequestParam(required = false) Double latitude,
+            @RequestParam(required = false) Double longitude,
             Authentication authentication,
             HttpServletRequest request) {
 
         requireWindowsComputer(request);
         Long actorId = attendanceService.findEmployeeIdByUsername(authentication.getName());
         Long targetEmployeeId = punchTarget(employeeId, actorId, authentication);
-        return attendanceService.checkIn(targetEmployeeId, actorId, false);
+        return attendanceService.checkIn(targetEmployeeId, actorId, false, latitude, longitude);
     }
 
     @PostMapping("/check-out")

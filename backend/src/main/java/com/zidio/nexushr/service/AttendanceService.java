@@ -3,9 +3,11 @@ package com.zidio.nexushr.service;
 import com.zidio.nexushr.domain.AttendanceRecord;
 import com.zidio.nexushr.domain.Employee;
 import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
+import com.zidio.nexushr.domain.LeaveStatus;
 import com.zidio.nexushr.domain.PayrollRecord;
 import com.zidio.nexushr.repository.AttendanceRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
+import com.zidio.nexushr.repository.LeaveRequestRepository;
 import com.zidio.nexushr.repository.PayrollRepository;
 import com.zidio.nexushr.web.dto.AttendanceImportResponse;
 import com.zidio.nexushr.web.dto.AttendanceImportRowError;
@@ -93,6 +95,9 @@ public class AttendanceService {
     @Autowired(required = false)
     private CompanyHolidayCalendar companyHolidayCalendar;
 
+    @Autowired(required = false)
+    private LeaveRequestRepository leaveRequestRepository;
+
     public AttendanceService(
             AttendanceRepository attendanceRepository,
             EmployeeRepository employeeRepository,
@@ -176,6 +181,43 @@ public class AttendanceService {
 
     public AttendanceRecord checkIn(Long employeeId) {
         return checkIn(employeeId, employeeId, false);
+    }
+
+    public AttendanceRecord checkIn(
+            Long employeeId,
+            Long actorId,
+            boolean selfieAttached,
+            Double latitude,
+            Double longitude) {
+        if (!selfieAttached) {
+            requireOfficeOrApprovedHome(employeeId, latitude, longitude);
+        }
+        return checkIn(employeeId, actorId, selfieAttached);
+    }
+
+    private void requireOfficeOrApprovedHome(Long employeeId, Double latitude, Double longitude) {
+        if (workFromHomeApproved(employeeId)) {
+            return;
+        }
+        if (latitude == null || longitude == null) {
+            throw badRequest("Office check-in needs your location. Allow location, or ask HR to approve work from home.");
+        }
+        if (!OfficeFence.inside(latitude, longitude)) {
+            throw badRequest("You are outside the office at Mayfair Garden, Banjara Hills. Ask HR to approve work from home, then check in.");
+        }
+    }
+
+    private boolean workFromHomeApproved(Long employeeId) {
+        if (leaveRequestRepository == null || employeeId == null) {
+            return false;
+        }
+        LocalDate today = LocalDate.now(COMPANY_ZONE);
+        return leaveRequestRepository.findByEmployee_IdAndStatus(employeeId, LeaveStatus.APPROVED).stream()
+                .anyMatch(leave -> "WFH".equalsIgnoreCase(leave.getLeaveType())
+                        && leave.getStartDate() != null
+                        && leave.getEndDate() != null
+                        && !leave.getStartDate().isAfter(today)
+                        && !leave.getEndDate().isBefore(today));
     }
 
     public AttendanceRecord checkIn(Long employeeId, Long actorId, boolean selfieAttached) {
