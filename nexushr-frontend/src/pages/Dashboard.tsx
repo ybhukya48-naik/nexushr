@@ -163,6 +163,7 @@ export default function Dashboard() {
   const company = getWorkspaceCompany() ?? "CYOND";
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [me, setMe] = useState<EmployeeResponse | null>(null);
+  const [selfRecord, setSelfRecord] = useState<AttendanceRecord | null>(null);
   const [people, setPeople] = useState<EmployeeResponse[]>([]);
   const [todayRows, setTodayRows] = useState<AttendanceRecord[]>([]);
   const [week, setWeek] = useState<Array<{ label: string; present: number }>>([]);
@@ -198,18 +199,27 @@ export default function Dashboard() {
     Promise.all([
       getDashboardSummary().catch(() => null),
       getCurrentEmployee().catch(() => null),
-      getEmployees(),
+      getEmployees().catch(() => [] as EmployeeResponse[]),
       getAttendanceByDate(today).catch(() => [] as AttendanceRecord[]),
       getLeaves().catch(() => [] as LeaveRequest[]),
       getHolidays().catch(() => [] as CompanyHoliday[]),
       getPayrollRecords().catch(() => [] as PayrollRecord[]),
     ])
-      .then(([dashboard, current, employees, attendance, leaveRows, extraHolidays, payroll]) => {
+      .then(async ([dashboard, current, employees, attendance, leaveRows, extraHolidays, payroll]) => {
         if (cancelled) {
           return;
         }
         setSummary(dashboard);
         setMe(current);
+        if (current?.id) {
+          const history = await getEmployeeAttendance(current.id).catch(() => [] as AttendanceRecord[]);
+          const ownToday = asList<AttendanceRecord>(history).find((row) => String(row.attendanceDate ?? "").slice(0, 10) === today) ?? null;
+          if (!cancelled) {
+            setSelfRecord(ownToday);
+          }
+        } else if (!cancelled) {
+          setSelfRecord(null);
+        }
         const listedPeople = asList<EmployeeResponse>(employees).filter((employee) =>
           isCompanyMatch(employee.companyCode, company) && isListedEmployee(employee.roleType));
         const listedIds = new Set(listedPeople.map((employee) => employee.id));
@@ -377,7 +387,8 @@ export default function Dashboard() {
     && String(leave.endDate ?? leave.startDate ?? "").slice(0, 10) >= today,
   );
   function attendanceTime(employeeId?: number) {
-    const row = todayRows.find((item) => item.employee?.id === employeeId && item.checkInTime);
+    const row = (employeeId === me?.id && selfRecord?.checkInTime ? selfRecord : undefined)
+      ?? todayRows.find((item) => item.employee?.id === employeeId && item.checkInTime);
     if (!row?.checkInTime) {
       return "No check-in yet";
     }
@@ -389,7 +400,7 @@ export default function Dashboard() {
   const maxPresent = Math.max(1, ...week.map((day) => day.present));
   const now = new Date();
   const displayName = me?.fullName || localStorage.getItem("nexushr_user") || "there";
-  const myRecord = todayRows.find((row) => row.employee?.id === me?.id);
+  const myRecord = selfRecord ?? todayRows.find((row) => row.employee?.id === me?.id);
   const selfOpen = Boolean(myRecord?.checkInTime && !myRecord?.checkOutTime);
   const selfOut = Boolean(myRecord?.checkOutTime);
   const lunchStarted = selfOut ? new Date(String(myRecord?.checkOutTime)).getTime() : 0;
@@ -502,6 +513,21 @@ export default function Dashboard() {
           {now.toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}
         </time>
       </header>
+
+      <section className="hr-card">
+        <div className="hr-card-title">
+          <h3>Your profile</h3>
+        </div>
+        {me ? (
+          <>
+            <p>{me.fullName} · {me.employeeCode} · {me.designation || me.roleType}</p>
+            <p>{me.email}{me.phone ? ` · ${me.phone}` : ""} · {me.department || "No department"} · {me.companyName || me.companyCode}</p>
+            <p>{myRecord?.checkInTime ? attendanceTime(me.id) : "No check-in yet"}</p>
+          </>
+        ) : (
+          <p className="hr-empty">Your profile did not load. Sign in again.</p>
+        )}
+      </section>
 
       <section className="hr-kpis">
         <button type="button" onClick={() => navigate("/employees")}>
