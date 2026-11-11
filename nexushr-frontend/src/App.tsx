@@ -921,10 +921,15 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
 
             <div className="login-card-brand">
               <div className="login-brand-logos">
-                <img className="brand-logo-large" src="/images/cyond-logo.jpeg" alt="CYOND logo" />
-                <img className="brand-logo-large" src="/images/gorle-group-logo.jpeg" alt="Gorle Group logo" />
+                <div className="login-logo-slot">
+                  <img className="login-logo-cyond" src="/images/cyond-logo.jpeg" alt="CYOND" />
+                  <span>CYOND</span>
+                </div>
+                <div className="login-logo-slot">
+                  <img className="login-logo-gorle" src="/images/gorle-group-logo.jpeg" alt="Gorle Group" />
+                  <span>GORLE GROUP</span>
+                </div>
               </div>
-              <strong><span className="login-brand-cyond">CYOND</span> and <span className="login-brand-gorle">gorle group</span></strong>
             </div>
 
             <div className="login-card-header">
