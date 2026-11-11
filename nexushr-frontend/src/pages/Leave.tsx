@@ -216,6 +216,7 @@ export default function Leave() {
     if (value === "WFH") return "Work from home";
     if (value === "SITE_MORNING") return "Morning site visit";
     if (value === "SITE_AFTERNOON") return "Afternoon site visit";
+    if (value === "SITE_EVENING") return "Evening site visit";
     return "Earned";
   }
 
@@ -392,6 +393,7 @@ export default function Leave() {
                 <option value="WFH">Work from home</option>
                 <option value="SITE_MORNING">Morning site visit</option>
                 <option value="SITE_AFTERNOON">Afternoon site visit</option>
+                <option value="SITE_EVENING">Evening site visit</option>
               </select>
             </label>
 

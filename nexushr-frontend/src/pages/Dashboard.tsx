@@ -16,6 +16,7 @@ import {
 import {
   checkIn,
   checkOut,
+  createLeave,
   updateLeaveStatus,
   getAttendanceByDate,
   getAttendanceRange,
@@ -31,6 +32,17 @@ import {
 import { isCompanyMatch } from "../utils/company";
 import { getWorkspaceCompany } from "../utils/workspace";
 import "./Dashboard.css";
+
+const DUTY_CHOICES = [
+  { type: "WFH", label: "Work from home" },
+  { type: "SITE_MORNING", label: "Morning site visit" },
+  { type: "SITE_AFTERNOON", label: "Afternoon site visit" },
+  { type: "SITE_EVENING", label: "Evening site visit" },
+] as const;
+
+function dutyName(value?: string) {
+  return DUTY_CHOICES.find((choice) => choice.type === value)?.label || "Leave";
+}
 
 const PUBLIC_HOLIDAYS = [
   { month: 1, day: 26, name: "Republic Day" },
@@ -174,6 +186,8 @@ export default function Dashboard() {
   const [exceptionOpen, setExceptionOpen] = useState<"" | "checkin" | "checkout" | "lunch">("");
   const [payslipBusy, setPayslipBusy] = useState<"" | "download" | "email">("");
   const [payslipNote, setPayslipNote] = useState("");
+  const [dutyBusy, setDutyBusy] = useState("");
+  const [dutyNote, setDutyNote] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -356,6 +370,7 @@ export default function Dashboard() {
   const offboardingCount = people.filter((person) => person.lifecycleStatus === "OFFBOARDING").length;
   const offboardedCount = people.filter((person) => person.lifecycleStatus === "OFFBOARDED").length;
   const waiting = [...pending].sort((a, b) => String(a.startDate ?? "").localeCompare(String(b.startDate ?? "")));
+  const dutyWaiting = waiting.filter((leave) => DUTY_CHOICES.some((choice) => choice.type === leave.leaveType));
   const idleWarnings = todayRows.filter((row) => row.yellowFlag).length;
   const maxPresent = Math.max(1, ...week.map((day) => day.present));
   const now = new Date();
@@ -507,6 +522,69 @@ export default function Dashboard() {
         </button>
       </section>
 
+      <section className="hr-card">
+        <div className="hr-card-title">
+          <h3>Work from home and site visit</h3>
+        </div>
+        <p>A request stays pending until HR approves it. It does not use leave.</p>
+        <div className="duty-choices">
+          {DUTY_CHOICES.map((choice) => {
+            const sent = leaves.find((leave) =>
+              leave.employee?.id === me?.id
+              && leave.leaveType === choice.type
+              && String(leave.startDate ?? "").slice(0, 10) === today
+              && leave.status !== "REJECTED",
+            );
+            const status = sent?.status === "APPROVED" ? "Approved" : sent ? "Waiting for HR" : "Ask HR";
+            return (
+              <button
+                key={choice.type}
+                type="button"
+                disabled={!me || Boolean(dutyBusy) || Boolean(sent)}
+                onClick={() => {
+                  if (!me) {
+                    return;
+                  }
+                  setDutyBusy(choice.type);
+                  setDutyNote("");
+                  void createLeave(me.id, today, today, choice.label, choice.type, false)
+                    .then(() => {
+                      setDutyNote(`${choice.label} was sent for HR approval.`);
+                      setRefreshTick((value) => value + 1);
+                    })
+                    .catch((err) => {
+                      setDutyNote(err instanceof Error ? err.message : "Unable to send this request.");
+                    })
+                    .finally(() => setDutyBusy(""));
+                }}
+              >
+                <strong>{choice.label}</strong>
+                <em>{dutyBusy === choice.type ? "Sending..." : status}</em>
+              </button>
+            );
+          })}
+        </div>
+        {dutyNote && <p>{dutyNote}</p>}
+        <h3>Waiting for approval</h3>
+        {dutyWaiting.length === 0 ? (
+          <p className="hr-empty">No work from home or site visit is waiting.</p>
+        ) : (
+          <ul className="hr-approvals">
+            {dutyWaiting.map((leave) => (
+              <li key={leave.id}>
+                <span>{dutyName(leave.leaveType)} · {leave.employee?.fullName || "Employee"} · {displayDate(leave.startDate)}</span>
+                <button type="button" onClick={() => void updateLeaveStatus(leave.id!, "APPROVED").then(() => setRefreshTick((value) => value + 1))}>Approve</button>
+                <button type="button" onClick={() => {
+                  if (window.confirm("Reject this request?")) {
+                    void updateLeaveStatus(leave.id!, "REJECTED").then(() => setRefreshTick((value) => value + 1));
+                  }
+                }}>Reject</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <section className="hr-split">
         <article className="hr-card">
           <div className="hr-card-title">
@@ -523,7 +601,7 @@ export default function Dashboard() {
                 return (
                   <li key={leave.id}>
                     <span>
-                      {leave.leaveType === "WFH" ? "Work from home" : leave.leaveType === "SITE_MORNING" ? "Morning site visit" : leave.leaveType === "SITE_AFTERNOON" ? "Afternoon site visit" : "Leave"} · {leave.employee?.fullName || "Employee"} · {displayDate(leave.startDate)} to {displayDate(leave.endDate)}
+                      {dutyName(leave.leaveType)} · {leave.employee?.fullName || "Employee"} · {displayDate(leave.startDate)} to {displayDate(leave.endDate)}
                       {waited > 0 ? ` · waiting ${waited} day${waited === 1 ? "" : "s"}` : ""}
                     </span>
                     <button type="button" onClick={() => void updateLeaveStatus(leave.id!, "APPROVED").then(() => setRefreshTick((value) => value + 1))}>Approve</button>

@@ -119,12 +119,14 @@ public class PayrollService {
             );
         }
 
-        if (employee.getBaseSalary() == null ||
-                employee.getBaseSalary().compareTo(ZERO) <= 0) {
-
+        BigDecimal requestedCtc = amount(request.getCtc());
+        validateNonNegative("CTC", requestedCtc);
+        boolean hasBase = employee.getBaseSalary() != null
+                && employee.getBaseSalary().compareTo(ZERO) > 0;
+        if (!hasBase && requestedCtc.compareTo(ZERO) <= 0 && request.getBasicSalary() == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Employee base salary must be greater than zero"
+                    "Enter a yearly CTC, or save a base salary greater than zero"
             );
         }
 
@@ -143,10 +145,15 @@ public class PayrollService {
         }
 
         BigDecimal basicSalary = amount(
-                request.getBasicSalary() == null
+                request.getBasicSalary() != null
+                        ? request.getBasicSalary()
+                        : hasBase
                         ? employee.getBaseSalary()
-                        : request.getBasicSalary()
+                        : requestedCtc.divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP)
         );
+        BigDecimal yearlyCtc = requestedCtc.compareTo(ZERO) > 0
+                ? requestedCtc
+                : basicSalary.multiply(BigDecimal.valueOf(12)).setScale(2, RoundingMode.HALF_UP);
 
         boolean autoFromAttendance = Boolean.TRUE.equals(
                 request.getAutoFromAttendance()
@@ -217,6 +224,7 @@ public class PayrollService {
         payrollRecord.setEmployee(employee);
         payrollRecord.setPayMonth(request.getPayMonth());
 
+        payrollRecord.setCtc(yearlyCtc);
         payrollRecord.setBasicSalary(basicSalary);
         payrollRecord.setHra(hra);
         payrollRecord.setBonus(bonus);

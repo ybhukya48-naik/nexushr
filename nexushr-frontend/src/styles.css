@@ -7554,3 +7554,41 @@ textarea {
   color: #101828;
   white-space: nowrap;
 }
+
+.duty-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.duty-choices button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 72px;
+  padding: 12px 14px;
+  text-align: left;
+  border: 1px solid #d9d0f5;
+  border-radius: 12px;
+  background: #fff;
+  color: #1d1633;
+  cursor: pointer;
+}
+
+.duty-choices button:disabled {
+  background: #f8fafc;
+  cursor: default;
+}
+
+.duty-choices strong {
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.duty-choices em {
+  font-size: 12px;
+  font-style: normal;
+  color: #667085;
+}

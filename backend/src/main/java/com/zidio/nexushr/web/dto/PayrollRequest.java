@@ -13,6 +13,7 @@ public class PayrollRequest {
      * Existing clients may omit these fields.
      * Omitted values are treated as zero by PayrollService.
      */
+    private BigDecimal ctc;
     private BigDecimal basicSalary;
     private BigDecimal hra;
     private BigDecimal bonus;
@@ -38,6 +39,14 @@ public class PayrollRequest {
 
     public void setPayMonth(String payMonth) {
         this.payMonth = payMonth;
+    }
+
+    public BigDecimal getCtc() {
+        return ctc;
+    }
+
+    public void setCtc(BigDecimal ctc) {
+        this.ctc = ctc;
     }
 
     public BigDecimal getBasicSalary() {

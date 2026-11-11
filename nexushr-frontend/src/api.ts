@@ -839,6 +839,7 @@ export type PayrollStatus =
 export interface PayrollRequest {
   employeeId: number;
   payMonth: string;
+  ctc?: number;
   basicSalary?: number;
   hra?: number;
   bonus?: number;

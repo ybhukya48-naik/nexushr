@@ -39,6 +39,7 @@ import {
   checkOut,
   getAttendanceAudit,
   getEmployeeAttendance,
+  createLeave,
   getLeaves,
   sendAttendanceHeartbeat,
   type AttendanceAuditEntry,
@@ -1173,6 +1174,13 @@ function punchPairs(entries: AttendanceAuditEntry[], date: string, record?: Atte
   return pairs;
 }
 
+const DUTY_CHOICES = [
+  { type: "WFH", label: "Work from home" },
+  { type: "SITE_MORNING", label: "Morning site visit" },
+  { type: "SITE_AFTERNOON", label: "Afternoon site visit" },
+  { type: "SITE_EVENING", label: "Evening site visit" },
+] as const;
+
 function hoursLabel(minutes?: number) {
   const value = Math.max(0, minutes ?? 0);
   return `${Math.floor(value / 60)}h ${value % 60}m`;
@@ -1204,6 +1212,8 @@ function EmployeeDashboard() {
   const [error, setError] = useState("");
   const [punching, setPunching] = useState(false);
   const [punchNote, setPunchNote] = useState("");
+  const [dutyBusy, setDutyBusy] = useState("");
+  const [dutyNote, setDutyNote] = useState("");
   const [clockNow, setClockNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -1545,6 +1555,54 @@ function EmployeeDashboard() {
                 <span>Celebrations</span>
                 <em>No birthdays or work anniversaries this week.</em>
               </article>
+            </section>
+            <section className="panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Today</p>
+                  <h3>Work from home and site visit</h3>
+                  <p>Choose one for today. It stays pending until HR approves it, and it does not use leave.</p>
+                </div>
+              </div>
+              <div className="duty-choices">
+                {DUTY_CHOICES.map((choice) => {
+                  const sent = savedLeaves.find((leave) =>
+                    leave.leaveType === choice.type
+                    && String(leave.startDate).slice(0, 10) === today
+                    && leave.status !== "REJECTED",
+                  );
+                  const status = sent?.status === "APPROVED" ? "Approved" : sent ? "Waiting for HR" : "Ask HR";
+                  return (
+                    <button
+                      key={choice.type}
+                      type="button"
+                      className="secondary-button"
+                      disabled={Boolean(dutyBusy) || Boolean(sent)}
+                      onClick={() => {
+                        if (!employee) {
+                          return;
+                        }
+                        setDutyBusy(choice.type);
+                        setDutyNote("");
+                        void createLeave(employee.id, today, today, choice.label, choice.type, false)
+                          .then(async () => {
+                            const leaves = await getLeaves();
+                            setMyLeaves(Array.isArray(leaves) ? leaves : []);
+                            setDutyNote(`${choice.label} was sent to HR.`);
+                          })
+                          .catch((err) => {
+                            setDutyNote(err instanceof Error ? err.message : "Unable to send this request.");
+                          })
+                          .finally(() => setDutyBusy(""));
+                      }}
+                    >
+                      <strong>{choice.label}</strong>
+                      <em>{dutyBusy === choice.type ? "Sending..." : status}</em>
+                    </button>
+                  );
+                })}
+              </div>
+              {dutyNote && <p>{dutyNote}</p>}
             </section>
             <section className="panel">
               <div className="panel-header">

@@ -54,6 +54,7 @@ export default function Payroll() {
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [payMonth, setPayMonth] = useState(currentMonth());
 
+  const [ctc, setCtc] = useState("");
   const [hra, setHra] = useState("");
   const [bonus, setBonus] = useState("");
   const [overtime, setOvertime] = useState("");
@@ -239,6 +240,7 @@ export default function Payroll() {
         employeeId: Number(selectedEmployee),
         payMonth,
         autoFromAttendance,
+        ctc: toOptionalNumber(ctc),
         hra: toOptionalNumber(hra),
         bonus: toOptionalNumber(bonus),
         overtime: toOptionalNumber(overtime),
@@ -251,6 +253,7 @@ export default function Payroll() {
 
       setMessage("Payroll generated successfully.");
 
+      setCtc("");
       setHra("");
       setBonus("");
       setOvertime("");
@@ -557,7 +560,7 @@ export default function Payroll() {
                     </strong>
                     <span>
                       {payMonth} runs from the 1st through day {new Date(Number(payMonth.slice(0, 4)), Number(payMonth.slice(5, 7)), 0).getDate()}. Worked {(autoComponents.workedMinutes / 60).toFixed(1)}h of {(autoComponents.expectedWorkMinutes / 60).toFixed(1)}h.
-                      {selectedEmployeeData?.baseSalary ? ` Monthly CTC amount ${money(selectedEmployeeData.baseSalary)}.` : " Save a CTC on the employee before pay can be calculated."}
+                      {ctc.trim() ? ` Yearly CTC ${money(Number(ctc))}. One month is ${money(Number(ctc) / 12)}.` : selectedEmployeeData?.baseSalary ? ` Monthly amount ${money(selectedEmployeeData.baseSalary)}.` : " Enter a yearly CTC, or save a base salary, before pay can be calculated."}
                     </span>
                     <span>
                       This amount goes into Leave Deduction {money(autoComponents.leaveDeduction)} and Overtime {money(autoComponents.overtimeAmount)}.
@@ -566,6 +569,19 @@ export default function Payroll() {
                 )}
               </div>
             )}
+
+            <label>
+              CTC
+              <input
+                min="0"
+                type="number"
+                step="0.01"
+                value={ctc}
+                onChange={(event) => setCtc(event.target.value)}
+                placeholder="Yearly amount"
+              />
+            </label>
+            <p>Yearly CTC. When base salary is empty, one month of pay is this amount divided by 12.</p>
 
             <label>
               HRA
@@ -743,6 +759,7 @@ export default function Payroll() {
                   <th>Month</th>
                   {isManagementRole && <th>Hours</th>}
                   <th>Gross Salary</th>
+                  {isManagementRole && <th>CTC</th>}
                   {isManagementRole && <th>PF</th>}
                   {isManagementRole && <th>Insurance</th>}
                   {isManagementRole && <th>Professional tax</th>}
@@ -774,6 +791,7 @@ export default function Payroll() {
                     )}
 
                     <td>{money(record.grossSalary)}</td>
+                    {isManagementRole && <td>{record.ctc ? money(record.ctc) : "—"}</td>}
 
                     {isManagementRole && <td>{money(record.pf)}</td>}
                     {isManagementRole && <td>{money(record.esi || 0)}</td>}

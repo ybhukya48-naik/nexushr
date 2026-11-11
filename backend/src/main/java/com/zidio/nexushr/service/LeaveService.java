@@ -206,6 +206,13 @@ public class LeaveService {
         );
     }
 
+    private boolean isDutyRequest(String type) {
+        return "WFH".equals(type)
+                || "SITE_MORNING".equals(type)
+                || "SITE_AFTERNOON".equals(type)
+                || "SITE_EVENING".equals(type);
+    }
+
     private String normalizeLeaveType(String leaveType) {
         if (leaveType == null || leaveType.isBlank()) {
             return "";
@@ -215,7 +222,7 @@ public class LeaveService {
 
     private void enforceLeavePolicy(Long employeeId, LeaveRequest request) {
         String type = normalizeLeaveType(request.getLeaveType());
-        if ("WFH".equals(type) || "SITE_MORNING".equals(type) || "SITE_AFTERNOON".equals(type)) {
+        if (isDutyRequest(type)) {
             return;
         }
         long requestedDays = ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
@@ -258,9 +265,9 @@ public class LeaveService {
                 .stream()
                 .filter(leave -> {
                     String type = normalizeLeaveType(leave.getLeaveType());
-                    return !"WFH".equals(type) && !"SITE_MORNING".equals(type) && !"SITE_AFTERNOON".equals(type);
+                    return !isDutyRequest(type);
                 })
-                .mapToLong(leave -> {
+                .mapToLong(leave ->
                         ChronoUnit.DAYS.between(
                                 leave.getStartDate(),
                                 leave.getEndDate()
