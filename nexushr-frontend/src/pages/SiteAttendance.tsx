@@ -139,7 +139,7 @@ export default function SiteAttendance() {
         {!signedIn && (
           <form onSubmit={(event) => void handleLogin(event)}>
             <label>
-              CYOND email or Gorle employee code
+              cyond email or Gorle employee code
               <input
                 type="text"
                 autoComplete="username"

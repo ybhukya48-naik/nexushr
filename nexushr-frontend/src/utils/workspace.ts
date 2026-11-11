@@ -34,7 +34,7 @@ export function workspaceName(company: WorkspaceCompany) {
 export function workspaceTagline(company: WorkspaceCompany) {
   return company === "GORLE"
     ? "Structural Engineering"
-    : "Waterproofing Diagnosis & Repair Experts";
+    : "The Building Doctor";
 }
 
 export function workspaceLogo(company: WorkspaceCompany) {

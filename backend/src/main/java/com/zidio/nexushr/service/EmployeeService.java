@@ -373,7 +373,7 @@ public class EmployeeService {
 
     public Employee findAccountForPasswordHelp(String email) {
         if (email == null || email.isBlank()) {
-            throw new IllegalArgumentException("Enter the CYOND email or the Gorle employee code");
+            throw new IllegalArgumentException("Enter the cyond email or the Gorle employee code");
         }
         String typed = email.trim();
         Employee employee = employeeRepository.findByEmailIgnoreCase(typed)

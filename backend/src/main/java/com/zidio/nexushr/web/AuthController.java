@@ -347,10 +347,10 @@ public class AuthController {
             }
 
             String message = rows.isEmpty()
-                    ? "That account is not saved yet. CYOND signs in with the email. Gorle Group signs in with the employee code."
+                    ? "That account is not saved yet. cyond signs in with the email. Gorle Group signs in with the employee code."
                     : sawInactive
                     ? "This employee account is not active."
-                    : "Password does not match. CYOND uses the email. Gorle Group uses the employee code.";
+                    : "Password does not match. cyond uses the email. Gorle Group uses the employee code.";
             return ResponseEntity.status(401).body(Map.of("message", message));
         } catch (Exception ex) {
             log.error("LOGIN_FAILED", ex);
@@ -368,7 +368,7 @@ public class AuthController {
         if ("GORLE".equalsIgnoreCase(companyCode)) {
             return code ? null : "Gorle Group signs in with the employee code, not the email.";
         }
-        return email ? null : "CYOND signs in with the email, not the employee code.";
+        return email ? null : "cyond signs in with the email, not the employee code.";
     }
 
     private boolean passwordMatches(String rawPassword, String storedHash) {

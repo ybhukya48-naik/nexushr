@@ -922,7 +922,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
             <div className="login-card-brand">
               <div className="login-brand-logos">
                 <div className="login-logo-slot">
-                  <img className="login-logo-cyond" src="/images/cyond-logo.jpeg" alt="CYOND" />
+                  <img className="login-logo-cyond" src="/images/cyond-logo.jpeg" alt="cyond" />
                 </div>
                 <div className="login-logo-slot">
                   <img className="login-logo-gorle" src="/images/gorle-group-emblem.jpg" alt="Gorle Group" />
@@ -948,12 +948,12 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
 
               <p>
                 {passwordHelp === "change"
-                  ? "CYOND uses the email. Gorle Group uses the employee code. Enter the password you use now, then choose a new one."
+                  ? "cyond uses the email. Gorle Group uses the employee code. Enter the password you use now, then choose a new one."
                   : passwordHelp === "forgot"
-                  ? "CYOND enters the email. Gorle Group enters the employee code. The new password is sent to the account email."
+                  ? "cyond enters the email. Gorle Group enters the employee code. The new password is sent to the account email."
                   : creating
-                  ? "Use your own email and password. CYOND signs in with that email. Gorle Group signs in with the employee code."
-                  : "CYOND signs in with the email. Gorle Group signs in with the employee code."}
+                  ? "Use your own email and password. cyond signs in with that email. Gorle Group signs in with the employee code."
+                  : "cyond signs in with the email. Gorle Group signs in with the employee code."}
               </p>
 
             </div>
@@ -1000,7 +1000,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
               )}
 
               <label>
-                <span>{passwordHelp === "forgot" ? "CYOND email or Gorle employee code" : "Email or employee code"}</span>
+                <span>{passwordHelp === "forgot" ? "cyond email or Gorle employee code" : "Email or employee code"}</span>
                 <div className="login-input-wrap">
                   <input
                     type="text"
@@ -1078,7 +1078,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
 
               {employee && !creating && (
                 <p className="login-notice">
-                  CYOND uses the email. Gorle Group uses the employee code. If you are new, create your profile. HR does not add it.
+                  cyond uses the email. Gorle Group uses the employee code. If you are new, create your profile. HR does not add it.
                 </p>
               )}
 
