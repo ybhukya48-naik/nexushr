@@ -22,7 +22,6 @@ public final class AttendanceRules {
     public static final LocalTime LUNCH_START = LocalTime.of(13, 0);
     public static final LocalTime LUNCH_END = LocalTime.of(13, 45);
     public static final LocalTime LUNCH_RETURN_DEADLINE = LocalTime.of(14, 0);
-    public static final LocalTime LOGOUT_DEADLINE = LocalTime.of(23, 0);
 
     public static final int WORK_MINUTES = 8 * 60;
     public static final int LUNCH_MINUTES = 60;
@@ -124,7 +123,31 @@ public final class AttendanceRules {
         return false;
     }
 
-    /** A day is finished after check-out, or after 11:00 PM if check-out was missed. */
+    /**
+     * A forgotten check-out closes 9 hours after check-in. That 9 already
+     * includes the flexible lunch hour. 09:30 closes at 18:30, 09:40 at 18:40,
+     * and 11:00 at 20:00. A fixed 18:30 does not cut a later check-in short.
+     */
+    public static LocalDateTime automaticLogoutAt(LocalDateTime checkIn) {
+        if (checkIn == null) {
+            return null;
+        }
+        return checkIn.plusMinutes(PRESENCE_MINUTES);
+    }
+
+    /** The person is still at the computer after the 9 hours, so extra time can be checked out manually. */
+    public static boolean stillWorkingPastFullDay(
+            LocalDateTime checkIn,
+            LocalDateTime lastActivity,
+            LocalDateTime now) {
+        LocalDateTime deadline = automaticLogoutAt(checkIn);
+        if (deadline == null || now == null || lastActivity == null || now.isBefore(deadline)) {
+            return false;
+        }
+        return !lastActivity.isBefore(deadline.minusMinutes(INACTIVE_LIMIT_MINUTES));
+    }
+
+    /** A day is finished after check-out, or on a later day once 9 hours from check-in have passed. */
     public static boolean dayComplete(
             LocalDateTime checkIn,
             LocalDateTime checkOut,
@@ -136,10 +159,11 @@ public final class AttendanceRules {
         if (checkOut != null) {
             return true;
         }
-        if (attendanceDate == null || now == null) {
+        LocalDateTime deadline = automaticLogoutAt(checkIn);
+        if (deadline == null || now == null || now.isBefore(deadline)) {
             return false;
         }
-        return !now.isBefore(attendanceDate.atTime(LOGOUT_DEADLINE));
+        return attendanceDate != null && attendanceDate.isBefore(now.toLocalDate());
     }
 
     /** Hours that count toward the month total. An open day stays out until it is finished. */
@@ -159,7 +183,8 @@ public final class AttendanceRules {
 
     /**
      * A finished day uses the stored minutes. An open check-in counts from
-     * that check-in until now, and stops at 11:00 PM.
+     * that check-in until now. A forgotten day from before today stops at
+     * 9 hours after check-in, so it does not keep adding overnight.
      */
     public static int countedWorkMinutes(
             LocalDateTime checkIn,
@@ -175,11 +200,9 @@ public final class AttendanceRules {
             return Math.max(0, storedWorkMinutes);
         }
         LocalDateTime end = now == null ? checkIn : now;
-        if (attendanceDate != null) {
-            LocalDateTime cap = attendanceDate.atTime(LOGOUT_DEADLINE);
-            if (end.isAfter(cap)) {
-                end = cap;
-            }
+        LocalDateTime cap = automaticLogoutAt(checkIn);
+        if (cap != null && end.isAfter(cap) && attendanceDate != null && attendanceDate.isBefore(end.toLocalDate())) {
+            end = cap;
         }
         if (!end.isAfter(checkIn)) {
             return Math.max(0, storedWorkMinutes);

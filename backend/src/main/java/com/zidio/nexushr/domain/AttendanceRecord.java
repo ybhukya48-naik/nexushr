@@ -138,16 +138,16 @@ public class AttendanceRecord {
     public Integer getWorkMinutes() {
         if (checkInTime != null && checkOutTime == null) {
             LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Kolkata"));
-            LocalDate day = attendanceDate != null ? attendanceDate : checkInTime.toLocalDate();
-            LocalDateTime deadline = day.atTime(AttendanceRules.LOGOUT_DEADLINE);
-            LocalDateTime end = now.isAfter(deadline) ? deadline : now;
+            LocalDateTime deadline = AttendanceRules.automaticLogoutAt(checkInTime);
+            boolean earlierDay = deadline != null && attendanceDate != null && attendanceDate.isBefore(now.toLocalDate());
+            LocalDateTime end = earlierDay && now.isAfter(deadline) ? deadline : now;
             if (end.isBefore(checkInTime)) {
                 end = checkInTime;
             }
             int elapsed = AttendanceRules.sessionMinutes(checkInTime, end);
             int breaks = breakMinutes == null ? 0 : breakMinutes;
             int presence = Math.max(0, elapsed - breaks);
-            if (now.isBefore(deadline)) {
+            if (!earlierDay || deadline == null || now.isBefore(deadline)) {
                 return presence;
             }
             return AttendanceRules.payableWorkMinutes(presence, breaks);

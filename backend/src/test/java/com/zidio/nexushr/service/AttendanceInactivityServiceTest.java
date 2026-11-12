@@ -42,7 +42,7 @@ class AttendanceInactivityServiceTest {
     private NotificationService notificationService;
 
     @Test
-    void closeExpiredOpenSessions_logsOutALateCheckInAt11PmAndLeavesTodayOpen() {
+    void closeExpiredOpenSessions_logsOutAForgottenDayNineHoursAfterCheckIn() {
         Employee employee = new Employee();
         employee.setId(7L);
         employee.setFullName("Bhukya Yakub");
@@ -88,12 +88,12 @@ class AttendanceInactivityServiceTest {
 
         service.closeExpiredOpenSessions();
 
-        assertThat(missed.getCheckOutTime()).isEqualTo(yesterday.atTime(23, 0));
+        assertThat(missed.getCheckOutTime()).isEqualTo(yesterday.atTime(10, 15, 21).plusHours(9));
         assertThat(missed.getBlueFlag()).isTrue();
         assertThat(missed.getAttendanceStatus()).isEqualTo("CLOSED");
         assertThat(missed.getWorkMinutes()).isEqualTo(
                 AttendanceRules.payableWorkMinutes(
-                        AttendanceRules.sessionMinutes(yesterday.atTime(10, 15, 21), yesterday.atTime(23, 0)),
+                        AttendanceRules.sessionMinutes(yesterday.atTime(10, 15, 21), yesterday.atTime(10, 15, 21).plusHours(9)),
                         0));
         assertThat(stillWorking.getCheckOutTime()).isNull();
     }

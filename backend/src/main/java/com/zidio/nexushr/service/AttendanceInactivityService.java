@@ -71,8 +71,8 @@ public class AttendanceInactivityService {
     }
 
     /**
-     * The 11:00 PM job only runs while the server is awake. This closes any day
-     * that is still open after that deadline, including a late morning check-in.
+     * Closes a forgotten check-in 9 hours after check-in. Someone still active
+     * after those 9 hours stays checked in, so a manual check-out can keep the extra time.
      */
     @Scheduled(fixedDelay = 600_000, initialDelay = 20_000)
     @Transactional
@@ -83,8 +83,11 @@ public class AttendanceInactivityService {
                 LocalDate date = record.getAttendanceDate() != null
                         ? record.getAttendanceDate()
                         : record.getCheckInTime().toLocalDate();
-                LocalDateTime deadline = date.atTime(AttendanceRules.LOGOUT_DEADLINE);
-                if (now.isBefore(deadline)) {
+                LocalDateTime deadline = AttendanceRules.automaticLogoutAt(record.getCheckInTime());
+                if (deadline == null || now.isBefore(deadline)) {
+                    continue;
+                }
+                if (AttendanceRules.stillWorkingPastFullDay(record.getCheckInTime(), record.getLastActivityAt(), now)) {
                     continue;
                 }
                 attendancePolicyService.automaticLogout(record);
@@ -97,11 +100,11 @@ public class AttendanceInactivityService {
                 notify(
                         employee,
                         "Automatic logout",
-                        marker + ". You were logged out at 11:00 PM. The attendance record is kept and marked with a blue flag.",
+                        marker + ". Check-out was saved 9 hours after check-in. The attendance record is kept.",
                         false);
-                notifyReportingManager(employee, marker, "was logged out automatically at 11:00 PM", false);
+                notifyReportingManager(employee, marker, "was checked out automatically 9 hours after check-in", false);
             } catch (RuntimeException ex) {
-                log.warn("Could not close attendance left open past 11:00 PM for record {}", record.getId(), ex);
+                log.warn("Could not close a forgotten check-in for record {}", record.getId(), ex);
             }
         }
     }
@@ -209,8 +212,8 @@ public class AttendanceInactivityService {
         notify(
                 employee,
                 "Automatic logout",
-                marker + ". You were logged out at 11:00 PM. The attendance record is kept and marked with a blue flag.");
-        notifyReportingManager(employee, marker, "was logged out automatically at 11:00 PM", true);
+                marker + ". Check-out was saved 9 hours after check-in. The attendance record is kept.");
+        notifyReportingManager(employee, marker, "was checked out automatically 9 hours after check-in", true);
     }
 
     private void notifyReportingManager(Employee employee, String marker, String reason) {
@@ -286,7 +289,7 @@ class CloseExpiredAttendanceOnStartup implements ApplicationRunner {
             attendanceInactivityService.closeExpiredOpenSessions();
         } catch (RuntimeException ex) {
             LoggerFactory.getLogger(CloseExpiredAttendanceOnStartup.class)
-                    .warn("Could not close attendance left open past 11:00 PM", ex);
+                    .warn("Could not close a forgotten check-in", ex);
         }
     }
 }

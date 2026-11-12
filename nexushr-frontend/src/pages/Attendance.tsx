@@ -46,12 +46,36 @@ function normalizeAttendanceDate(value?: string) {
 }
 
 function logoutDeadlineMs(record?: { attendanceDate?: string; checkInTime?: string } | null) {
-  const dateKey = String(record?.attendanceDate || record?.checkInTime || "").slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+  if (!record?.checkInTime) {
     return null;
   }
-  const deadline = new Date(`${dateKey}T23:00:00+05:30`);
-  return Number.isNaN(deadline.getTime()) ? null : deadline.getTime();
+  const start = new Date(record.checkInTime);
+  if (Number.isNaN(start.getTime())) {
+    return null;
+  }
+  return start.getTime() + 9 * 60 * 60 * 1000;
+}
+
+function istDateKey(now: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+function forgotCheckout(record?: { attendanceDate?: string; checkInTime?: string; checkOutTime?: string } | null, now = new Date()) {
+  const deadline = logoutDeadlineMs(record);
+  const dateKey = String(record?.attendanceDate || record?.checkInTime || "").slice(0, 10);
+  return Boolean(
+    record?.checkInTime
+    && !record.checkOutTime
+    && deadline
+    && now.getTime() >= deadline
+    && /^\d{4}-\d{2}-\d{2}$/.test(dateKey)
+    && dateKey < istDateKey(now),
+  );
 }
 
 /** Office punches work on a Windows or Mac computer. A phone stays blocked. */
@@ -70,7 +94,7 @@ export function isWindowsComputer() {
   return /Windows NT|Macintosh|Mac OS X/i.test(ua);
 }
 
-/** A finished day has a check-out, or it is past 11:00 PM. An open check-in is not finished. */
+/** A finished day has a check-out, or it is a previous day past 9 hours from check-in. */
 export function dayIsComplete(
   record?: { checkInTime?: string; checkOutTime?: string; attendanceDate?: string } | null,
   now = new Date(),
@@ -81,19 +105,15 @@ export function dayIsComplete(
   return Boolean(record.checkOutTime) || isCheckoutMissing(record, now);
 }
 
-/** A missed check-out is only after 11:00 PM. Signing out of the site is not a check-out. */
+/** A missed check-out is a previous day still open 9 hours after check-in. Signing out of the site is not a check-out. */
 export function isCheckoutMissing(
   record?: { checkInTime?: string; checkOutTime?: string; attendanceDate?: string } | null,
   now = new Date(),
 ) {
-  if (!record?.checkInTime || record.checkOutTime) {
-    return false;
-  }
-  const deadline = logoutDeadlineMs(record);
-  return deadline != null && now.getTime() >= deadline;
+  return forgotCheckout(record, now);
 }
 
-/** Checkout to show. After 11:00 PM the day is closed even if the punch was missed. */
+/** Checkout to show. A forgotten previous day closes 9 hours after check-in. */
 export function shownCheckOut(
   record?: { checkInTime?: string; checkOutTime?: string; attendanceDate?: string } | null,
   now = new Date(),
@@ -101,15 +121,11 @@ export function shownCheckOut(
   if (record?.checkOutTime) {
     return record.checkOutTime;
   }
-  if (!record?.checkInTime) {
+  if (!forgotCheckout(record, now)) {
     return undefined;
   }
   const deadline = logoutDeadlineMs(record);
-  if (deadline != null && now.getTime() >= deadline) {
-    const dateKey = String(record.attendanceDate || record.checkInTime).slice(0, 10);
-    return `${dateKey}T23:00:00`;
-  }
-  return undefined;
+  return deadline == null ? undefined : new Date(deadline).toISOString();
 }
 
 export const DAY_PRESENCE_MINUTES = 9 * 60;
@@ -129,7 +145,7 @@ export function presenceMinutes(
     return Math.max(0, record.workMinutes ?? 0);
   }
   const deadline = logoutDeadlineMs(record);
-  const pastLogout = !record.checkOutTime && deadline != null && now.getTime() >= deadline;
+  const pastLogout = forgotCheckout(record, now);
   const end = record.checkOutTime
     ? new Date(record.checkOutTime)
     : pastLogout && deadline != null
@@ -170,7 +186,7 @@ export function presenceSeconds(
     return Math.max(0, (record.workMinutes ?? 0) * 60);
   }
   const deadline = logoutDeadlineMs(record);
-  const pastLogout = !record.checkOutTime && deadline != null && now.getTime() >= deadline;
+  const pastLogout = forgotCheckout(record, now);
   const end = record.checkOutTime
     ? new Date(record.checkOutTime)
     : pastLogout && deadline != null
@@ -235,7 +251,7 @@ export function clockedWorkMinutes(
     return Math.max(0, record.workMinutes ?? 0);
   }
   const deadline = logoutDeadlineMs(record);
-  const pastLogout = !record.checkOutTime && deadline != null && now.getTime() >= deadline;
+  const pastLogout = forgotCheckout(record, now);
   const end = record.checkOutTime
     ? new Date(record.checkOutTime)
     : pastLogout && deadline != null
@@ -1687,9 +1703,8 @@ export default function Attendance() {
                   <td>
                     {[
                       row?.lateWarning ? "Late" : "",
-                      row?.yellowFlag ? "Yellow" : "",
-                      row?.redFlag ? "Red" : "",
-                      row?.blueFlag ? "Blue" : "",
+                      row?.yellowFlag ? "Inactive" : "",
+                      row?.blueFlag ? "No check-out" : "",
                     ].filter(Boolean).join(", ") || "-"}
                   </td>
                   <td>{row?.deductedMinutes ? formatAsHours(row.deductedMinutes) : "-"}</td>

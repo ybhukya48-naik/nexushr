@@ -133,7 +133,7 @@ export default function SiteAttendance() {
         <h1>Check in with a selfie</h1>
         <p>
           This phone app is only for site staff. Check in and check out each need a photo.
-          If you are still checked in at 11:00 PM, logout happens automatically and the attendance record stays.
+          If you forget to check out, check-out is saved 9 hours after check-in and the attendance record stays.
         </p>
 
         {!signedIn && (

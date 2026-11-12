@@ -1458,11 +1458,14 @@ function EmployeeDashboard() {
         const workday = new Date().getDay() !== 0;
         const notices = [
           workday && !todayRecord?.checkInTime ? "Check-in is missing today." : "",
-          todayRecord?.checkInTime && !todayRecord.checkOutTime && !isCheckoutMissing(todayRecord)
-            ? "You are still checked in. Signing out of the website does not check you out. If you do not check out, logout is automatic at 11:00 PM."
+          todayRecord?.checkInTime && !todayRecord.checkOutTime && todaySeconds < 9 * 60 * 60
+            ? "You are still checked in. Signing out of the website does not check you out. If you forget, check-out is saved 9 hours after check-in."
+            : "",
+          todayRecord?.checkInTime && !todayRecord.checkOutTime && todaySeconds >= 9 * 60 * 60
+            ? "9 hours are complete. Extra hours are showing. Check out when you leave."
             : "",
           isCheckoutMissing(todayRecord)
-            ? "Check-out was missed. Automatic logout at 11:00 PM keeps the attendance record."
+            ? "Check-out was missed. It is saved 9 hours after check-in, and the attendance record stays."
             : "",
           todayRecord?.yellowFlag
             ? "Desktop was inactive for more than 15 minutes. This is a warning."
@@ -1716,12 +1719,13 @@ function EmployeeDashboard() {
                       <th>Check out</th>
                       <th>Working hours</th>
                       <th>Extra working hours</th>
+                      <th>Flags</th>
                     </tr>
                   </thead>
                   <tbody>
                     {detailsLoading ? (
                       <tr>
-                        <td colSpan={5}>Loading the last 30 days...</td>
+                        <td colSpan={6}>Loading the last 30 days...</td>
                       </tr>
                     ) : monthDateKeys().slice().reverse().map((date) => {
                       const row = records.find((item) => item.attendanceDate?.slice(0, 10) === date);
@@ -1731,9 +1735,14 @@ function EmployeeDashboard() {
                         <tr key={date}>
                           <td>{new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
                           <td>{dayPairs.length > 0 ? dayPairs.map((pair) => pair.checkIn).join(", ") : "—"}</td>
-                          <td>{!row?.checkInTime ? "—" : !checkOut ? "Still in" : dayPairs.length > 0 ? dayPairs.map((pair) => pair.checkOut ?? "23:00").join(", ") : formatClock(checkOut)}</td>
+                          <td>{!row?.checkInTime ? "—" : !checkOut ? "Still in" : dayPairs.length > 0 ? dayPairs.map((pair) => pair.checkOut ?? formatClock(checkOut)).join(", ") : formatClock(checkOut)}</td>
                           <td>{row?.checkInTime ? formatHoursSeconds(dayCountedSeconds(row, clockNow)) : "No check-in"}</td>
                           <td>{row?.checkInTime ? formatHoursSeconds(dayExtraSeconds(row, clockNow)) : "—"}</td>
+                          <td>{[
+                            row?.lateWarning ? "Late" : "",
+                            row?.yellowFlag ? "Inactive" : "",
+                            row?.blueFlag ? "No check-out" : "",
+                          ].filter(Boolean).join(", ") || "—"}</td>
                         </tr>
                       );
                     })}

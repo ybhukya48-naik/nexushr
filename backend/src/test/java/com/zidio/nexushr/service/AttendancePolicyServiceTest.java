@@ -41,7 +41,7 @@ class AttendancePolicyServiceTest {
     private AttendancePolicyService attendancePolicyService;
 
     @Test
-    void automaticLogoutClosesTheOpenDayAt11PmAndKeepsTheRecord() {
+    void automaticLogoutClosesTheOpenDayNineHoursAfterCheckIn() {
         Employee employee = new Employee();
         employee.setId(1L);
         employee.setFullName("Site Staff");
@@ -60,10 +60,10 @@ class AttendancePolicyServiceTest {
 
         attendancePolicyService.automaticLogout(record);
 
-        assertThat(record.getCheckOutTime()).isEqualTo(LocalDateTime.of(2026, 10, 22, 23, 0));
+        assertThat(record.getCheckOutTime()).isEqualTo(LocalDateTime.of(2026, 10, 22, 18, 30));
         assertThat(record.getBlueFlag()).isTrue();
         assertThat(record.getAttendanceStatus()).isEqualTo("CLOSED");
-        assertThat(record.getWorkMinutes()).isEqualTo(750);
+        assertThat(record.getWorkMinutes()).isEqualTo(480);
         verify(auditRepository).save(any());
     }
 

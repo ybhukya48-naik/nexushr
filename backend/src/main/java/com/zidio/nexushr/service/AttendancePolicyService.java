@@ -108,11 +108,8 @@ public class AttendancePolicyService {
         if (record.getCheckInTime() == null || record.getCheckOutTime() != null) {
             return;
         }
-        LocalDate date = record.getAttendanceDate() == null
-                ? LocalDate.now(AttendanceService.COMPANY_ZONE)
-                : record.getAttendanceDate();
-        LocalDateTime deadline = date.atTime(AttendanceRules.LOGOUT_DEADLINE);
-        LocalDateTime checkoutAt = record.getCheckInTime().isAfter(deadline)
+        LocalDateTime deadline = AttendanceRules.automaticLogoutAt(record.getCheckInTime());
+        LocalDateTime checkoutAt = deadline == null || record.getCheckInTime().isAfter(deadline)
                 ? record.getCheckInTime()
                 : deadline;
         AttendanceDay day = new AttendanceDay();
@@ -143,7 +140,7 @@ public class AttendancePolicyService {
         record.setLastActivityAt(checkoutAt);
         applyMonthPenalties(record);
         audit(record, record.getEmployee(), "AUTO_LOGOUT",
-                "Automatic logout at 11:00 PM. The attendance record is kept.");
+                "Automatic check-out 9 hours after check-in. The attendance record is kept.");
     }
 
     public void markMissingLogout(AttendanceRecord record) {
