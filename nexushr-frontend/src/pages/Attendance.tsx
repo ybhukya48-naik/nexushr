@@ -295,7 +295,7 @@ async function attendanceRequest<T>(
 }
 export async function checkIn(
   employeeId?: number,
-  place?: { latitude: number; longitude: number } | null,
+  place?: { latitude: number; longitude: number; accuracy?: number } | null,
 ) {
   const params = new URLSearchParams();
   if (employeeId != null) {
@@ -304,6 +304,9 @@ export async function checkIn(
   if (place) {
     params.set("latitude", String(place.latitude));
     params.set("longitude", String(place.longitude));
+    if (Number.isFinite(place.accuracy)) {
+      params.set("accuracyMeters", String(place.accuracy));
+    }
   }
   const query = params.toString();
   return attendanceRequest<AttendanceRecord>(`/attendance/check-in${query ? `?${query}` : ""}`, {
@@ -312,18 +315,34 @@ export async function checkIn(
 }
 
 export function readOfficeLocation() {
-  return new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
+  return new Promise<{ latitude: number; longitude: number; accuracy: number } | null>((resolve) => {
     if (!navigator.geolocation) {
       resolve(null);
       return;
     }
+    let settled = false;
+    const finish = (place: { latitude: number; longitude: number; accuracy: number } | null) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve(place);
+    };
+    const timer = window.setTimeout(() => finish(null), 4000);
     navigator.geolocation.getCurrentPosition(
-      (position) => resolve({
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      }),
-      () => resolve(null),
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
+      (position) => {
+        window.clearTimeout(timer);
+        finish({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        });
+      },
+      () => {
+        window.clearTimeout(timer);
+        finish(null);
+      },
+      { enableHighAccuracy: false, timeout: 3500, maximumAge: 300000 },
     );
   });
 }

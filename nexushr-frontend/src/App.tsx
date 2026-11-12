@@ -1519,7 +1519,6 @@ function EmployeeDashboard() {
                       </button>
                     </div>
                     {!isWindowsComputer() && <em>Check in works on a Windows or Mac computer. A phone cannot punch.</em>}
-                    <em>Office check-in uses your location at Mayfair Garden, Banjara Hills. Work from home needs HR approval.</em>
                     {punchNote && <em>{punchNote}</em>}
                   </div>
                   <div className="home-lunch-timer">

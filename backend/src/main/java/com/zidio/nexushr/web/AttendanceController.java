@@ -42,13 +42,14 @@ public class AttendanceController {
             @RequestParam(required = false) Long employeeId,
             @RequestParam(required = false) Double latitude,
             @RequestParam(required = false) Double longitude,
+            @RequestParam(required = false) Double accuracyMeters,
             Authentication authentication,
             HttpServletRequest request) {
 
         requireWindowsComputer(request);
         Long actorId = attendanceService.findEmployeeIdByUsername(authentication.getName());
         Long targetEmployeeId = punchTarget(employeeId, actorId, authentication);
-        return attendanceService.checkIn(targetEmployeeId, actorId, false, latitude, longitude);
+        return attendanceService.checkIn(targetEmployeeId, actorId, false, latitude, longitude, accuracyMeters);
     }
 
     @PostMapping("/check-out")

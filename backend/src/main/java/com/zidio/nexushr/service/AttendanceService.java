@@ -188,22 +188,28 @@ public class AttendanceService {
             Long actorId,
             boolean selfieAttached,
             Double latitude,
-            Double longitude) {
+            Double longitude,
+            Double accuracyMeters) {
         if (!selfieAttached) {
-            requireOfficeOrApprovedHome(employeeId, latitude, longitude);
+            requireOfficeOrApprovedHome(employeeId, latitude, longitude, accuracyMeters);
         }
         return checkIn(employeeId, actorId, selfieAttached);
     }
 
-    private void requireOfficeOrApprovedHome(Long employeeId, Double latitude, Double longitude) {
+    private void requireOfficeOrApprovedHome(
+            Long employeeId,
+            Double latitude,
+            Double longitude,
+            Double accuracyMeters) {
         if (workFromHomeApproved(employeeId)) {
             return;
         }
-        if (latitude == null || longitude == null) {
-            throw badRequest("Office check-in needs your location. Allow location, or ask HR to approve work from home.");
+        // Some office computers cannot share a location, or the reading is too rough to trust.
+        if (latitude == null || longitude == null || (accuracyMeters != null && accuracyMeters > 1000)) {
+            return;
         }
         if (!OfficeFence.inside(latitude, longitude)) {
-            throw badRequest("You are outside the office at Mayfair Garden, Banjara Hills. Ask HR to approve work from home, then check in.");
+            throw badRequest("You are outside the office. Ask HR to approve work from home, then check in.");
         }
     }
 

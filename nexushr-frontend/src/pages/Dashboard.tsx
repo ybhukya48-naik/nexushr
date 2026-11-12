@@ -796,7 +796,7 @@ export default function Dashboard() {
       <section className="hr-card hr-lunch">
         <div>
           <strong>Check in and check out</strong>
-          <p className="hr-empty">The lunch hour is flexible. Office check-in uses your location at Mayfair Garden, Banjara Hills. Work from home needs HR approval.</p>
+          <p className="hr-empty">The lunch hour is flexible. Check out when you leave, and check in when you are back. It can be any hour.</p>
         </div>
         <div className="hr-timer" aria-live="polite">
           <span>{selfOut ? "Lunch timer" : "Work timer"}</span>
