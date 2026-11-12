@@ -40,5 +40,5 @@ export function workspaceTagline(company: WorkspaceCompany) {
 export function workspaceLogo(company: WorkspaceCompany) {
   return company === "GORLE"
     ? "/images/gorle-group-emblem.png"
-    : "/images/cyond-logo.png";
+    : "/images/cyond-logo-light.png";
 }

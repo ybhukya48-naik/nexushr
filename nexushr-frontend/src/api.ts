@@ -22,7 +22,7 @@ function resolveApiBase() {
 export const API_BASE = resolveApiBase();
 
 const SESSION_KEY = "nexushr_session_until";
-export const WEBSITE_SESSION_MS = 60 * 60 * 1000;
+export const WEBSITE_SESSION_MS = 12 * 60 * 60 * 1000;
 
 export function beginWebsiteSession() {
   localStorage.setItem(SESSION_KEY, String(Date.now() + WEBSITE_SESSION_MS));
