@@ -24,6 +24,8 @@ import {
   getEmployeeAttendance,
   getLeaves,
   clockedWorkMinutes,
+  dayCountedSeconds,
+  formatHoursSeconds,
   isWindowsComputer,
   monthDateKeys,
   shownCheckOut,
@@ -192,6 +194,9 @@ export default function Dashboard() {
   const [dutyBusy, setDutyBusy] = useState("");
   const [dutyNote, setDutyNote] = useState("");
   const [dailyCounts, setDailyCounts] = useState<DailyCheckInCount[]>([]);
+  const [pickedDay, setPickedDay] = useState("");
+  const [pickedRows, setPickedRows] = useState<AttendanceRecord[]>([]);
+  const [pickedLoading, setPickedLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -420,6 +425,26 @@ export default function Dashboard() {
     return Math.max(0, Math.floor((end - start - breakMs) / 1000));
   })();
   const lunchPerson = people.find((person) => String(person.id) === lunchEmployeeId);
+  async function openDay(date: string) {
+    const day = date.slice(0, 10);
+    setPickedDay(day);
+    setRosterDate(day);
+    setRosterView("date");
+    setLunchEmployeeId("");
+    setPickedLoading(true);
+    try {
+      const rows = await getAttendanceByDate(day);
+      setPickedRows(asList<AttendanceRecord>(rows).filter((row) =>
+        isListedEmployee(row.employee?.roleType)
+        && (isCompanyMatch(row.employee?.companyCode, company) || people.some((person) => person.id === row.employee?.id)),
+      ));
+    } catch {
+      setPickedRows([]);
+    } finally {
+      setPickedLoading(false);
+    }
+  }
+
   function viewAllToday() {
     setLunchEmployeeId("");
     setPunchNote("");
@@ -571,7 +596,7 @@ export default function Dashboard() {
         <div className="hr-card-title">
           <h3>Checked in, day by day</h3>
         </div>
-        <p>Today, yesterday, and every earlier day. This is the number of people who checked in, not only the last 30 days.</p>
+        <p>Click a day to see who checked in. Today, yesterday, and every earlier day.</p>
         <div className="hr-history-table">
           <table className="employees-table">
             <thead>
@@ -585,15 +610,61 @@ export default function Dashboard() {
                 <tr>
                   <td colSpan={2}>No check-ins yet.</td>
                 </tr>
-              ) : dailyCounts.map((row) => (
-                <tr key={row.date}>
-                  <td>{displayDate(String(row.date).slice(0, 10))}</td>
-                  <td>{row.checkedIn}</td>
-                </tr>
-              ))}
+              ) : dailyCounts.map((row) => {
+                const day = String(row.date).slice(0, 10);
+                return (
+                  <tr key={day}>
+                    <td>
+                      <button type="button" className="panel-link" onClick={() => void openDay(day)}>
+                        {displayDate(day)}
+                      </button>
+                    </td>
+                    <td>{row.checkedIn}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
+        {pickedDay && (
+          <>
+            <h3>{displayDate(pickedDay)}</h3>
+            <div className="hr-history-table">
+              <table className="employees-table">
+                <thead>
+                  <tr>
+                    <th>Employee</th>
+                    <th>Check in</th>
+                    <th>Check out</th>
+                    <th>Working hours</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pickedLoading ? (
+                    <tr>
+                      <td colSpan={4}>Loading {displayDate(pickedDay)}...</td>
+                    </tr>
+                  ) : activePeople.length === 0 ? (
+                    <tr>
+                      <td colSpan={4}>No employees for this company.</td>
+                    </tr>
+                  ) : activePeople.map((person) => {
+                    const row = pickedRows.find((item) => item.employee?.id === person.id);
+                    const checkOut = shownCheckOut(row);
+                    return (
+                      <tr key={person.id}>
+                        <td>{person.fullName}</td>
+                        <td>{row?.checkInTime ? clock(row.checkInTime) : "—"}</td>
+                        <td>{checkOut ? clock(checkOut) : row?.checkInTime ? "Still in" : "—"}</td>
+                        <td>{row?.checkInTime ? formatHoursSeconds(dayCountedSeconds(row, clockNow)) : "No check-in"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </section>
 
       <section className="hr-card">

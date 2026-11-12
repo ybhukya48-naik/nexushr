@@ -44,12 +44,10 @@ import {
   sendAttendanceHeartbeat,
   type AttendanceAuditEntry,
   type LeaveRequest,
-  datesFrom,
   dayCountedSeconds,
   dayExtraSeconds,
   dayIsComplete,
   formatHoursSeconds,
-  getDailyCheckInCounts,
   isCheckoutMissing,
   isWindowsComputer,
   monthDateKeys,
@@ -57,7 +55,6 @@ import {
   shownCheckOut,
   writeDashboardSnapshot,
   type AttendanceRecord,
-  type DailyCheckInCount,
 } from "./pages/Attendance";
 import {
   asWorkspaceCompany,
@@ -1235,7 +1232,6 @@ function EmployeeDashboard() {
   const [dutyBusy, setDutyBusy] = useState("");
   const [dutyNote, setDutyNote] = useState("");
   const [clockNow, setClockNow] = useState(() => new Date());
-  const [dailyCounts, setDailyCounts] = useState<DailyCheckInCount[]>([]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setClockNow(new Date()), 1000);
@@ -1257,8 +1253,7 @@ function EmployeeDashboard() {
           getLeaves().catch(() => []),
           getEmployeePayroll(me.id).catch(() => []),
           getHolidays().catch(() => []),
-          getDailyCheckInCounts().catch(() => []),
-        ]).then(([history, punches, leaves, payroll, holidays, counts]) => {
+        ]).then(([history, punches, leaves, payroll, holidays]) => {
           if (cancelled) {
             return;
           }
@@ -1282,7 +1277,6 @@ function EmployeeDashboard() {
             .filter((item) => item?.payMonth)
             .sort((a, b) => b.payMonth.localeCompare(a.payMonth))[0];
           setLatestPay(pay ?? null);
-          setDailyCounts(Array.isArray(counts) ? counts : []);
         });
       })
       .catch((err) => {
@@ -1363,8 +1357,6 @@ function EmployeeDashboard() {
       const savedHistory = [...history].sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
       setRecords(savedHistory);
       writeDashboardSnapshot(signedInEmployee, savedHistory);
-      const counts = await getDailyCheckInCounts().catch(() => []);
-      setDailyCounts(Array.isArray(counts) ? counts : []);
       setPunchNote(kind === "out" ? "Checked out." : "Checked in.");
     } catch (err) {
       setPunchNote(
@@ -1461,11 +1453,6 @@ function EmployeeDashboard() {
         const monthExtra = monthRows.reduce((sum, row) => sum + dayExtraSeconds(row, clockNow), 0);
         const historySeconds = records.reduce((sum, row) => sum + dayCountedSeconds(row, clockNow), 0);
         const historyExtra = records.reduce((sum, row) => sum + dayExtraSeconds(row, clockNow), 0);
-        const countByDate = new Map(dailyCounts.map((row) => [String(row.date).slice(0, 10), row.checkedIn]));
-        const recordedDates = records.map((row) => String(row.attendanceDate ?? "").slice(0, 10)).filter(Boolean);
-        const countedDates = dailyCounts.map((row) => String(row.date).slice(0, 10)).filter(Boolean);
-        const earliest = [...recordedDates, ...countedDates].sort()[0] || today;
-        const historyDays = datesFrom(earliest, today).slice().reverse();
         const warnings = monthRows.filter((row) => row.yellowFlag).length;
         const halfDay = warnings >= 3 ? Math.round(Number(employee.baseSalary || 0) / 26 / 2) : 0;
         const workday = new Date().getDay() !== 0;
@@ -1716,8 +1703,8 @@ function EmployeeDashboard() {
               <div className="panel-header">
                 <div>
                   <p className="eyebrow">HISTORY</p>
-                  <h3>Day by day</h3>
-                  <p>Today, yesterday, and every earlier day. People checked in is the company count. Your hours include seconds.</p>
+                  <h3>Last 30 days</h3>
+                  <p>Your check-in, check-out, and the working hours used for salary.</p>
                 </div>
               </div>
               <div className="employees-table-wrap month-history">
@@ -1725,7 +1712,6 @@ function EmployeeDashboard() {
                   <thead>
                     <tr>
                       <th>Date</th>
-                      <th>People checked in</th>
                       <th>Check in</th>
                       <th>Check out</th>
                       <th>Working hours</th>
@@ -1735,19 +1721,17 @@ function EmployeeDashboard() {
                   <tbody>
                     {detailsLoading ? (
                       <tr>
-                        <td colSpan={6}>Loading each day...</td>
+                        <td colSpan={5}>Loading the last 30 days...</td>
                       </tr>
-                    ) : historyDays.map((date) => {
+                    ) : monthDateKeys().slice().reverse().map((date) => {
                       const row = records.find((item) => item.attendanceDate?.slice(0, 10) === date);
-                      const pairs = punchPairs(audit, date, row);
+                      const dayPairs = punchPairs(audit, date, row);
                       const checkOut = shownCheckOut(row);
-                      const people = countByDate.get(date);
                       return (
                         <tr key={date}>
                           <td>{new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
-                          <td>{people == null ? "—" : people}</td>
-                          <td>{pairs.length > 0 ? pairs.map((pair) => pair.checkIn).join(", ") : "—"}</td>
-                          <td>{!row?.checkInTime ? "—" : !checkOut ? "Still in" : pairs.length > 0 ? pairs.map((pair) => pair.checkOut ?? "23:00").join(", ") : formatClock(checkOut)}</td>
+                          <td>{dayPairs.length > 0 ? dayPairs.map((pair) => pair.checkIn).join(", ") : "—"}</td>
+                          <td>{!row?.checkInTime ? "—" : !checkOut ? "Still in" : dayPairs.length > 0 ? dayPairs.map((pair) => pair.checkOut ?? "23:00").join(", ") : formatClock(checkOut)}</td>
                           <td>{row?.checkInTime ? formatHoursSeconds(dayCountedSeconds(row, clockNow)) : "No check-in"}</td>
                           <td>{row?.checkInTime ? formatHoursSeconds(dayExtraSeconds(row, clockNow)) : "—"}</td>
                         </tr>
