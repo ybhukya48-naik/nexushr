@@ -7660,10 +7660,11 @@ textarea {
 }
 
 .hours-totals article {
-  display: flex;
-  flex-direction: column;
+  display: flex !important;
+  flex-direction: column !important;
+  grid-template-columns: none !important;
   align-items: flex-start;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
   padding: 12px 14px;
   border: 1px solid #eaecf0;
@@ -7696,6 +7697,7 @@ textarea {
   line-height: 1.2;
   color: #101828;
   white-space: nowrap;
+  position: static;
 }
 
 .duty-choices {

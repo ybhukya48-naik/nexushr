@@ -588,7 +588,7 @@ export default function Notifications() {
         </section>
       )}
 
-      <section className="panel">
+      <section className="panel notification-list">
         <div className="panel-header">
           <div>
             <h3>
