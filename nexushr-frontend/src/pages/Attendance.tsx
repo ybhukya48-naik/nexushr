@@ -156,6 +156,71 @@ export function dayExtraMinutes(
   return Math.max(0, presenceMinutes(record, now) - DAY_PRESENCE_MINUTES);
 }
 
+const DAY_PRESENCE_SECONDS = DAY_PRESENCE_MINUTES * 60;
+
+export function presenceSeconds(
+  record?: Parameters<typeof presenceMinutes>[0],
+  now = new Date(),
+) {
+  if (!record?.checkInTime) {
+    return Math.max(0, (record?.workMinutes ?? 0) * 60);
+  }
+  const start = new Date(record.checkInTime);
+  if (Number.isNaN(start.getTime())) {
+    return Math.max(0, (record.workMinutes ?? 0) * 60);
+  }
+  const deadline = logoutDeadlineMs(record);
+  const pastLogout = !record.checkOutTime && deadline != null && now.getTime() >= deadline;
+  const end = record.checkOutTime
+    ? new Date(record.checkOutTime)
+    : pastLogout && deadline != null
+      ? new Date(deadline)
+      : now;
+  if (Number.isNaN(end.getTime()) || end.getTime() < start.getTime()) {
+    return Math.max(0, (record.workMinutes ?? 0) * 60);
+  }
+  const breakSeconds = Math.max(0, (record.breakMinutes ?? 0) * 60);
+  return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000) - breakSeconds);
+}
+
+export function dayCountedSeconds(
+  record?: Parameters<typeof presenceMinutes>[0],
+  now = new Date(),
+) {
+  return Math.min(DAY_PRESENCE_SECONDS, presenceSeconds(record, now));
+}
+
+export function dayExtraSeconds(
+  record?: Parameters<typeof presenceMinutes>[0],
+  now = new Date(),
+) {
+  return Math.max(0, presenceSeconds(record, now) - DAY_PRESENCE_SECONDS);
+}
+
+export function formatHoursSeconds(totalSeconds?: number) {
+  const safe = Math.max(0, Math.floor(totalSeconds ?? 0));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = safe % 60;
+  return `${hours}h ${minutes}m ${seconds}s`;
+}
+
+export function datesFrom(start: string, end: string) {
+  const dates: string[] = [];
+  const cursor = new Date(`${start}T00:00:00`);
+  const last = new Date(`${end}T00:00:00`);
+  if (Number.isNaN(cursor.getTime()) || Number.isNaN(last.getTime()) || cursor > last) {
+    return end ? [end] : [];
+  }
+  while (cursor <= last) {
+    const month = String(cursor.getMonth() + 1).padStart(2, "0");
+    const day = String(cursor.getDate()).padStart(2, "0");
+    dates.push(`${cursor.getFullYear()}-${month}-${day}`);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dates;
+}
+
 export function clockedWorkMinutes(
   record?: (Pick<AttendanceRecord, "checkInTime" | "checkOutTime" | "breakMinutes" | "workMinutes"> & {
     attendanceDate?: string;
@@ -432,6 +497,16 @@ export async function biometricCheckOut() {
   );
 }
 
+export interface DailyCheckInCount {
+  date: string;
+  checkedIn: number;
+}
+
+export async function getDailyCheckInCounts(company?: string) {
+  const query = company ? `?company=${encodeURIComponent(company)}` : "";
+  return attendanceRequest<DailyCheckInCount[]>(`/attendance/daily-counts${query}`);
+}
+
 export async function getAttendanceByDate(date: string) {
   return attendanceRequest<AttendanceRecord[]>(
     `/attendance?date=${encodeURIComponent(date)}`,
@@ -489,35 +564,34 @@ export function HoursTotals({ records, now }: { records: AttendanceRecord[]; now
     return date >= `${month}-01` && date <= today;
   };
   const monthRows = records.filter(inMonth);
-  const monthMinutes = monthRows.reduce((sum, row) => sum + dayCountedMinutes(row, now), 0);
-  const monthExtra = monthRows.reduce((sum, row) => sum + dayExtraMinutes(row, now), 0);
-  const historyMinutes = records.reduce((sum, row) => sum + dayCountedMinutes(row, now), 0);
-  const historyExtra = records.reduce((sum, row) => sum + dayExtraMinutes(row, now), 0);
-  const todayExtra = dayExtraMinutes(todayRow, now);
-  const asHours = (minutes: number) => `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  const monthSeconds = monthRows.reduce((sum, row) => sum + dayCountedSeconds(row, now), 0);
+  const monthExtra = monthRows.reduce((sum, row) => sum + dayExtraSeconds(row, now), 0);
+  const historySeconds = records.reduce((sum, row) => sum + dayCountedSeconds(row, now), 0);
+  const historyExtra = records.reduce((sum, row) => sum + dayExtraSeconds(row, now), 0);
+  const todayExtra = dayExtraSeconds(todayRow, now);
   return (
     <div className="hours-totals">
       <article>
         <span>Today working hours</span>
-        <strong>{asHours(dayCountedMinutes(todayRow, now))}</strong>
+        <strong>{formatHoursSeconds(dayCountedSeconds(todayRow, now))}</strong>
         <em>Up to 9 hours, including 1 flexible lunch hour</em>
       </article>
       <article>
         <span>Month working hours</span>
-        <strong>{asHours(monthMinutes)}</strong>
+        <strong>{formatHoursSeconds(monthSeconds)}</strong>
         <em>1st through today, 9 hours each day</em>
       </article>
       <article>
         <span>History total working hours</span>
-        <strong>{asHours(historyMinutes)}</strong>
+        <strong>{formatHoursSeconds(historySeconds)}</strong>
         <em>Every recorded day, up to 9 hours</em>
       </article>
       <article className="hours-extra">
         <span>Extra working hours</span>
-        <strong>{asHours(todayExtra)}</strong>
+        <strong>{formatHoursSeconds(todayExtra)}</strong>
         <em>Today. Not counted in the 9 hours.</em>
-        <em>Month {asHours(monthExtra)}</em>
-        <em>History {asHours(historyExtra)}</em>
+        <em>Month {formatHoursSeconds(monthExtra)}</em>
+        <em>History {formatHoursSeconds(historyExtra)}</em>
       </article>
     </div>
   );

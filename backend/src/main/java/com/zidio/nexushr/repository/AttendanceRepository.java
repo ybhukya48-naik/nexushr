@@ -3,6 +3,8 @@ package com.zidio.nexushr.repository;
 import com.zidio.nexushr.domain.AttendanceRecord;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -43,6 +45,17 @@ public interface AttendanceRepository
             LocalDate startDate,
             LocalDate endDate
     );
+
+    @Query("""
+            select a.attendanceDate, count(a)
+            from AttendanceRecord a
+            where a.checkInTime is not null
+              and a.employee.roleType = com.zidio.nexushr.domain.RoleType.EMPLOYEE
+              and a.employee.company.code = :companyCode
+            group by a.attendanceDate
+            order by a.attendanceDate desc
+            """)
+    List<Object[]> countCheckedInByDate(@Param("companyCode") String companyCode);
 
     long countByAttendanceDate(LocalDate attendanceDate);
 

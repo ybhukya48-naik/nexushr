@@ -346,6 +346,7 @@ public class SecurityConfig {
                 // Ownership is enforced by @PreAuthorize on the controller.
                 .requestMatchers(
                     HttpMethod.GET,
+                    "/api/v1/attendance/daily-counts",
                     "/api/v1/attendance/employee/*"
                 )
                 .hasAnyRole(

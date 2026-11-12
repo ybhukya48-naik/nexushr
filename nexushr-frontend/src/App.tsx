@@ -44,9 +44,12 @@ import {
   sendAttendanceHeartbeat,
   type AttendanceAuditEntry,
   type LeaveRequest,
-  dayCountedMinutes,
-  dayExtraMinutes,
+  datesFrom,
+  dayCountedSeconds,
+  dayExtraSeconds,
   dayIsComplete,
+  formatHoursSeconds,
+  getDailyCheckInCounts,
   isCheckoutMissing,
   isWindowsComputer,
   monthDateKeys,
@@ -54,6 +57,7 @@ import {
   shownCheckOut,
   writeDashboardSnapshot,
   type AttendanceRecord,
+  type DailyCheckInCount,
 } from "./pages/Attendance";
 import {
   asWorkspaceCompany,
@@ -1202,11 +1206,6 @@ const DUTY_CHOICES = [
   { type: "SITE_EVENING", label: "Evening site visit" },
 ] as const;
 
-function hoursLabel(minutes?: number) {
-  const value = Math.max(0, minutes ?? 0);
-  return `${Math.floor(value / 60)}h ${value % 60}m`;
-}
-
 function formatTimer(totalSeconds: number) {
   const safe = Math.max(0, totalSeconds);
   const hours = Math.floor(safe / 3600);
@@ -1236,6 +1235,7 @@ function EmployeeDashboard() {
   const [dutyBusy, setDutyBusy] = useState("");
   const [dutyNote, setDutyNote] = useState("");
   const [clockNow, setClockNow] = useState(() => new Date());
+  const [dailyCounts, setDailyCounts] = useState<DailyCheckInCount[]>([]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setClockNow(new Date()), 1000);
@@ -1257,7 +1257,8 @@ function EmployeeDashboard() {
           getLeaves().catch(() => []),
           getEmployeePayroll(me.id).catch(() => []),
           getHolidays().catch(() => []),
-        ]).then(([history, punches, leaves, payroll, holidays]) => {
+          getDailyCheckInCounts().catch(() => []),
+        ]).then(([history, punches, leaves, payroll, holidays, counts]) => {
           if (cancelled) {
             return;
           }
@@ -1281,6 +1282,7 @@ function EmployeeDashboard() {
             .filter((item) => item?.payMonth)
             .sort((a, b) => b.payMonth.localeCompare(a.payMonth))[0];
           setLatestPay(pay ?? null);
+          setDailyCounts(Array.isArray(counts) ? counts : []);
         });
       })
       .catch((err) => {
@@ -1361,6 +1363,8 @@ function EmployeeDashboard() {
       const savedHistory = [...history].sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
       setRecords(savedHistory);
       writeDashboardSnapshot(signedInEmployee, savedHistory);
+      const counts = await getDailyCheckInCounts().catch(() => []);
+      setDailyCounts(Array.isArray(counts) ? counts : []);
       setPunchNote(kind === "out" ? "Checked out." : "Checked in.");
     } catch (err) {
       setPunchNote(
@@ -1447,16 +1451,21 @@ function EmployeeDashboard() {
           const date = String(row.attendanceDate ?? "").slice(0, 10);
           return date >= `${month}-01` && date <= today;
         });
-        const todayMinutes = dayCountedMinutes(todayRecord, clockNow);
-        const todayExtra = dayExtraMinutes(todayRecord, clockNow);
+        const todaySeconds = dayCountedSeconds(todayRecord, clockNow);
+        const todayExtra = dayExtraSeconds(todayRecord, clockNow);
         const todayComplete = dayIsComplete(todayRecord, clockNow);
-        const doneMinutes = monthRows
+        const doneSeconds = monthRows
           .filter((row) => dayIsComplete(row, clockNow))
-          .reduce((sum, row) => sum + dayCountedMinutes(row, clockNow), 0);
-        const monthMinutes = monthRows.reduce((sum, row) => sum + dayCountedMinutes(row, clockNow), 0);
-        const monthExtra = monthRows.reduce((sum, row) => sum + dayExtraMinutes(row, clockNow), 0);
-        const historyMinutes = records.reduce((sum, row) => sum + dayCountedMinutes(row, clockNow), 0);
-        const historyExtra = records.reduce((sum, row) => sum + dayExtraMinutes(row, clockNow), 0);
+          .reduce((sum, row) => sum + dayCountedSeconds(row, clockNow), 0);
+        const monthSeconds = monthRows.reduce((sum, row) => sum + dayCountedSeconds(row, clockNow), 0);
+        const monthExtra = monthRows.reduce((sum, row) => sum + dayExtraSeconds(row, clockNow), 0);
+        const historySeconds = records.reduce((sum, row) => sum + dayCountedSeconds(row, clockNow), 0);
+        const historyExtra = records.reduce((sum, row) => sum + dayExtraSeconds(row, clockNow), 0);
+        const countByDate = new Map(dailyCounts.map((row) => [String(row.date).slice(0, 10), row.checkedIn]));
+        const recordedDates = records.map((row) => String(row.attendanceDate ?? "").slice(0, 10)).filter(Boolean);
+        const countedDates = dailyCounts.map((row) => String(row.date).slice(0, 10)).filter(Boolean);
+        const earliest = [...recordedDates, ...countedDates].sort()[0] || today;
+        const historyDays = datesFrom(earliest, today).slice().reverse();
         const warnings = monthRows.filter((row) => row.yellowFlag).length;
         const halfDay = warnings >= 3 ? Math.round(Number(employee.baseSalary || 0) / 26 / 2) : 0;
         const workday = new Date().getDay() !== 0;
@@ -1497,7 +1506,7 @@ function EmployeeDashboard() {
         );
         const wfhTime = !todayRecord?.checkInTime
           ? "No check-in yet"
-          : `Check in ${formatClock(todayRecord.checkInTime)} · ${todayRecord.checkOutTime ? `Check out ${formatClock(todayRecord.checkOutTime)}` : "Still in"} · ${hoursLabel(todayMinutes)}`;
+          : `Check in ${formatClock(todayRecord.checkInTime)} · ${todayRecord.checkOutTime ? `Check out ${formatClock(todayRecord.checkOutTime)}` : "Still in"} · ${formatHoursSeconds(todaySeconds)}`;
         const onLunch = Boolean(todayRecord?.checkInTime && todayRecord?.checkOutTime);
         const lunchStarted = onLunch ? new Date(String(todayRecord?.checkOutTime)).getTime() : 0;
         const lunchSeconds = lunchStarted
@@ -1505,6 +1514,30 @@ function EmployeeDashboard() {
           : Math.max(0, (todayRecord?.breakMinutes ?? 0) * 60);
         return (
           <>
+            <section className="panel">
+              <div className="hours-totals">
+                <article>
+                  <span>Today working hours</span>
+                  <strong>{formatHoursSeconds(todaySeconds)}</strong>
+                  <em>{!todayRecord?.checkInTime ? "Not started" : todayComplete ? "Complete" : "Still in"}</em>
+                </article>
+                <article>
+                  <span>Month working hours</span>
+                  <strong>{formatHoursSeconds(monthSeconds)}</strong>
+                  <em>1st through today. Salary uses finished days, {formatHoursSeconds(doneSeconds)}.</em>
+                </article>
+                <article>
+                  <span>History total working hours</span>
+                  <strong>{formatHoursSeconds(historySeconds)}</strong>
+                  <em>Every recorded day, up to 9 hours.</em>
+                </article>
+                <article className="hours-extra">
+                  <span>Extra working hours</span>
+                  <strong>{formatHoursSeconds(todayExtra)}</strong>
+                  <em>Not counted in the day. Month {formatHoursSeconds(monthExtra)}. History {formatHoursSeconds(historyExtra)}.</em>
+                </article>
+              </div>
+            </section>
             <section className="home-board">
               <article className="home-clock-card">
                 <span>{new Date().toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short" })} · General shift 9:30–6:30</span>
@@ -1610,7 +1643,7 @@ function EmployeeDashboard() {
                   );
                   const timeLine = !todayRecord?.checkInTime
                     ? "No check-in yet"
-                    : `Check in ${formatClock(todayRecord.checkInTime)} · ${todayRecord.checkOutTime ? `Check out ${formatClock(todayRecord.checkOutTime)}` : "Still in"} · ${hoursLabel(todayMinutes)}`;
+                    : `Check in ${formatClock(todayRecord.checkInTime)} · ${todayRecord.checkOutTime ? `Check out ${formatClock(todayRecord.checkOutTime)}` : "Still in"} · ${formatHoursSeconds(todaySeconds)}`;
                   const status = sent?.status === "APPROVED"
                     ? `Approved · ${timeLine}`
                     : sent
@@ -1678,35 +1711,13 @@ function EmployeeDashboard() {
                   ))}
                 </ul>
               )}
-              <div className="hours-totals">
-                <article>
-                  <span>Today working hours</span>
-                  <strong>{hoursLabel(todayMinutes)}</strong>
-                  <em>{!todayRecord?.checkInTime ? "Not started" : todayComplete ? "Complete" : "Still in"}</em>
-                </article>
-                <article>
-                  <span>Month working hours</span>
-                  <strong>{hoursLabel(monthMinutes)}</strong>
-                  <em>1st through today. Salary uses finished days, {hoursLabel(doneMinutes)}.</em>
-                </article>
-                <article>
-                  <span>History total working hours</span>
-                  <strong>{hoursLabel(historyMinutes)}</strong>
-                  <em>Every recorded day, up to 9 hours.</em>
-                </article>
-                <article className="hours-extra">
-                  <span>Extra working hours</span>
-                  <strong>{hoursLabel(todayExtra)}</strong>
-                  <em>Not counted in the day. Month {hoursLabel(monthExtra)}. History {hoursLabel(historyExtra)}.</em>
-                </article>
-              </div>
             </section>
             <section className="panel">
               <div className="panel-header">
                 <div>
                   <p className="eyebrow">HISTORY</p>
-                  <h3>Last 30 days</h3>
-                  <p>Check-in, check-out, and the working hours used for salary.</p>
+                  <h3>Day by day</h3>
+                  <p>Today, yesterday, and every earlier day. People checked in is the company count. Your hours include seconds.</p>
                 </div>
               </div>
               <div className="employees-table-wrap month-history">
@@ -1714,6 +1725,7 @@ function EmployeeDashboard() {
                   <thead>
                     <tr>
                       <th>Date</th>
+                      <th>People checked in</th>
                       <th>Check in</th>
                       <th>Check out</th>
                       <th>Working hours</th>
@@ -1723,19 +1735,21 @@ function EmployeeDashboard() {
                   <tbody>
                     {detailsLoading ? (
                       <tr>
-                        <td colSpan={5}>Loading the last 30 days...</td>
+                        <td colSpan={6}>Loading each day...</td>
                       </tr>
-                    ) : monthDateKeys().slice().reverse().map((date) => {
+                    ) : historyDays.map((date) => {
                       const row = records.find((item) => item.attendanceDate?.slice(0, 10) === date);
                       const pairs = punchPairs(audit, date, row);
                       const checkOut = shownCheckOut(row);
+                      const people = countByDate.get(date);
                       return (
                         <tr key={date}>
                           <td>{new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                          <td>{people == null ? "—" : people}</td>
                           <td>{pairs.length > 0 ? pairs.map((pair) => pair.checkIn).join(", ") : "—"}</td>
                           <td>{!row?.checkInTime ? "—" : !checkOut ? "Still in" : pairs.length > 0 ? pairs.map((pair) => pair.checkOut ?? "23:00").join(", ") : formatClock(checkOut)}</td>
-                          <td>{row?.checkInTime ? hoursLabel(dayCountedMinutes(row)) : "No check-in"}</td>
-                          <td>{row?.checkInTime ? hoursLabel(dayExtraMinutes(row)) : "—"}</td>
+                          <td>{row?.checkInTime ? formatHoursSeconds(dayCountedSeconds(row, clockNow)) : "No check-in"}</td>
+                          <td>{row?.checkInTime ? formatHoursSeconds(dayExtraSeconds(row, clockNow)) : "—"}</td>
                         </tr>
                       );
                     })}

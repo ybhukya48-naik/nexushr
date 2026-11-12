@@ -5,6 +5,7 @@ import com.zidio.nexushr.domain.Employee;
 import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
 import com.zidio.nexushr.domain.LeaveStatus;
 import com.zidio.nexushr.domain.PayrollRecord;
+import com.zidio.nexushr.domain.RoleType;
 import com.zidio.nexushr.repository.AttendanceRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.repository.LeaveRequestRepository;
@@ -13,6 +14,7 @@ import com.zidio.nexushr.web.dto.AttendanceImportResponse;
 import com.zidio.nexushr.web.dto.AttendanceImportRowError;
 import com.zidio.nexushr.web.dto.AttendanceMonthlyEmployeeSummary;
 import com.zidio.nexushr.web.dto.AttendanceMetricsResponse;
+import com.zidio.nexushr.web.dto.DailyCheckInCount;
 import com.zidio.nexushr.web.dto.AttendanceMonthlySummaryResponse;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -1389,6 +1391,35 @@ public class AttendanceService {
             totalShortfallMinutes,
             employeeSummaries
         );
+    }
+
+    public List<DailyCheckInCount> dailyCheckInCounts(String username, String requestedCompany) {
+        Employee employee = employeeRepository.findByEmailIgnoreCase(username == null ? "" : username.trim())
+                .or(() -> employeeRepository.findByEmployeeCodeIgnoreCase(username == null ? "" : username.trim()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Employee not found for authenticated user"));
+        String company = employee.getCompany() == null ? null : employee.getCompany().getCode();
+        RoleType role = employee.getRoleType();
+        boolean management = role == RoleType.HR || role == RoleType.ADMIN
+                || role == RoleType.MANAGER || role == RoleType.SUPER_ADMIN;
+        if (management && requestedCompany != null && !requestedCompany.isBlank()) {
+            company = requestedCompany.trim();
+        }
+        LocalDate today = LocalDate.now(COMPANY_ZONE);
+        if (company == null || company.isBlank()) {
+            return List.of(new DailyCheckInCount(today, 0));
+        }
+        Map<LocalDate, Long> counts = new HashMap<>();
+        for (Object[] row : attendanceRepository.countCheckedInByDate(company)) {
+            if (row[0] instanceof LocalDate date && row[1] instanceof Number number) {
+                counts.put(date, number.longValue());
+            }
+        }
+        LocalDate start = counts.keySet().stream().min(LocalDate::compareTo).orElse(today);
+        List<DailyCheckInCount> days = new ArrayList<>();
+        for (LocalDate date = today; !date.isBefore(start); date = date.minusDays(1)) {
+            days.add(new DailyCheckInCount(date, counts.getOrDefault(date, 0L)));
+        }
+        return days;
     }
 
     public Long findEmployeeIdByUsername(String username) {

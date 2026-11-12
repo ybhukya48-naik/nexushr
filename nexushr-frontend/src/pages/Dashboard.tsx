@@ -20,6 +20,7 @@ import {
   updateLeaveStatus,
   getAttendanceByDate,
   getAttendanceRange,
+  getDailyCheckInCounts,
   getEmployeeAttendance,
   getLeaves,
   clockedWorkMinutes,
@@ -27,6 +28,7 @@ import {
   monthDateKeys,
   shownCheckOut,
   type AttendanceRecord,
+  type DailyCheckInCount,
   type LeaveRequest,
 } from "./Attendance";
 import { isCompanyMatch } from "../utils/company";
@@ -189,6 +191,7 @@ export default function Dashboard() {
   const [payslipNote, setPayslipNote] = useState("");
   const [dutyBusy, setDutyBusy] = useState("");
   const [dutyNote, setDutyNote] = useState("");
+  const [dailyCounts, setDailyCounts] = useState<DailyCheckInCount[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -204,8 +207,9 @@ export default function Dashboard() {
       getLeaves().catch(() => [] as LeaveRequest[]),
       getHolidays().catch(() => [] as CompanyHoliday[]),
       getPayrollRecords().catch(() => [] as PayrollRecord[]),
+      getDailyCheckInCounts(company).catch(() => [] as DailyCheckInCount[]),
     ])
-      .then(async ([dashboard, current, employees, attendance, leaveRows, extraHolidays, payroll]) => {
+      .then(async ([dashboard, current, employees, attendance, leaveRows, extraHolidays, payroll, counts]) => {
         if (cancelled) {
           return;
         }
@@ -234,6 +238,7 @@ export default function Dashboard() {
           .sort((a, b) => b.payMonth.localeCompare(a.payMonth));
         setPayrollRows(slips);
         setPayslipId((currentId) => currentId || (slips[0] ? String(slips[0].id) : ""));
+        setDailyCounts(asList<DailyCheckInCount>(counts));
       })
       .catch((err) => {
         if (!cancelled) {
@@ -560,6 +565,35 @@ export default function Dashboard() {
           <strong>{late}</strong>
           <em>after 10:15</em>
         </button>
+      </section>
+
+      <section className="hr-card">
+        <div className="hr-card-title">
+          <h3>Checked in, day by day</h3>
+        </div>
+        <p>Today, yesterday, and every earlier day. This is the number of people who checked in, not only the last 30 days.</p>
+        <div className="hr-history-table">
+          <table className="employees-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>People checked in</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dailyCounts.length === 0 ? (
+                <tr>
+                  <td colSpan={2}>No check-ins yet.</td>
+                </tr>
+              ) : dailyCounts.map((row) => (
+                <tr key={row.date}>
+                  <td>{displayDate(String(row.date).slice(0, 10))}</td>
+                  <td>{row.checkedIn}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="hr-card">

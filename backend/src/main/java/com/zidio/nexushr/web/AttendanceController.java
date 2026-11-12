@@ -3,6 +3,7 @@ package com.zidio.nexushr.web;
 import com.zidio.nexushr.domain.AttendanceRecord;
 import com.zidio.nexushr.service.AttendanceService;
 import com.zidio.nexushr.web.dto.AttendanceImportResponse;
+import com.zidio.nexushr.web.dto.DailyCheckInCount;
 import com.zidio.nexushr.web.dto.AttendanceMetricsResponse;
 import com.zidio.nexushr.web.dto.AttendanceMonthlySummaryResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -172,6 +173,14 @@ public class AttendanceController {
             @RequestParam LocalDate date) {
 
         return attendanceService.listByDate(date);
+    }
+
+    @GetMapping("/daily-counts")
+    @PreAuthorize("isAuthenticated()")
+    public List<DailyCheckInCount> dailyCounts(
+            @RequestParam(required = false) String company,
+            Authentication authentication) {
+        return attendanceService.dailyCheckInCounts(authentication.getName(), company);
     }
 
     @GetMapping("/range")
