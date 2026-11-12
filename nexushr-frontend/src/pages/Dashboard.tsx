@@ -4,13 +4,11 @@ import {
   downloadPayslipPdf,
   emailPayslip,
   getCurrentEmployee,
-  getDashboardSummary,
   getEmployees,
   getHolidays,
   getPayrollRecords,
   type PayrollRecord,
   type CompanyHoliday,
-  type DashboardSummary,
   type EmployeeResponse,
 } from "../api";
 import {
@@ -165,7 +163,6 @@ function displayDate(value?: string) {
 export default function Dashboard() {
   const navigate = useNavigate();
   const company = getWorkspaceCompany() ?? "CYOND";
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [me, setMe] = useState<EmployeeResponse | null>(null);
   const [selfRecord, setSelfRecord] = useState<AttendanceRecord | null>(null);
   const [people, setPeople] = useState<EmployeeResponse[]>([]);
@@ -205,7 +202,6 @@ export default function Dashboard() {
     const from = dates[0];
     const to = dates[dates.length - 1];
     Promise.all([
-      getDashboardSummary().catch(() => null),
       getCurrentEmployee().catch(() => null),
       getEmployees().catch(() => [] as EmployeeResponse[]),
       getAttendanceByDate(today).catch(() => [] as AttendanceRecord[]),
@@ -214,11 +210,10 @@ export default function Dashboard() {
       getPayrollRecords().catch(() => [] as PayrollRecord[]),
       getDailyCheckInCounts(company).catch(() => [] as DailyCheckInCount[]),
     ])
-      .then(async ([dashboard, current, employees, attendance, leaveRows, extraHolidays, payroll, counts]) => {
+      .then(async ([current, employees, attendance, leaveRows, extraHolidays, payroll, counts]) => {
         if (cancelled) {
           return;
         }
-        setSummary(dashboard);
         setMe(current);
         if (current?.id) {
           const history = await getEmployeeAttendance(current.id).catch(() => [] as AttendanceRecord[]);
@@ -352,9 +347,13 @@ export default function Dashboard() {
 
   const today = todayIso();
   const present = todayRows.filter((row) => row.checkInTime && row.attendanceStatus !== "INACTIVE");
-  const onLeave = leaves.filter((leave) =>
-    leave.status === "APPROVED" && String(leave.startDate ?? "") <= today && String(leave.endDate ?? "") >= today,
-  );
+  const onLeave = leaves.filter((leave) => {
+    const kind = String(leave.leaveType ?? "");
+    const timeOff = !DUTY_CHOICES.some((choice) => choice.type === kind);
+    const start = String(leave.startDate ?? "").slice(0, 10);
+    const end = String(leave.endDate ?? leave.startDate ?? "").slice(0, 10);
+    return leave.status === "APPROVED" && timeOff && start <= today && end >= today;
+  });
   const pending = leaves.filter((leave) => leave.status === "PENDING");
   const nowForMissing = new Date();
   const kolkata = kolkataClock(nowForMissing);
@@ -562,8 +561,8 @@ export default function Dashboard() {
       <section className="hr-kpis">
         <button type="button" onClick={() => navigate("/employees")}>
           <span>Headcount</span>
-          <strong>{people.length || summary?.totalEmployees || 0}</strong>
-          <em>{company === "GORLE" ? "Gorle Group" : "CYOND"}</em>
+          <strong>{activePeople.length}</strong>
+          <em>{company === "GORLE" ? "Gorle Group employees" : "CYOND employees"}</em>
         </button>
         <button type="button" onClick={() => navigate("/attendance")}>
           <span>Present</span>
@@ -583,7 +582,7 @@ export default function Dashboard() {
         <button type="button" onClick={() => navigate("/leave")}>
           <span>On leave</span>
           <strong>{onLeave.length}</strong>
-          <em>approved today</em>
+          <em>approved leave today</em>
         </button>
         <button type="button" onClick={() => navigate("/attendance")}>
           <span>Late</span>
