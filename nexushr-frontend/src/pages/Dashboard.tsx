@@ -205,40 +205,23 @@ export default function Dashboard() {
       getCurrentEmployee().catch(() => null),
       getEmployees().catch(() => [] as EmployeeResponse[]),
       getAttendanceByDate(today).catch(() => [] as AttendanceRecord[]),
-      getLeaves().catch(() => [] as LeaveRequest[]),
-      getHolidays().catch(() => [] as CompanyHoliday[]),
-      getPayrollRecords().catch(() => [] as PayrollRecord[]),
-      getDailyCheckInCounts(company).catch(() => [] as DailyCheckInCount[]),
     ])
-      .then(async ([current, employees, attendance, leaveRows, extraHolidays, payroll, counts]) => {
+      .then(([current, employees, attendance]) => {
         if (cancelled) {
           return;
         }
         setMe(current);
-        if (current?.id) {
-          const history = await getEmployeeAttendance(current.id).catch(() => [] as AttendanceRecord[]);
-          const ownToday = asList<AttendanceRecord>(history).find((row) => String(row.attendanceDate ?? "").slice(0, 10) === today) ?? null;
-          if (!cancelled) {
-            setSelfRecord(ownToday);
-          }
-        } else if (!cancelled) {
-          setSelfRecord(null);
-        }
         const listedPeople = asList<EmployeeResponse>(employees).filter((employee) =>
           isCompanyMatch(employee.companyCode, company) && isListedEmployee(employee.roleType));
         const listedIds = new Set(listedPeople.map((employee) => employee.id));
-        setPeople(listedPeople);
-        setTodayRows(asList<AttendanceRecord>(attendance).filter((row) =>
+        const rows = asList<AttendanceRecord>(attendance).filter((row) =>
           isListedEmployee(row.employee?.roleType)
-          && (isCompanyMatch(row.employee?.companyCode, company) || listedIds.has(row.employee?.id ?? -1))));
-        setLeaves(asList<LeaveRequest>(leaveRows).filter((leave) => isCompanyMatch(leave.employee?.companyCode, company)));
-        setHolidays(upcomingHolidays(asList<CompanyHoliday>(extraHolidays), company));
-        const slips = asList<PayrollRecord>(payroll)
-          .filter((row) => row?.employee && isCompanyMatch(row.employee.companyCode, company))
-          .sort((a, b) => b.payMonth.localeCompare(a.payMonth));
-        setPayrollRows(slips);
-        setPayslipId((currentId) => currentId || (slips[0] ? String(slips[0].id) : ""));
-        setDailyCounts(asList<DailyCheckInCount>(counts));
+          && (isCompanyMatch(row.employee?.companyCode, company) || listedIds.has(row.employee?.id ?? -1)));
+        setPeople(listedPeople);
+        setTodayRows(rows);
+        setSelfRecord(current?.id
+          ? rows.find((row) => row.employee?.id === current.id) ?? null
+          : null);
       })
       .catch((err) => {
         if (!cancelled) {
@@ -250,6 +233,25 @@ export default function Dashboard() {
           setLoading(false);
         }
       });
+
+    Promise.all([
+      getLeaves().catch(() => [] as LeaveRequest[]),
+      getHolidays().catch(() => [] as CompanyHoliday[]),
+      getPayrollRecords().catch(() => [] as PayrollRecord[]),
+      getDailyCheckInCounts(company).catch(() => [] as DailyCheckInCount[]),
+    ]).then(([leaveRows, extraHolidays, payroll, counts]) => {
+      if (cancelled) {
+        return;
+      }
+      setLeaves(asList<LeaveRequest>(leaveRows).filter((leave) => isCompanyMatch(leave.employee?.companyCode, company)));
+      setHolidays(upcomingHolidays(asList<CompanyHoliday>(extraHolidays), company));
+      const slips = asList<PayrollRecord>(payroll)
+        .filter((row) => row?.employee && isCompanyMatch(row.employee.companyCode, company))
+        .sort((a, b) => b.payMonth.localeCompare(a.payMonth));
+      setPayrollRows(slips);
+      setPayslipId((currentId) => currentId || (slips[0] ? String(slips[0].id) : ""));
+      setDailyCounts(asList<DailyCheckInCount>(counts));
+    }).catch(() => undefined);
 
     getAttendanceRange(from, to)
       .catch(() =>

@@ -92,9 +92,6 @@ public class AttendanceService {
     private AttendancePolicyService attendancePolicyService;
 
     @Autowired(required = false)
-    private AttendanceInactivityService attendanceInactivityService;
-
-    @Autowired(required = false)
     private CompanyHolidayCalendar companyHolidayCalendar;
 
     @Autowired(required = false)
@@ -453,11 +450,7 @@ public class AttendanceService {
         record.setOvertimeMinutes(calculateOvertimeMinutes(payable));
     }
 
-    private void closeOpenDaysPastLogout() {
-        if (attendanceInactivityService != null) {
-            attendanceInactivityService.closeExpiredOpenSessions();
-        }
-    }
+    // Forgotten check-outs are closed by the scheduled job, not while a page is loading.
 
     private void restoreListed(List<AttendanceRecord> records) {
         if (records == null) {
@@ -520,7 +513,6 @@ public class AttendanceService {
             throw badRequest("Date is required");
         }
 
-        closeOpenDaysPastLogout();
         List<AttendanceRecord> records = attendanceRepository.findByAttendanceDate(date);
         restoreListed(records);
         return records;
@@ -536,7 +528,6 @@ public class AttendanceService {
         if (ChronoUnit.DAYS.between(from, to) > 31) {
             throw badRequest("Ask for at most 31 days at a time");
         }
-        closeOpenDaysPastLogout();
         List<AttendanceRecord> records = attendanceRepository.findByAttendanceDateBetween(from, to);
         restoreListed(records);
         return records;
@@ -545,7 +536,6 @@ public class AttendanceService {
     public List<AttendanceRecord> listByEmployee(Long employeeId) {
 
         getActiveEmployee(employeeId);
-        closeOpenDaysPastLogout();
 
         List<AttendanceRecord> records = attendanceRepository
                 .findByEmployee_IdOrderByAttendanceDateDesc(employeeId);
