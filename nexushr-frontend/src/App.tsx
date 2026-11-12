@@ -1888,12 +1888,10 @@ class PageGuard extends Component<{ children: ReactNode }, { failed: boolean }> 
   render() {
     if (this.state.failed) {
       return (
-        <div className="page-heading">
+        <div style={{ minHeight: "100vh", padding: 32, background: "#f5f7fb", color: "#101828", fontFamily: "Segoe UI, sans-serif" }}>
           <h2>This page hit a problem</h2>
           <p>Your attendance is still saved. Reload the page to continue.</p>
-          <button className="primary-button" type="button" onClick={() => window.location.reload()}>
-            Reload
-          </button>
+          <button type="button" onClick={() => window.location.reload()}>Reload</button>
         </div>
       );
     }
@@ -1903,6 +1901,7 @@ class PageGuard extends Component<{ children: ReactNode }, { failed: boolean }> 
 
 export default function App() {
   return (
+    <PageGuard>
     <BrowserRouter>
 
       <Routes>
@@ -1947,6 +1946,7 @@ export default function App() {
       </Routes>
 
     </BrowserRouter>
+    </PageGuard>
   );
 }
 

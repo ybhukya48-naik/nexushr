@@ -10,8 +10,18 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>Cyond | HR & Workforce Intelligence</title>
   </head>
-  <body>
-    <div id="root"></div>
+  <body style="margin:0;background:#f5f7fb;color:#101828">
+    <div id="root">
+      <p id="boot" style="font-family:Segoe UI,sans-serif;margin:0;padding:32px;font-size:16px">Opening the page…</p>
+    </div>
+    <script>
+      window.addEventListener("error", function () {
+        if (window.__nexushr_booted) return;
+        var boot = document.getElementById("boot");
+        if (!boot) return;
+        boot.innerHTML = "<strong>The page did not open.</strong><br>Reload the page. Your attendance is still saved.<br><br><button type='button' onclick='location.reload()'>Reload</button>";
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
