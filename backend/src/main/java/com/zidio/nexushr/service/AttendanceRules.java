@@ -26,7 +26,7 @@ public final class AttendanceRules {
     public static final int WORK_MINUTES = 8 * 60;
     public static final int LUNCH_MINUTES = 60;
     public static final int PRESENCE_MINUTES = 9 * 60;
-    public static final int INACTIVE_LIMIT_MINUTES = 15;
+    public static final int INACTIVE_LIMIT_MINUTES = 30;
     public static final int WARNINGS_BEFORE_PENALTY = 3;
     public static final int LATE_DEDUCT_MINUTES = 2 * 60;
     public static final int HALF_DAY_MINUTES = WORK_MINUTES / 2;

@@ -1468,7 +1468,7 @@ function EmployeeDashboard() {
             ? "Check-out was missed. It is saved 9 hours after check-in, and the attendance record stays."
             : "",
           todayRecord?.yellowFlag
-            ? "Desktop was inactive for more than 15 minutes. This is a warning."
+            ? "Desktop was inactive for more than 30 minutes. This is a warning."
             : "",
           warnings >= 3
             ? `3 inactivity warnings this month. A half day, ₹${halfDay.toLocaleString("en-IN")}, is cut from salary.`
