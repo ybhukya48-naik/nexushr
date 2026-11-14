@@ -6694,6 +6694,9 @@ button.employee-summary-card {
   object-fit: contain;
   object-position: center;
   background: #fff;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .entity-card strong {
@@ -7913,17 +7916,17 @@ textarea {
   display: flex;
   width: 100%;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 18px;
   flex-wrap: nowrap;
 }
 
 .login-page .login-logo-slot {
   width: 46%;
+  height: 112px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
 }
 
 .login-page .login-logo-cyond,
@@ -7935,6 +7938,9 @@ textarea {
   background: transparent;
   object-fit: contain;
   object-position: center;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .login-page .login-logo-gorle {
@@ -7989,6 +7995,9 @@ textarea {
   background: transparent;
   border: 0;
   border-radius: 0;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .sidebar .brand strong {

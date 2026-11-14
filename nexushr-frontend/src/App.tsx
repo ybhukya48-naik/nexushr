@@ -425,7 +425,7 @@ function AppRoutes() {
                 className="entity-card"
                 onClick={() => enterWorkspace("CYOND")}
               >
-                <img src={workspaceLogo("CYOND")} alt="CYOND logo" />
+                <img src={workspaceLogo("CYOND")} alt="CYOND logo" draggable={false} />
                 <strong>CYOND</strong>
                 <span>{workspaceTagline("CYOND")}</span>
               </button>
@@ -434,7 +434,7 @@ function AppRoutes() {
                 className="entity-card"
                 onClick={() => enterWorkspace("GORLE")}
               >
-                <img src={workspaceLogo("GORLE")} alt="Gorle Group logo" />
+                <img src={workspaceLogo("GORLE")} alt="Gorle Group logo" draggable={false} />
                 <strong>Gorle Group</strong>
                 <span>{workspaceTagline("GORLE")}</span>
               </button>
@@ -455,6 +455,7 @@ function AppRoutes() {
             className="brand-logo"
             src={workspaceLogo(workspace)}
             alt={`${workspaceName(workspace)} logo`}
+            draggable={false}
           />
           <div>
             <strong>{workspaceName(workspace)}</strong>
@@ -930,10 +931,10 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
             <div className="login-card-brand">
               <div className="login-brand-logos">
                 <div className="login-logo-slot">
-                  <img className="login-logo-cyond" src="/images/cyond-logo.png" alt="cyond" />
+                  <img className="login-logo-cyond" src="/images/cyond-logo.png" alt="cyond" draggable={false} />
                 </div>
                 <div className="login-logo-slot">
-                  <img className="login-logo-gorle" src="/images/gorle-group-emblem.png" alt="Gorle Group" />
+                  <img className="login-logo-gorle" src="/images/gorle-group-emblem.png" alt="Gorle Group" draggable={false} />
                 </div>
               </div>
             </div>
