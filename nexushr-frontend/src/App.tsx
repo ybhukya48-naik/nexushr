@@ -453,7 +453,7 @@ function AppRoutes() {
                 className="entity-card"
                 onClick={() => enterWorkspace("CYOND")}
               >
-                <img src={workspaceLogo("CYOND")} alt="CYOND logo" draggable={false} />
+                <img src={workspaceLogo("CYOND")} alt="CYOND logo" draggable={false} onDragStart={(event) => event.preventDefault()} />
                 <strong>CYOND</strong>
                 <span>{workspaceTagline("CYOND")}</span>
               </button>
@@ -462,7 +462,7 @@ function AppRoutes() {
                 className="entity-card"
                 onClick={() => enterWorkspace("GORLE")}
               >
-                <img src={workspaceLogo("GORLE")} alt="Gorle Group logo" draggable={false} />
+                <img src={workspaceLogo("GORLE")} alt="Gorle Group logo" draggable={false} onDragStart={(event) => event.preventDefault()} />
                 <strong>Gorle Group</strong>
                 <span>{workspaceTagline("GORLE")}</span>
               </button>
@@ -485,6 +485,7 @@ function AppRoutes() {
             src={workspaceLogo(workspace)}
             alt={`${workspaceName(workspace)} logo`}
             draggable={false}
+            onDragStart={(event) => event.preventDefault()}
           />
           <div>
             <strong>{workspaceName(workspace)}</strong>
@@ -979,12 +980,12 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
           >
 
             <div className="login-card-brand">
-              <div className="login-brand-logos">
+              <div className="login-brand-logos" onDragStart={(event) => event.preventDefault()}>
                 <div className="login-logo-slot">
-                  <img className="login-logo-cyond" src="/images/cyond-logo.png" alt="cyond" draggable={false} />
+                  <img className="login-logo-cyond" src="/images/cyond-logo.png" alt="cyond" draggable={false} onDragStart={(event) => event.preventDefault()} />
                 </div>
                 <div className="login-logo-slot">
-                  <img className="login-logo-gorle" src="/images/gorle-group-emblem.png" alt="Gorle Group" draggable={false} />
+                  <img className="login-logo-gorle" src="/images/gorle-group-emblem.png" alt="Gorle Group" draggable={false} onDragStart={(event) => event.preventDefault()} />
                 </div>
               </div>
             </div>

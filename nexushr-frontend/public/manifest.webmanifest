@@ -5,5 +5,10 @@
   "display": "standalone",
   "background_color": "#0f2744",
   "theme_color": "#0f2744",
-  "description": "Site staff login, selfie check-in, and selfie check-out."
+  "description": "Site staff login, selfie check-in, and selfie check-out.",
+  "icons": [
+    { "src": "/favicon-32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "/favicon-48.png", "sizes": "48x48", "type": "image/png" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
 }

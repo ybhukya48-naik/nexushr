@@ -7966,39 +7966,64 @@ textarea {
 .login-page .login-brand-logos {
   display: flex;
   width: 100%;
+  height: 104px;
   justify-content: space-between;
   align-items: center;
-  gap: 18px;
+  gap: 20px;
   flex-wrap: nowrap;
+  margin: 0 0 6px;
 }
 
 .login-page .login-logo-slot {
-  width: 46%;
-  height: 112px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  height: 104px;
+  background: transparent;
+}
+
+.login-page .login-logo-slot:first-child {
+  flex: 1.4;
+  justify-content: flex-start;
+}
+
+.login-page .login-logo-slot:last-child {
+  flex: 0.7;
+  justify-content: flex-end;
 }
 
 .login-page .login-logo-cyond,
 .login-page .login-logo-gorle {
-  width: 100%;
-  height: 84px;
-  max-height: 84px;
+  width: auto;
+  max-width: 100%;
   border-radius: 0;
   background: transparent;
   object-fit: contain;
-  object-position: center;
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
 }
 
+.login-page .login-logo-cyond {
+  height: 76px;
+  max-height: 76px;
+  object-position: left center;
+}
+
 .login-page .login-logo-gorle {
-  height: 112px;
-  max-height: 112px;
-  object-fit: contain;
-  object-position: center;
+  height: 96px;
+  max-height: 96px;
+  object-position: right center;
+}
+
+.login-page .login-brand-logos,
+.login-page .login-logo-slot,
+.login-page .login-logo-cyond,
+.login-page .login-logo-gorle,
+.sidebar .brand-logo,
+.entity-card img {
+  -webkit-user-drag: none;
+  user-select: none;
+  pointer-events: none;
 }
 
 .login-page .login-card-header,
