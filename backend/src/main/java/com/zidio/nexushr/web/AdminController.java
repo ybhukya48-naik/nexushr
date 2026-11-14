@@ -80,6 +80,8 @@ public class AdminController {
             row.put("fullName", employee.getFullName());
             row.put("email", employee.getEmail());
             row.put("role", employee.getRoleType() == null ? "EMPLOYEE" : employee.getRoleType().name());
+            row.put("designation", employee.getDesignation() == null ? "" : employee.getDesignation());
+            row.put("department", employee.getDepartment() == null ? "" : employee.getDepartment());
             row.put("company", employee.getCompany() == null ? "" : employee.getCompany().getCode());
             row.put("active", employee.isActive());
             row.put("attendanceStatus", attendanceStatus);

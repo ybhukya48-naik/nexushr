@@ -389,6 +389,8 @@ export type AdminEmployeeRow = {
   fullName: string;
   email: string;
   role: string;
+  designation?: string;
+  department?: string;
   company: string;
   active: boolean;
   attendanceStatus: string;

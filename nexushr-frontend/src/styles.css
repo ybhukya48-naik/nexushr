@@ -6829,6 +6829,46 @@ textarea {
   margin-bottom: 18px;
 }
 
+.admin-lens {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.admin-leader {
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.admin-leader h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.admin-leader-meta {
+  margin: 4px 0 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+.admin-leader-people {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-leader-people li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid #f2f4f7;
+  font-size: 13px;
+}
+
 .sidebar-footer span {
   font-size: 12px;
   line-height: 1.35;

@@ -22,6 +22,76 @@ function formatClock(value?: string | null) {
   return match ? match[1] : value;
 }
 
+function isChairman(row: AdminEmployeeRow) {
+  const text = `${row.designation ?? ""} ${row.department ?? ""}`.toLowerCase();
+  return text.includes("chairman") || text.includes("founder");
+}
+
+function punchLine(row: AdminEmployeeRow) {
+  if (!row.checkInTime) {
+    return "No check-in";
+  }
+  if (!row.checkOutTime) {
+    return `In ${formatClock(row.checkInTime)} · Still in`;
+  }
+  return `In ${formatClock(row.checkInTime)} · Out ${formatClock(row.checkOutTime)}`;
+}
+
+function Leadership({ lens, rows }: { lens: "chairman" | "manager"; rows: AdminEmployeeRow[] }) {
+  const chairmen = rows.filter(isChairman);
+  const managers = rows.filter((row) => row.role === "MANAGER" && !isChairman(row));
+  const people = lens === "chairman" ? chairmen : managers;
+
+  function reportsOf(person: AdminEmployeeRow) {
+    const direct = rows.filter((row) => row.reportingManagerId === person.id);
+    if (lens === "chairman" && direct.length === 0) {
+      return managers.filter((row) => row.company === person.company);
+    }
+    return direct;
+  }
+
+  if (people.length === 0) {
+    return (
+      <p>
+        {lens === "chairman"
+          ? "No chairman in this company. A chairman is the founder, or a person whose designation says Chairman."
+          : "No manager in this company."}
+      </p>
+    );
+  }
+
+  return (
+    <div>
+      {people.map((person) => {
+        const reports = reportsOf(person);
+        return (
+          <article key={person.id} className="admin-leader">
+            <h3>{person.fullName}</h3>
+            <p className="admin-leader-meta">
+              {person.designation || (lens === "chairman" ? "Chairman" : "Manager")}
+              {person.department ? ` · ${person.department}` : ""}
+              {person.employeeCode ? ` · ${person.employeeCode}` : ""}
+            </p>
+            <p className="admin-leader-meta">{punchLine(person)}</p>
+            <ul className="admin-leader-people">
+              {reports.map((report) => (
+                <li key={report.id}>
+                  <span>
+                    <strong>{report.fullName}</strong>
+                    {report.designation ? ` · ${report.designation}` : ""}
+                  </span>
+                  <span>{punchLine(report)}</span>
+                </li>
+              ))}
+              {reports.length === 0 && <li>No one reports to {person.fullName}.</li>}
+            </ul>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Admin() {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [error, setError] = useState("");
@@ -30,6 +100,7 @@ export default function Admin() {
   const [holidays, setHolidays] = useState<CompanyHoliday[]>([]);
   const [holidayDate, setHolidayDate] = useState("");
   const [holidayName, setHolidayName] = useState("");
+  const [lens, setLens] = useState<"chairman" | "manager">("chairman");
   const company = getWorkspaceCompany();
 
   async function load() {
@@ -138,8 +209,8 @@ export default function Admin() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">Admin</p>
-          <h2>Admin</h2>
-          <p>Accounts, roles, reporting managers, site visitors, holidays, and today's flags.</p>
+          <h2>Admin panel</h2>
+          <p>See the chairman or a manager, and the people who report to them.</p>
         </div>
       </div>
 
@@ -169,6 +240,32 @@ export default function Admin() {
       </div>
 
       <section className="panel">
+        <div className="admin-lens">
+          <button
+            type="button"
+            className={lens === "chairman" ? "primary-button" : "secondary-button"}
+            onClick={() => setLens("chairman")}
+          >
+            Chairman
+          </button>
+          <button
+            type="button"
+            className={lens === "manager" ? "primary-button" : "secondary-button"}
+            onClick={() => setLens("manager")}
+          >
+            Manager
+          </button>
+        </div>
+        <Leadership lens={lens} rows={rows} />
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">ACCOUNTS</p>
+            <h3>Accounts</h3>
+          </div>
+        </div>
         <div className="employees-table-wrap">
           <table className="employees-table">
             <thead>
