@@ -1389,9 +1389,7 @@ public class AttendanceService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Employee not found for authenticated user"));
         String company = employee.getCompany() == null ? null : employee.getCompany().getCode();
         RoleType role = employee.getRoleType();
-        boolean management = role == RoleType.HR || role == RoleType.ADMIN
-                || role == RoleType.MANAGER || role == RoleType.SUPER_ADMIN;
-        if (management && requestedCompany != null && !requestedCompany.isBlank()) {
+        if (role == RoleType.SUPER_ADMIN && requestedCompany != null && !requestedCompany.isBlank()) {
             company = requestedCompany.trim();
         }
         LocalDate today = LocalDate.now(COMPANY_ZONE);

@@ -15,7 +15,9 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import com.zidio.nexushr.security.AuthorizationService;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpClientErrorException;
@@ -44,26 +46,30 @@ public class PayrollController {
     private final ResendEmailService resendEmailService;
     private final ExcelPayrollService excelPayrollService;
     private final AttendanceService attendanceService;
+    private final AuthorizationService authorizationService;
 
     public PayrollController(
             PayrollService payrollService,
             PayrollPdfService payrollPdfService,
             ResendEmailService resendEmailService,
             ExcelPayrollService excelPayrollService,
-            @Lazy AttendanceService attendanceService) {
+            @Lazy AttendanceService attendanceService,
+            AuthorizationService authorizationService) {
 
         this.payrollService = payrollService;
         this.payrollPdfService = payrollPdfService;
         this.resendEmailService = resendEmailService;
         this.excelPayrollService = excelPayrollService;
         this.attendanceService = attendanceService;
+        this.authorizationService = authorizationService;
     }
 
     @GetMapping
-    public List<PayrollResponse> list() {
+    public List<PayrollResponse> list(Authentication authentication) {
 
         return payrollService.findAll()
                 .stream()
+                .filter(record -> authorizationService.canSeeEmployee(record.getEmployee(), authentication))
                 .map(PayrollResponse::from)
                 .toList();
     }

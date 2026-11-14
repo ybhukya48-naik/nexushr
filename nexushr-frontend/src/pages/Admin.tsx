@@ -22,7 +22,7 @@ function formatClock(value?: string | null) {
   return match ? match[1] : value;
 }
 
-export default function Admin() {
+export default function Admin({ view = "settings" }: { view?: "users" | "settings" }) {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -126,26 +126,40 @@ export default function Admin() {
     }
   }
 
-  const rows = (overview?.rows ?? []).filter((row) => {
+  const companyRows = (overview?.rows ?? []).filter((row) => {
     if (!company) {
       return true;
     }
     return asWorkspaceCompany(row.company) === company;
   });
+  const visibleHolidays = holidays.filter((holiday) => {
+    const code = holiday.companyCode?.trim();
+    if (!code || !company) {
+      return true;
+    }
+    return asWorkspaceCompany(code) === company;
+  });
+  const rows = view === "users"
+    ? companyRows.filter((row) => ["HR", "ADMIN", "MANAGER", "SUPER_ADMIN"].includes(row.role))
+    : companyRows;
 
   return (
     <div className="admin-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Accounts</p>
-          <h2>Accounts</h2>
-          <p>Roles, reporting managers, site visitors, holidays, and today's flags.</p>
+          <p className="eyebrow">{view === "users" ? "Users" : "Settings"}</p>
+          <h2>{view === "users" ? "User and HR management" : "System settings"}</h2>
+          <p>
+            {view === "users"
+              ? "HR, manager, and admin accounts for this company. A super admin is the only role that can open every company."
+              : "Holidays for this company. A holiday is not a working day."}
+          </p>
         </div>
       </div>
 
       {error && <p className="page-alert">{error}</p>}
 
-      <div className="stats-grid admin-stats">
+      {view === "settings" && <div className="stats-grid admin-stats">
         <article className="stat-card">
           <p>Employees</p>
           <h3>{overview?.employees ?? 0}</h3>
@@ -166,9 +180,9 @@ export default function Admin() {
           <h3>{overview?.missingCheckOut ?? 0}</h3>
           <span>Today</span>
         </article>
-      </div>
+      </div>}
 
-      <section className="panel">
+      {view === "users" && <section className="panel">
         <div className="employees-table-wrap">
           <table className="employees-table">
             <thead>
@@ -258,9 +272,9 @@ export default function Admin() {
             </tbody>
           </table>
         </div>
-      </section>
+      </section>}
 
-      <section className="panel">
+      {view === "settings" && <section className="panel">
         <div className="panel-header">
           <div>
             <p className="eyebrow">HOLIDAYS</p>
@@ -290,7 +304,7 @@ export default function Admin() {
           </button>
         </div>
         <ul>
-          {holidays.map((holiday) => (
+          {visibleHolidays.map((holiday) => (
             <li key={holiday.id}>
               {holiday.holidayDate} — {holiday.name}
               {holiday.companyCode ? ` (${holiday.companyCode})` : " (both companies)"}
@@ -299,9 +313,9 @@ export default function Admin() {
               </button>
             </li>
           ))}
-          {holidays.length === 0 && <li>No extra holidays saved.</li>}
+          {visibleHolidays.length === 0 && <li>No extra holidays saved.</li>}
         </ul>
-      </section>
+      </section>}
     </div>
   );
 }

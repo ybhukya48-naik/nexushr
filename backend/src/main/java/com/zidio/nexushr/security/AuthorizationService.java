@@ -50,7 +50,8 @@ public class AuthorizationService {
         }
 
         if (hasManagementRole(authentication)) {
-            return true;
+            Employee target = employeeRepository.findById(employeeId).orElse(null);
+            return canSeeEmployee(target, authentication);
         }
 
         Employee employee = findAuthenticatedEmployee(authentication);
@@ -64,6 +65,38 @@ public class AuthorizationService {
             Authentication authentication) {
 
         return isSelf(employeeId, authentication);
+    }
+
+    public boolean seesAllCompanies(Authentication authentication) {
+        if (authentication == null || authentication.getAuthorities() == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_SUPER_ADMIN".equals(authority.getAuthority()));
+    }
+
+    public boolean canSeeEmployee(Employee employee, Authentication authentication) {
+        if (seesAllCompanies(authentication)) {
+            return true;
+        }
+        if (employee == null || employee.getCompany() == null || employee.getCompany().getCode() == null) {
+            return false;
+        }
+        Employee self = findAuthenticatedEmployee(authentication);
+        if (self == null || self.getCompany() == null || self.getCompany().getCode() == null) {
+            return false;
+        }
+        return self.getCompany().getCode().equalsIgnoreCase(employee.getCompany().getCode());
+    }
+
+    public boolean canSeeEmployeeId(Long employeeId, Authentication authentication) {
+        if (seesAllCompanies(authentication)) {
+            return true;
+        }
+        if (employeeId == null) {
+            return false;
+        }
+        return canSeeEmployee(employeeRepository.findById(employeeId).orElse(null), authentication);
     }
 
     public boolean hasManagementRole(
@@ -98,10 +131,6 @@ public class AuthorizationService {
             Long leaveId,
             Authentication authentication) {
 
-        if (hasManagementRole(authentication)) {
-            return true;
-        }
-
         if (leaveId == null) {
             return false;
         }
@@ -117,10 +146,6 @@ public class AuthorizationService {
     public boolean canAccessPayroll(
             Long payrollId,
             Authentication authentication) {
-
-        if (hasManagementRole(authentication)) {
-            return true;
-        }
 
         if (payrollId == null) {
             return false;

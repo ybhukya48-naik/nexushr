@@ -2,6 +2,7 @@ package com.zidio.nexushr.web;
 
 import com.zidio.nexushr.domain.LeaveRequest;
 import com.zidio.nexushr.domain.LeaveStatus;
+import com.zidio.nexushr.security.AuthorizationService;
 import com.zidio.nexushr.service.AttendanceService;
 import com.zidio.nexushr.service.LeaveService;
 import com.zidio.nexushr.web.dto.LeaveBalanceResponse;
@@ -17,13 +18,16 @@ public class LeaveController {
 
     private final LeaveService leaveService;
     private final AttendanceService attendanceService;
+    private final AuthorizationService authorizationService;
 
     public LeaveController(
             LeaveService leaveService,
-            AttendanceService attendanceService) {
+            AttendanceService attendanceService,
+            AuthorizationService authorizationService) {
 
         this.leaveService = leaveService;
         this.attendanceService = attendanceService;
+        this.authorizationService = authorizationService;
     }
 
     @GetMapping
@@ -37,7 +41,9 @@ public class LeaveController {
                                 || authority.getAuthority().equals("ROLE_ADMIN")
                                 || authority.getAuthority().equals("ROLE_MANAGER"))) {
 
-            return leaveService.findAll();
+            return leaveService.findAll().stream()
+                    .filter(leave -> authorizationService.canSeeEmployee(leave.getEmployee(), authentication))
+                    .toList();
         }
 
         Long employeeId =

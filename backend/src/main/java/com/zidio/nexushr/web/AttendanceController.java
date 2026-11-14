@@ -1,6 +1,7 @@
 package com.zidio.nexushr.web;
 
 import com.zidio.nexushr.domain.AttendanceRecord;
+import com.zidio.nexushr.security.AuthorizationService;
 import com.zidio.nexushr.service.AttendanceService;
 import com.zidio.nexushr.web.dto.AttendanceImportResponse;
 import com.zidio.nexushr.web.dto.DailyCheckInCount;
@@ -25,9 +26,13 @@ import java.util.List;
 public class AttendanceController {
 
     private final AttendanceService attendanceService;
+    private final AuthorizationService authorizationService;
 
-    public AttendanceController(AttendanceService attendanceService) {
+    public AttendanceController(
+            AttendanceService attendanceService,
+            AuthorizationService authorizationService) {
         this.attendanceService = attendanceService;
+        this.authorizationService = authorizationService;
     }
 
     @PostMapping
@@ -144,7 +149,9 @@ public class AttendanceController {
             }
             employeeId = self;
         }
-        return attendanceService.auditTrail(employeeId);
+        return attendanceService.auditTrail(employeeId).stream()
+                .filter(log -> authorizationService.canSeeEmployeeId(log.getEmployeeId(), authentication))
+                .toList();
     }
 
     @GetMapping("/my-status")
@@ -170,9 +177,12 @@ public class AttendanceController {
 
     @GetMapping
     public List<AttendanceRecord> listByDate(
-            @RequestParam LocalDate date) {
+            @RequestParam LocalDate date,
+            Authentication authentication) {
 
-        return attendanceService.listByDate(date);
+        return attendanceService.listByDate(date).stream()
+                .filter(record -> authorizationService.canSeeEmployee(record.getEmployee(), authentication))
+                .toList();
     }
 
     @GetMapping("/daily-counts")
@@ -187,9 +197,12 @@ public class AttendanceController {
     @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER')")
     public List<AttendanceRecord> listBetween(
             @RequestParam LocalDate from,
-            @RequestParam LocalDate to) {
+            @RequestParam LocalDate to,
+            Authentication authentication) {
 
-        return attendanceService.listBetween(from, to);
+        return attendanceService.listBetween(from, to).stream()
+                .filter(record -> authorizationService.canSeeEmployee(record.getEmployee(), authentication))
+                .toList();
     }
 
     @GetMapping("/metrics")

@@ -75,6 +75,7 @@ const Payroll = lazy(() => import("./pages/Payroll"));
 const Performance = lazy(() => import("./pages/Performance"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Admin = lazy(() => import("./pages/Admin"));
+const AdminArea = lazy(() => import("./pages/AdminArea"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const SiteAttendance = lazy(() => import("./pages/SiteAttendance"));
 
@@ -82,7 +83,6 @@ const navItems: ReadonlyArray<
   readonly [string, string, readonly string[]]
 > = [
   ["Dashboard", "/", ["HR", "MANAGER", "EMPLOYEE", "ADMIN", "SUPER_ADMIN"]],
-  ["Accounts", "/admin", ["ADMIN", "SUPER_ADMIN"]],
   ["Employees", "/employees", ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"]],
   ["Attendance", "/attendance", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
   ["Leave", "/leave", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
@@ -92,6 +92,19 @@ const navItems: ReadonlyArray<
   ["Notifications", "/notifications", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
   ["Profile", "/profile", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
 ] as const;
+
+const adminNav: ReadonlyArray<readonly [string, string]> = [
+  ["Dashboard", "/"],
+  ["Company Management", "/admin/companies"],
+  ["User & HR Management", "/admin/users"],
+  ["Employee Management", "/employees"],
+  ["Attendance Management", "/attendance"],
+  ["Payroll Management", "/payroll"],
+  ["Roles & Permissions", "/admin/roles"],
+  ["Reports & Analytics", "/ai"],
+  ["Audit Logs", "/admin/audit"],
+  ["System Settings", "/admin"],
+];
 
 function isAuthenticated() {
   return websiteSessionActive();
@@ -164,6 +177,11 @@ function AppRoutes() {
       .then((employee) => {
         if (!cancelled) {
           setMe(employee);
+          if (employee?.companyCode && role !== "SUPER_ADMIN") {
+            const own = asWorkspaceCompany(employee.companyCode);
+            setWorkspaceCompany(own);
+            setWorkspace(own);
+          }
         }
       })
       .catch(() => {
@@ -174,7 +192,7 @@ function AppRoutes() {
     return () => {
       cancelled = true;
     };
-  }, [workspace]);
+  }, [workspace, role]);
 
   useEffect(() => {
     if (!me?.hasProfilePhoto) {
@@ -455,7 +473,8 @@ function AppRoutes() {
     );
   }
 
-  const canSwitchWorkspace = role === "ADMIN" || role === "SUPER_ADMIN" || role === "HR" || role === "MANAGER";
+  const isAdmin = role === "ADMIN" || role === "SUPER_ADMIN";
+  const canSwitchWorkspace = role === "SUPER_ADMIN";
 
   return (
     <div className="app-shell" data-company={workspace}>
@@ -488,8 +507,7 @@ function AppRoutes() {
         )}
 
         <nav>
-          {navItems
-            .filter(([, , roles]) => roles.includes(role))
+          {(isAdmin ? adminNav : navItems.filter(([, , roles]) => roles.includes(role)))
             .map(([label, path]) => (
             <NavLink
               key={path}
@@ -648,7 +666,23 @@ function AppRoutes() {
               <Route path="/notifications" element={<Notifications />} />
               <Route
                 path="/admin"
-                element={role === "ADMIN" || role === "SUPER_ADMIN" ? <Admin /> : <Navigate to="/" replace />}
+                element={isAdmin ? <Admin view="settings" /> : <Navigate to="/" replace />}
+              />
+              <Route
+                path="/admin/users"
+                element={isAdmin ? <Admin view="users" /> : <Navigate to="/" replace />}
+              />
+              <Route
+                path="/admin/companies"
+                element={isAdmin ? <AdminArea section="companies" /> : <Navigate to="/" replace />}
+              />
+              <Route
+                path="/admin/roles"
+                element={isAdmin ? <AdminArea section="roles" /> : <Navigate to="/" replace />}
+              />
+              <Route
+                path="/admin/audit"
+                element={isAdmin ? <AdminArea section="audit" /> : <Navigate to="/" replace />}
               />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
@@ -1154,6 +1188,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
               </div>
             )}
 
+            {kind !== "admin" && (
             <div className="login-doors">
               <button className={kind === "hr" ? "login-door active" : "login-door"} type="button" onClick={() => navigate("/login")}>
                 HR login
@@ -1164,10 +1199,8 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
               <button className={kind === "manager" ? "login-door active" : "login-door"} type="button" onClick={() => navigate("/manager-login")}>
                 Manager login
               </button>
-              <button className={kind === "admin" ? "login-door active" : "login-door"} type="button" onClick={() => navigate("/admin-login")}>
-                Admin login
-              </button>
             </div>
+            )}
 
           </form>
 

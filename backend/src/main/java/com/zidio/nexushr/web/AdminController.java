@@ -46,7 +46,7 @@ public class AdminController {
     }
 
     @GetMapping("/overview")
-    public Map<String, Object> overview() {
+    public Map<String, Object> overview(Authentication authentication) {
         LocalDate today = LocalDate.now(AttendanceService.COMPANY_ZONE);
         Map<Long, AttendanceRecord> todayRecords = new LinkedHashMap<>();
         for (AttendanceRecord record : attendanceService.listByDate(today)) {
@@ -55,7 +55,9 @@ public class AdminController {
             }
         }
 
-        List<Employee> employees = employeeService.findAll();
+        List<Employee> employees = employeeService.findAll().stream()
+                .filter(employee -> authorizationService.canSeeEmployee(employee, authentication))
+                .toList();
         long active = employees.stream().filter(Employee::isActive).count();
         long missingCheckIn = 0;
         long missingCheckOut = 0;

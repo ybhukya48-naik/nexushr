@@ -31,9 +31,10 @@ public class EmployeeController {
     }
 
     @GetMapping
-    public List<EmployeeResponse> list() {
+    public List<EmployeeResponse> list(Authentication authentication) {
         return employeeService.findAll()
                 .stream()
+                .filter(employee -> authorizationService.canSeeEmployee(employee, authentication))
                 .map(EmployeeResponse::from)
                 .toList();
     }
