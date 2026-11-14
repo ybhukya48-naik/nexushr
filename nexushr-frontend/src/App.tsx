@@ -80,7 +80,7 @@ const SiteAttendance = lazy(() => import("./pages/SiteAttendance"));
 const navItems: ReadonlyArray<
   readonly [string, string, readonly string[]]
 > = [
-  ["Dashboard", "/", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
+  ["Dashboard", "/", ["HR", "MANAGER", "EMPLOYEE", "ADMIN", "SUPER_ADMIN"]],
   ["Employees", "/employees", ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"]],
   ["Attendance", "/attendance", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
   ["Leave", "/leave", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
@@ -89,7 +89,6 @@ const navItems: ReadonlyArray<
   ["AI Insights", "/ai", ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"]],
   ["Notifications", "/notifications", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
   ["Profile", "/profile", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
-  ["Admin", "/admin", ["ADMIN", "SUPER_ADMIN"]],
 ] as const;
 
 function isAuthenticated() {
@@ -144,11 +143,18 @@ function AppRoutes() {
   useEffect(() => {
     const watch = window.setInterval(() => {
       if (!websiteSessionActive()) {
-        navigate("/login", { replace: true });
+        const door = role === "MANAGER"
+          ? "/manager-login"
+          : role === "EMPLOYEE"
+            ? "/employee-login"
+            : role === "ADMIN" || role === "SUPER_ADMIN"
+              ? "/admin-login"
+              : "/login";
+        navigate(door, { replace: true });
       }
     }, 15000);
     return () => window.clearInterval(watch);
-  }, [navigate]);
+  }, [navigate, role]);
 
   useEffect(() => {
     let cancelled = false;
@@ -255,7 +261,9 @@ function AppRoutes() {
       ? "/manager-login"
       : signedInRole === "EMPLOYEE"
         ? "/employee-login"
-        : "/login";
+        : signedInRole === "ADMIN" || signedInRole === "SUPER_ADMIN"
+          ? "/admin-login"
+          : "/login";
     void fetch(`${API_BASE}/auth/logout`, { method: "POST" }).catch(() => undefined);
     clearWebsiteSession();
     clearWorkspaceCompany();
@@ -490,7 +498,7 @@ function AppRoutes() {
               }
             >
               {label === "Dashboard"
-                ? "Home"
+                ? role === "ADMIN" || role === "SUPER_ADMIN" ? "Admin" : "Home"
                 : label === "Attendance"
                   ? role === "EMPLOYEE" ? "My Attendance" : "Attendance"
                   : label === "Leave"
@@ -620,6 +628,8 @@ function AppRoutes() {
                 element={
                   role === "EMPLOYEE" ? (
                     <EmployeeDashboard />
+                  ) : role === "ADMIN" || role === "SUPER_ADMIN" ? (
+                    <Admin />
                   ) : (
                     <Dashboard />
                   )
@@ -636,7 +646,7 @@ function AppRoutes() {
               <Route path="/notifications" element={<Notifications />} />
               <Route
                 path="/admin"
-                element={role === "ADMIN" ? <Admin /> : <Navigate to="/" replace />}
+                element={role === "ADMIN" || role === "SUPER_ADMIN" ? <Admin /> : <Navigate to="/" replace />}
               />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
@@ -692,7 +702,7 @@ function PasswordField({
   );
 }
 
-function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
+function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin" }) {
   const navigate = useNavigate();
   const employee = kind === "employee";
 
@@ -719,14 +729,18 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
       ? signedInRole === "EMPLOYEE"
       : kind === "manager"
         ? signedInRole === "MANAGER"
-        : signedInRole === "HR" || signedInRole === "ADMIN" || signedInRole === "SUPER_ADMIN";
+        : kind === "admin"
+          ? signedInRole === "ADMIN" || signedInRole === "SUPER_ADMIN"
+          : signedInRole === "HR";
     if (!allowed) {
       clearWebsiteSession();
       setError(signedInRole === "EMPLOYEE"
         ? "Use Employee login for this email."
         : signedInRole === "MANAGER"
           ? "Use Manager login for this email."
-          : "Use HR login for this email.");
+          : signedInRole === "ADMIN" || signedInRole === "SUPER_ADMIN"
+            ? "Use Admin login for this email."
+            : "Use HR login for this email.");
       return;
     }
     beginWebsiteSession();
@@ -952,7 +966,9 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                         ? <>Employee <span className="login-title-rest">sign in</span></>
                         : kind === "manager"
                           ? <>Manager <span className="login-title-rest">sign in</span></>
-                          : <>HR <span className="login-title-rest">sign in</span></>}
+                          : kind === "admin"
+                            ? <>Admin <span className="login-title-rest">sign in</span></>
+                            : <>HR <span className="login-title-rest">sign in</span></>}
               </h2>
 
               <p>
@@ -964,6 +980,8 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
                   ? "Use your own email and password. cyond signs in with that email. Gorle Group signs in with the employee code."
                   : kind === "manager"
                   ? "A cyond manager signs in with their own email and password. A Gorle manager signs in with the employee code and password."
+                  : kind === "admin"
+                  ? "A cyond admin signs in with their own email and password. A Gorle admin signs in with the employee code and password."
                   : "cyond signs in with the email. Gorle Group signs in with the employee code."}
               </p>
 
@@ -1143,6 +1161,9 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" }) {
               </button>
               <button className={kind === "manager" ? "login-door active" : "login-door"} type="button" onClick={() => navigate("/manager-login")}>
                 Manager login
+              </button>
+              <button className={kind === "admin" ? "login-door active" : "login-door"} type="button" onClick={() => navigate("/admin-login")}>
+                Admin login
               </button>
             </div>
 
@@ -1929,6 +1950,11 @@ export default function App() {
         <Route
           path="/manager-login"
           element={<PageGuard><Login kind="manager" /></PageGuard>}
+        />
+
+        <Route
+          path="/admin-login"
+          element={<PageGuard><Login kind="admin" /></PageGuard>}
         />
 
         <Route

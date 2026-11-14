@@ -137,9 +137,9 @@ export default function Admin() {
     <div className="admin-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Settings</p>
-          <h2>Settings</h2>
-          <p>Super admin and admin access. Accounts, site visitors, roles, and today's flags.</p>
+          <p className="eyebrow">Admin</p>
+          <h2>Admin</h2>
+          <p>Accounts, roles, reporting managers, site visitors, holidays, and today's flags.</p>
         </div>
       </div>
 
