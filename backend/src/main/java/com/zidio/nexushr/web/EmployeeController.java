@@ -108,7 +108,13 @@ public class EmployeeController {
     public Map<String, String> resetPassword(
             @PathVariable Long id,
             Authentication authentication) {
-        requireHr(authentication);
+        requireHrOrAdmin(authentication);
+        Employee existing = employeeService.findById(id);
+        if (!authorizationService.canSeeEmployee(existing, authentication)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Employee not found");
+        }
         String temporary = employeeService.resetToDefaultPassword(id);
         return Map.of(
                 "message", "Password reset. The employee must set a new password at the next sign-in.",
@@ -143,21 +149,44 @@ public class EmployeeController {
             @RequestParam("file") MultipartFile file,
             Authentication authentication) throws IOException {
 
-        requireHr(authentication);
+        requireHrOrAdmin(authentication);
+        Employee existing = employeeService.findById(id);
+        if (!authorizationService.canSeeEmployee(existing, authentication)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Employee not found");
+        }
         return EmployeeResponse.from(savePhoto(id, file));
     }
 
     @GetMapping("/{id}")
-    public EmployeeResponse getById(@PathVariable Long id) {
-        return EmployeeResponse.from(
-                employeeService.findById(id)
-        );
+    public EmployeeResponse getById(
+            @PathVariable Long id,
+            Authentication authentication) {
+        Employee employee = employeeService.findById(id);
+        if (!authorizationService.canSeeEmployee(employee, authentication)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Employee not found");
+        }
+        return EmployeeResponse.from(employee);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public EmployeeResponse create(
-            @RequestBody EmployeeRequest request) {
+            @RequestBody EmployeeRequest request,
+            Authentication authentication) {
+        requireHrOrAdmin(authentication);
+        if (!authorizationService.seesAllCompanies(authentication)) {
+            String own = authorizationService.ownCompanyCode(authentication);
+            if (own == null || own.isBlank()) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        "This account has no company");
+            }
+            request.setCompanyCode(own);
+        }
 
         Employee created = employeeService.create(request);
 
@@ -170,7 +199,16 @@ public class EmployeeController {
             @RequestBody EmployeeRequest request,
             Authentication authentication) {
 
-        requireHr(authentication);
+        requireHrOrAdmin(authentication);
+        Employee existing = employeeService.findById(id);
+        if (!authorizationService.canSeeEmployee(existing, authentication)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Employee not found");
+        }
+        if (!authorizationService.seesAllCompanies(authentication)) {
+            request.setCompanyCode(existing.getCompanyCode());
+        }
 
         Employee updated = employeeService.update(id, request);
 
@@ -183,7 +221,13 @@ public class EmployeeController {
             @PathVariable Long id,
             Authentication authentication) {
 
-        requireHr(authentication);
+        requireHrOrAdmin(authentication);
+        Employee existing = employeeService.findById(id);
+        if (!authorizationService.canSeeEmployee(existing, authentication)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Employee not found");
+        }
         try {
             employeeService.delete(id);
         } catch (IllegalArgumentException ex) {
@@ -220,15 +264,17 @@ public class EmployeeController {
         }
     }
 
-    private void requireHr(Authentication authentication) {
+    private void requireHrOrAdmin(Authentication authentication) {
         if (authentication == null
                 || authentication.getAuthorities().stream()
                 .noneMatch(authority ->
-                        "ROLE_HR".equals(authority.getAuthority()))) {
+                        "ROLE_HR".equals(authority.getAuthority())
+                                || "ROLE_ADMIN".equals(authority.getAuthority())
+                                || "ROLE_SUPER_ADMIN".equals(authority.getAuthority()))) {
 
             throw new org.springframework.web.server.ResponseStatusException(
                     HttpStatus.FORBIDDEN,
-                    "Only HR users can edit or delete employees"
+                    "Only HR or admin can edit employees"
             );
         }
     }

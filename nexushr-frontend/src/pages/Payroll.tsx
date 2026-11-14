@@ -44,7 +44,7 @@ function toOptionalNumber(value: string): number | undefined {
 export default function Payroll() {
   const navigate = useNavigate();
   const role = (localStorage.getItem("nexushr_role") || "EMPLOYEE").toUpperCase();
-  const isManagementRole = ["ADMIN", "HR", "MANAGER"].includes(role);
+  const isManagementRole = ["ADMIN", "SUPER_ADMIN", "HR", "MANAGER"].includes(role);
 
   const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string>(
@@ -124,7 +124,7 @@ export default function Payroll() {
     setError("");
 
     try {
-      const isManagementRole = ["ADMIN", "HR", "MANAGER"].includes(role);
+      const isManagementRole = ["ADMIN", "SUPER_ADMIN", "HR", "MANAGER"].includes(role);
 
       if (!isManagementRole) {
         const me = await getCurrentEmployee();

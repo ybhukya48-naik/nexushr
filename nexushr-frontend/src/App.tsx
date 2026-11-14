@@ -512,7 +512,7 @@ function AppRoutes() {
             <NavLink
               key={path}
               to={path}
-              end={path === "/"}
+              end={path === "/" || path === "/admin"}
               className={({ isActive }) =>
                 isActive ? "nav-link active" : "nav-link"
               }

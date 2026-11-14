@@ -139,9 +139,7 @@ export default function Admin({ view = "settings" }: { view?: "users" | "setting
     }
     return asWorkspaceCompany(code) === company;
   });
-  const rows = view === "users"
-    ? companyRows.filter((row) => ["HR", "ADMIN", "MANAGER", "SUPER_ADMIN"].includes(row.role))
-    : companyRows;
+  const rows = companyRows;
 
   return (
     <div className="admin-page">
@@ -151,7 +149,7 @@ export default function Admin({ view = "settings" }: { view?: "users" | "setting
           <h2>{view === "users" ? "User and HR management" : "System settings"}</h2>
           <p>
             {view === "users"
-              ? "HR, manager, and admin accounts for this company. A super admin is the only role that can open every company."
+              ? "Change a person's role here. HR, manager, and admin stay inside this company. Only a super admin can open every company."
               : "Holidays for this company. A holiday is not a working day."}
           </p>
         </div>

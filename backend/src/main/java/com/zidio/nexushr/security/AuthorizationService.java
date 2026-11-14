@@ -89,6 +89,14 @@ public class AuthorizationService {
         return self.getCompany().getCode().equalsIgnoreCase(employee.getCompany().getCode());
     }
 
+    public String ownCompanyCode(Authentication authentication) {
+        Employee self = findAuthenticatedEmployee(authentication);
+        if (self == null || self.getCompany() == null) {
+            return null;
+        }
+        return self.getCompany().getCode();
+    }
+
     public boolean canSeeEmployeeId(Long employeeId, Authentication authentication) {
         if (seesAllCompanies(authentication)) {
             return true;

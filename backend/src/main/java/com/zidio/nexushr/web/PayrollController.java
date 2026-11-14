@@ -109,7 +109,11 @@ public class PayrollController {
         @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER')")
         public PayrollAutoComponentsResponse autoComponents(
                         @RequestParam Long employeeId,
-                        @RequestParam String payMonth) {
+                        @RequestParam String payMonth,
+                        Authentication authentication) {
+                if (!authorizationService.canSeeEmployeeId(employeeId, authentication)) {
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Employee not found");
+                }
 
                 return payrollService.autoComponents(employeeId, payMonth);
         }
@@ -242,7 +246,11 @@ public class PayrollController {
 
     @PostMapping
     public PayrollResponse create(
-            @RequestBody PayrollRequest request) {
+            @RequestBody PayrollRequest request,
+            Authentication authentication) {
+        if (request == null || !authorizationService.canSeeEmployeeId(request.getEmployeeId(), authentication)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Employee not found");
+        }
 
         return PayrollResponse.from(
                 payrollService.create(request)
@@ -281,10 +289,14 @@ public class PayrollController {
     @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER')")
     public Map<String, Object> generateFromAttendance(
             @RequestParam String payMonth,
-            @RequestParam(required = false) String companyCode) {
+            @RequestParam(required = false) String companyCode,
+            Authentication authentication) {
 
         if (payMonth == null || payMonth.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "payMonth is required (YYYY-MM)");
+        }
+        if (!authorizationService.seesAllCompanies(authentication)) {
+            companyCode = authorizationService.ownCompanyCode(authentication);
         }
         int employees = attendanceService.generatePayrollFromAttendance(payMonth, companyCode);
         Map<String, Object> body = new LinkedHashMap<>();

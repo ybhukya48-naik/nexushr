@@ -1,9 +1,11 @@
 package com.zidio.nexushr.web;
 
 import com.zidio.nexushr.domain.Employee;
+import com.zidio.nexushr.security.AuthorizationService;
 import com.zidio.nexushr.service.AiInsightService;
 import com.zidio.nexushr.service.EmployeeService;
 import com.zidio.nexushr.web.dto.AiInsightResponse;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -14,13 +16,16 @@ public class AiInsightsController {
 
     private final AiInsightService aiInsightService;
     private final EmployeeService employeeService;
+    private final AuthorizationService authorizationService;
 
     public AiInsightsController(
             AiInsightService aiInsightService,
-            EmployeeService employeeService) {
+            EmployeeService employeeService,
+            AuthorizationService authorizationService) {
 
         this.aiInsightService = aiInsightService;
         this.employeeService = employeeService;
+        this.authorizationService = authorizationService;
     }
 
     @GetMapping("/attrition/{employeeId}")
@@ -56,7 +61,11 @@ public class AiInsightsController {
 
     @GetMapping("/workforce-dashboard")
     public Map<String, Object> workforceDashboard(
-            @RequestParam(required = false) String companyCode) {
+            @RequestParam(required = false) String companyCode,
+            Authentication authentication) {
+        if (!authorizationService.seesAllCompanies(authentication)) {
+            companyCode = authorizationService.ownCompanyCode(authentication);
+        }
 
         return aiInsightService.workforceDashboard(companyCode);
     }

@@ -119,6 +119,7 @@ public class AdminController {
         if (currentId != null && currentId.equals(id) && !Boolean.TRUE.equals(body.get("active"))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot deactivate your own account");
         }
+        requireVisible(id, authentication);
         Employee updated = employeeService.setActive(id, Boolean.TRUE.equals(body.get("active")));
         return Map.of(
                 "id", updated.getId(),
@@ -128,10 +129,12 @@ public class AdminController {
     @PatchMapping("/employees/{id}/site-visitor")
     public Map<String, Object> setSiteVisitor(
             @PathVariable Long id,
-            @RequestBody Map<String, Boolean> body) {
+            @RequestBody Map<String, Boolean> body,
+            Authentication authentication) {
         if (body == null || !body.containsKey("siteVisitor")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "siteVisitor is required");
         }
+        requireVisible(id, authentication);
         Employee updated = employeeService.setSiteVisitor(id, Boolean.TRUE.equals(body.get("siteVisitor")));
         return Map.of(
                 "id", updated.getId(),
@@ -150,11 +153,15 @@ public class AdminController {
         if (currentId != null && currentId.equals(id)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot change your own role");
         }
+        requireVisible(id, authentication);
         RoleType role;
         try {
             role = RoleType.valueOf(body.get("role").trim());
         } catch (IllegalArgumentException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown role");
+        }
+        if (role == RoleType.SUPER_ADMIN && !authorizationService.seesAllCompanies(authentication)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only a super admin can assign that role");
         }
         Employee updated = employeeService.setRole(id, role);
         return Map.of("id", updated.getId(), "role", updated.getRoleType().name());
@@ -163,9 +170,14 @@ public class AdminController {
     @PatchMapping("/employees/{id}/reporting-manager")
     public Map<String, Object> setReportingManager(
             @PathVariable Long id,
-            @RequestBody Map<String, Long> body) {
+            @RequestBody Map<String, Long> body,
+            Authentication authentication) {
         if (body == null || !body.containsKey("managerId")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "managerId is required");
+        }
+        requireVisible(id, authentication);
+        if (body.get("managerId") != null) {
+            requireVisible(body.get("managerId"), authentication);
         }
         try {
             Employee updated = employeeService.setReportingManager(id, body.get("managerId"));
@@ -179,12 +191,20 @@ public class AdminController {
     }
 
     @GetMapping("/holidays")
-    public List<CompanyHoliday> holidays() {
-        return companyHolidayRepository.findAll();
+    public List<CompanyHoliday> holidays(Authentication authentication) {
+        String own = authorizationService.ownCompanyCode(authentication);
+        return companyHolidayRepository.findAll().stream()
+                .filter(holiday -> authorizationService.seesAllCompanies(authentication)
+                        || holiday.getCompanyCode() == null
+                        || holiday.getCompanyCode().isBlank()
+                        || (own != null && own.equalsIgnoreCase(holiday.getCompanyCode())))
+                .toList();
     }
 
     @PostMapping("/holidays")
-    public CompanyHoliday addHoliday(@RequestBody Map<String, String> body) {
+    public CompanyHoliday addHoliday(
+            @RequestBody Map<String, String> body,
+            Authentication authentication) {
         if (body == null || body.get("date") == null || body.get("name") == null || body.get("name").isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Holiday date and name are required");
         }
@@ -198,6 +218,12 @@ public class AdminController {
         if (companyCode != null && companyCode.isBlank()) {
             companyCode = null;
         }
+        if (!authorizationService.seesAllCompanies(authentication)) {
+            companyCode = authorizationService.ownCompanyCode(authentication);
+            if (companyCode == null || companyCode.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This account has no company");
+            }
+        }
         if (companyHolidayRepository.existsForDay(date, companyCode)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "That holiday is already saved");
         }
@@ -209,11 +235,27 @@ public class AdminController {
     }
 
     @DeleteMapping("/holidays/{id}")
-    public Map<String, Object> deleteHoliday(@PathVariable Long id) {
-        if (!companyHolidayRepository.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Holiday not found");
+    public Map<String, Object> deleteHoliday(
+            @PathVariable Long id,
+            Authentication authentication) {
+        CompanyHoliday holiday = companyHolidayRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Holiday not found"));
+        if (!authorizationService.seesAllCompanies(authentication)) {
+            String own = authorizationService.ownCompanyCode(authentication);
+            if (holiday.getCompanyCode() == null
+                    || own == null
+                    || !own.equalsIgnoreCase(holiday.getCompanyCode())) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Holiday not found");
+            }
         }
         companyHolidayRepository.deleteById(id);
         return Map.of("deleted", true);
+    }
+
+    private void requireVisible(Long id, Authentication authentication) {
+        Employee employee = employeeService.findById(id);
+        if (!authorizationService.canSeeEmployee(employee, authentication)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Employee not found");
+        }
     }
 }

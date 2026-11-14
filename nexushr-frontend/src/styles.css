@@ -6830,7 +6830,7 @@ textarea {
 }
 
 .admin-dashboard .hr-kpis button {
-  cursor: default;
+  cursor: pointer;
 }
 
 .admin-dashboard .admin-leader {

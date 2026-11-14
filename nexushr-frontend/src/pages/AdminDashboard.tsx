@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   getAdminOverview,
   getCurrentEmployee,
@@ -32,6 +33,7 @@ function punchLine(row: AdminEmployeeRow) {
 }
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   const company = getWorkspaceCompany();
   const [rows, setRows] = useState<AdminEmployeeRow[]>([]);
   const [me, setMe] = useState<EmployeeResponse | null>(null);
@@ -79,6 +81,7 @@ export default function AdminDashboard() {
   const chairmen = active.filter(isChairman);
   const managers = active.filter((row) => row.role === "MANAGER" && !isChairman(row));
   const staff = active.filter((row) => row.role === "EMPLOYEE");
+  const hr = active.filter((row) => row.role === "HR" || row.role === "ADMIN" || row.role === "SUPER_ADMIN");
   const checkedIn = active.filter((row) => row.checkInTime);
   const missingCheckIn = active.filter((row) => !row.checkInTime);
   const missingCheckOut = active.filter((row) => row.checkInTime && !row.checkOutTime);
@@ -110,32 +113,37 @@ export default function AdminDashboard() {
       {error && <p className="page-alert">{error}</p>}
 
       <section className="hr-kpis">
-        <button type="button">
+        <button type="button" onClick={() => navigate("/employees")}>
           <span>Employees</span>
           <strong>{staff.length}</strong>
           <em>{companyName}</em>
         </button>
-        <button type="button">
+        <button type="button" onClick={() => navigate("/admin/users")}>
+          <span>HR and admin</span>
+          <strong>{hr.length}</strong>
+          <em>this company</em>
+        </button>
+        <button type="button" onClick={() => navigate("/admin/users")}>
           <span>Managers</span>
           <strong>{managers.length}</strong>
           <em>team leaders</em>
         </button>
-        <button type="button">
+        <button type="button" onClick={() => navigate("/admin/companies")}>
           <span>Chairman</span>
           <strong>{chairmen.length}</strong>
           <em>founder</em>
         </button>
-        <button type="button">
+        <button type="button" onClick={() => navigate("/attendance")}>
           <span>Checked in</span>
           <strong>{checkedIn.length}</strong>
           <em>today</em>
         </button>
-        <button type="button">
+        <button type="button" onClick={() => navigate("/attendance")}>
           <span>Missing check-in</span>
           <strong>{missingCheckIn.length}</strong>
           <em>today</em>
         </button>
-        <button type="button">
+        <button type="button" onClick={() => navigate("/attendance")}>
           <span>Missing check-out</span>
           <strong>{missingCheckOut.length}</strong>
           <em>still in</em>

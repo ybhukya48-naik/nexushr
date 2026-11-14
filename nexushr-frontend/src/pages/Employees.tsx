@@ -221,7 +221,7 @@ function getStoredRole() {
 }
 
 function canManageEmployees(role: string) {
-  return role === "ADMIN" || role === "HR" || role === "MANAGER";
+  return role === "ADMIN" || role === "SUPER_ADMIN" || role === "HR" || role === "MANAGER";
 }
 
 function matchesLifecycle(status: string, lifecycle?: string) {
@@ -269,7 +269,7 @@ export default function Employees() {
   const [role] = useState(getStoredRole);
 
   const managementAccess = canManageEmployees(role);
-  const canEditDeleteEmployees = role === "HR";
+  const canEditDeleteEmployees = role === "HR" || role === "ADMIN" || role === "SUPER_ADMIN";
 
   const [editingEmployeeId, setEditingEmployeeId] =
     useState<number | null>(null);
@@ -635,7 +635,7 @@ export default function Employees() {
           <p className="page-eyebrow">Directory</p>
           <h1>Employees</h1>
           <p>
-            People in the company selected in the sidebar.
+            People in this company.
           </p>
         </div>
 

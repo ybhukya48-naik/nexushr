@@ -32,19 +32,47 @@ function AdminCompanies() {
         </div>
       </div>
       {error && <p className="page-alert">{error}</p>}
-      <div className="stats-grid admin-stats">
-        {[...groups.entries()].map(([code, people]) => (
-          <article key={code} className="stat-card">
-            <p>{code === "GORLE" ? "Gorle Group" : code}</p>
-            <h3>{people.filter((person) => person.role === "EMPLOYEE" && person.active).length}</h3>
-            <span>
-              {people.filter((person) => person.role === "HR" && person.active).length} HR
-              {" · "}
-              {people.filter((person) => person.role === "MANAGER" && person.active).length} managers
-            </span>
-          </article>
-        ))}
-      </div>
+      {[...groups.entries()].map(([code, people]) => (
+        <section key={code} className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">{code === "GORLE" ? "Gorle Group" : code}</p>
+              <h3>
+                {people.filter((person) => person.active).length} people
+                {" · "}
+                {people.filter((person) => person.role === "HR" && person.active).length} HR
+                {" · "}
+                {people.filter((person) => person.role === "MANAGER" && person.active).length} managers
+              </h3>
+            </div>
+          </div>
+          <div className="employees-table-wrap">
+            <table className="employees-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Role</th>
+                  <th>Designation</th>
+                  <th>Today</th>
+                </tr>
+              </thead>
+              <tbody>
+                {people.map((person) => (
+                  <tr key={person.id}>
+                    <td>
+                      <strong>{person.fullName}</strong>
+                      <span className="admin-sub">{person.employeeCode}</span>
+                    </td>
+                    <td>{person.role}</td>
+                    <td>{person.designation || "—"}</td>
+                    <td>{person.checkInTime ? "Checked in" : "No check-in"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ))}
       {groups.size === 0 && !error && <p>No company records yet.</p>}
     </div>
   );
@@ -94,12 +122,15 @@ function AdminRoles() {
 function AdminAudit() {
   const [rows, setRows] = useState<AttendanceAuditEntry[]>([]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
   const company = getWorkspaceCompany();
 
   useEffect(() => {
+    setLoading(true);
     void getAttendanceAudit()
       .then((entries) => setRows(Array.isArray(entries) ? entries : []))
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Unable to load the audit log."));
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : "Unable to load the audit log."))
+      .finally(() => setLoading(false));
   }, [company]);
 
   return (
@@ -132,7 +163,12 @@ function AdminAudit() {
                   <td>{row.detail}</td>
                 </tr>
               ))}
-              {rows.length === 0 && !error && (
+              {loading && (
+                <tr>
+                  <td colSpan={4}>Loading the audit log...</td>
+                </tr>
+              )}
+              {!loading && rows.length === 0 && !error && (
                 <tr>
                   <td colSpan={4}>No attendance changes recorded yet.</td>
                 </tr>

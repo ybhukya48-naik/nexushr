@@ -877,7 +877,7 @@ export default function Attendance() {
     setAttendanceLoaded(false);
 
     try {
-      const isManagementRole = ["ADMIN", "HR", "MANAGER"].includes(
+      const isManagementRole = ["ADMIN", "SUPER_ADMIN", "HR", "MANAGER"].includes(
         currentRole,
       );
 
