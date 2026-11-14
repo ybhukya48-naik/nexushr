@@ -6829,6 +6829,17 @@ textarea {
   margin-bottom: 18px;
 }
 
+.admin-dashboard .hr-kpis button {
+  cursor: default;
+}
+
+.admin-dashboard .admin-leader {
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
 .admin-lens {
   display: flex;
   gap: 8px;

@@ -75,12 +75,14 @@ const Payroll = lazy(() => import("./pages/Payroll"));
 const Performance = lazy(() => import("./pages/Performance"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Admin = lazy(() => import("./pages/Admin"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const SiteAttendance = lazy(() => import("./pages/SiteAttendance"));
 
 const navItems: ReadonlyArray<
   readonly [string, string, readonly string[]]
 > = [
   ["Dashboard", "/", ["HR", "MANAGER", "EMPLOYEE", "ADMIN", "SUPER_ADMIN"]],
+  ["Accounts", "/admin", ["ADMIN", "SUPER_ADMIN"]],
   ["Employees", "/employees", ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"]],
   ["Attendance", "/attendance", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
   ["Leave", "/leave", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
@@ -498,7 +500,7 @@ function AppRoutes() {
               }
             >
               {label === "Dashboard"
-                ? role === "ADMIN" || role === "SUPER_ADMIN" ? "Admin" : "Home"
+                ? role === "ADMIN" || role === "SUPER_ADMIN" ? "Dashboard" : "Home"
                 : label === "Attendance"
                   ? role === "EMPLOYEE" ? "My Attendance" : "Attendance"
                   : label === "Leave"
@@ -629,7 +631,7 @@ function AppRoutes() {
                   role === "EMPLOYEE" ? (
                     <EmployeeDashboard />
                   ) : role === "ADMIN" || role === "SUPER_ADMIN" ? (
-                    <Admin />
+                    <AdminDashboard />
                   ) : (
                     <Dashboard />
                   )
