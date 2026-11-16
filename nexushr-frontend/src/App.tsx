@@ -473,7 +473,8 @@ function AppRoutes() {
     );
   }
 
-  const isAdmin = role === "ADMIN" || role === "SUPER_ADMIN";
+  const signedRole = (me?.roleType || role || "HR").toUpperCase();
+  const isAdmin = signedRole === "ADMIN" || signedRole === "SUPER_ADMIN";
   const canSwitchWorkspace = role === "SUPER_ADMIN";
 
   return (
@@ -519,7 +520,7 @@ function AppRoutes() {
               }
             >
               {label === "Dashboard"
-                ? role === "ADMIN" || role === "SUPER_ADMIN" ? "Dashboard" : "Home"
+                ? signedRole === "ADMIN" || signedRole === "SUPER_ADMIN" ? "Dashboard" : "Home"
                 : label === "Attendance"
                   ? role === "EMPLOYEE" ? "My Attendance" : "Attendance"
                   : label === "Leave"
@@ -647,9 +648,9 @@ function AppRoutes() {
               <Route
                 path="/"
                 element={
-                  role === "EMPLOYEE" ? (
+                  signedRole === "EMPLOYEE" ? (
                     <EmployeeDashboard />
-                  ) : role === "ADMIN" || role === "SUPER_ADMIN" ? (
+                  ) : signedRole === "ADMIN" || signedRole === "SUPER_ADMIN" ? (
                     <AdminDashboard />
                   ) : (
                     <Dashboard />

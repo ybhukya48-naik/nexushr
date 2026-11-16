@@ -7,6 +7,7 @@ import {
   getEmployee,
   updateEmployee,
   uploadEmployeePhoto,
+  deleteEmployeePhoto,
   type EmployeeRequest,
   type EmployeeResponse,
   type EmployeeLifecycleStatus,
@@ -217,6 +218,20 @@ export default function EmployeeProfile() {
     }
   }
 
+  async function removePicture() {
+    if (!employee) {
+      return;
+    }
+    setPhotoError("");
+    try {
+      const updated = await deleteEmployeePhoto(mine ? "me" : employee.id);
+      setPhotoUrl("");
+      setEmployee(updated);
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : "Could not remove the profile picture.");
+    }
+  }
+
   function updateForm(
     field: keyof EmployeeRequest,
     value: string | number | boolean,
@@ -358,8 +373,17 @@ export default function EmployeeProfile() {
               className="table-action"
               onClick={() => pictureInput.current?.click()}
             >
-              Add profile picture
+              {photoUrl ? "Change profile picture" : "Add profile picture"}
             </button>
+            {photoUrl && (
+              <button
+                type="button"
+                className="table-action"
+                onClick={() => void removePicture()}
+              >
+                Remove profile picture
+              </button>
+            )}
             {photoError && <span className="profile-picture-error">{photoError}</span>}
             <input
               ref={pictureInput}

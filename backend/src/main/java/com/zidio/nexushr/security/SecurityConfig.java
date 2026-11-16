@@ -215,6 +215,17 @@ public class SecurityConfig {
                 )
 
                 .requestMatchers(
+                    HttpMethod.DELETE,
+                    "/api/v1/employees/me/photo"
+                )
+                .hasAnyRole(
+                    "HR",
+                    "ADMIN",
+                    "MANAGER",
+                    "EMPLOYEE"
+                )
+
+                .requestMatchers(
                     HttpMethod.GET,
                     "/api/v1/employees/*/photo"
                 )
@@ -230,6 +241,12 @@ public class SecurityConfig {
                     "/api/v1/employees/*/photo"
                 )
                 .hasAnyRole("HR", "ADMIN", "MANAGER")
+
+                .requestMatchers(
+                    HttpMethod.DELETE,
+                    "/api/v1/employees/*/photo"
+                )
+                .hasAnyRole("HR", "ADMIN")
 
                 // Employee directory remains management-only.
                 .requestMatchers(

@@ -308,6 +308,13 @@ public class EmployeeService {
         return employeeRepository.save(employee);
     }
 
+    public Employee clearProfilePhoto(Long id) {
+        Employee employee = findById(id);
+        employee.setProfilePhoto(null);
+        employee.setProfilePhotoType(null);
+        return employeeRepository.save(employee);
+    }
+
     public Employee changeOwnPassword(Long id, String newPassword) {
         if (newPassword == null || newPassword.length() < 8) {
             throw new IllegalArgumentException("Password must contain at least 8 characters");

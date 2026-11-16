@@ -489,6 +489,11 @@ export async function fetchEmployeePhoto(id: number): Promise<string | null> {
   return URL.createObjectURL(await response.blob());
 }
 
+export async function deleteEmployeePhoto(id: number | "me") {
+  const path = id === "me" ? "/employees/me/photo" : `/employees/${id}/photo`;
+  return request<EmployeeResponse>(path, { method: "DELETE" });
+}
+
 export async function uploadEmployeePhoto(id: number | "me", file: File) {
   const token = localStorage.getItem("nexushr_token");
   const body = new FormData();

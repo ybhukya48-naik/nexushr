@@ -83,6 +83,7 @@ export default function AdminDashboard() {
   const staff = active.filter((row) => row.role === "EMPLOYEE");
   const hr = active.filter((row) => row.role === "HR" || row.role === "ADMIN" || row.role === "SUPER_ADMIN");
   const checkedIn = active.filter((row) => row.checkInTime);
+  const signedInToday = staff.filter((row) => row.checkInTime);
   const missingCheckIn = active.filter((row) => !row.checkInTime);
   const missingCheckOut = active.filter((row) => row.checkInTime && !row.checkOutTime);
   const companyName = company === "GORLE" ? "Gorle Group" : "CYOND";
@@ -148,6 +149,32 @@ export default function AdminDashboard() {
           <strong>{missingCheckOut.length}</strong>
           <em>still in</em>
         </button>
+      </section>
+
+      <section className="hr-card">
+        <div className="hr-card-title">
+          <h3>Checked in today</h3>
+        </div>
+        <p>
+          {companyName} employees who checked in today.
+        </p>
+        {loading ? (
+          <p className="hr-empty">Loading today's check-ins...</p>
+        ) : signedInToday.length === 0 ? (
+          <p className="hr-empty">No {companyName} employee has checked in today.</p>
+        ) : (
+          <ul className="admin-leader-people">
+            {signedInToday.map((person) => (
+              <li key={person.id}>
+                <span>
+                  <strong>{person.fullName}</strong>
+                  {person.employeeCode ? ` · ${person.employeeCode}` : ""}
+                </span>
+                <span>{punchLine(person)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="hr-split">

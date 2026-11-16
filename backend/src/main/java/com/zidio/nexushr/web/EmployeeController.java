@@ -131,6 +131,12 @@ public class EmployeeController {
         return EmployeeResponse.from(savePhoto(employeeId, file));
     }
 
+    @DeleteMapping("/me/photo")
+    public EmployeeResponse deleteMyPhoto(Authentication authentication) {
+        Long employeeId = requireSelf(authentication);
+        return EmployeeResponse.from(employeeService.clearProfilePhoto(employeeId));
+    }
+
     @GetMapping("/{id}/photo")
     public ResponseEntity<byte[]> photo(@PathVariable Long id) {
         Employee employee = employeeService.findById(id);
@@ -157,6 +163,20 @@ public class EmployeeController {
                     "Employee not found");
         }
         return EmployeeResponse.from(savePhoto(id, file));
+    }
+
+    @DeleteMapping("/{id}/photo")
+    public EmployeeResponse deletePhoto(
+            @PathVariable Long id,
+            Authentication authentication) {
+        requireHrOrAdmin(authentication);
+        Employee existing = employeeService.findById(id);
+        if (!authorizationService.canSeeEmployee(existing, authentication)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Employee not found");
+        }
+        return EmployeeResponse.from(employeeService.clearProfilePhoto(id));
     }
 
     @GetMapping("/{id}")
