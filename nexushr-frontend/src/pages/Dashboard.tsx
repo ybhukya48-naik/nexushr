@@ -597,30 +597,37 @@ export default function Dashboard() {
         <div className="hr-card-title">
           <h3>Checked in, day by day</h3>
         </div>
-        <p>Click a day to see who checked in. Today, yesterday, and every earlier day.</p>
+        <p>Use View to see who checked in. Today, yesterday, and every earlier day.</p>
         <div className="hr-history-table">
           <table className="employees-table">
             <thead>
               <tr>
                 <th>Date</th>
                 <th>People checked in</th>
+                <th>View</th>
               </tr>
             </thead>
             <tbody>
               {dailyCounts.length === 0 ? (
                 <tr>
-                  <td colSpan={2}>No check-ins yet.</td>
+                  <td colSpan={3}>No check-ins yet.</td>
                 </tr>
               ) : dailyCounts.map((row) => {
                 const day = String(row.date).slice(0, 10);
+                const open = pickedDay === day;
                 return (
                   <tr key={day}>
+                    <td>{displayDate(day)}</td>
+                    <td>{row.checkedIn}</td>
                     <td>
-                      <button type="button" className="panel-link" onClick={() => void openDay(day)}>
-                        {displayDate(day)}
+                      <button
+                        type="button"
+                        className={open ? "table-action day-view active" : "table-action day-view"}
+                        onClick={() => void openDay(day)}
+                      >
+                        View
                       </button>
                     </td>
-                    <td>{row.checkedIn}</td>
                   </tr>
                 );
               })}
