@@ -194,6 +194,7 @@ export default function Dashboard() {
   const [pickedDay, setPickedDay] = useState("");
   const [pickedRows, setPickedRows] = useState<AttendanceRecord[]>([]);
   const [pickedLoading, setPickedLoading] = useState(false);
+  const [showAllDays, setShowAllDays] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -597,7 +598,7 @@ export default function Dashboard() {
         <div className="hr-card-title">
           <h3>Checked in, day by day</h3>
         </div>
-        <p>Use View to see who checked in. Today, yesterday, and every earlier day.</p>
+        <p>Use View to see who checked in.</p>
         <div className="hr-history-table">
           <table className="employees-table">
             <thead>
@@ -612,7 +613,7 @@ export default function Dashboard() {
                 <tr>
                   <td colSpan={3}>No check-ins yet.</td>
                 </tr>
-              ) : dailyCounts.map((row) => {
+              ) : (showAllDays ? dailyCounts : dailyCounts.slice(0, 3)).map((row) => {
                 const day = String(row.date).slice(0, 10);
                 const open = pickedDay === day;
                 return (
@@ -634,6 +635,15 @@ export default function Dashboard() {
             </tbody>
           </table>
         </div>
+        {dailyCounts.length > 3 && (
+          <button
+            type="button"
+            className="table-action day-view"
+            onClick={() => setShowAllDays((open) => !open)}
+          >
+            {showAllDays ? "View less" : "View more"}
+          </button>
+        )}
         {pickedDay && (
           <div className="day-view-panel">
             <strong>{displayDate(pickedDay)}</strong>
