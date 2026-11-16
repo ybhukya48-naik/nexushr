@@ -350,6 +350,43 @@
   color: #6941c6;
 }
 
+.day-view-panel {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px solid #ece7fb;
+  border-radius: 10px;
+  background: #faf9ff;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.day-view-panel strong,
+.day-view-panel p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.day-view-panel ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.day-view-panel li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.day-view-panel li span:last-child {
+  color: #475467;
+  white-space: nowrap;
+}
+
 .hr-card-title button,
 .hr-alerts button {
   border: 0;

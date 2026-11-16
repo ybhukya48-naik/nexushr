@@ -635,43 +635,32 @@ export default function Dashboard() {
           </table>
         </div>
         {pickedDay && (
-          <>
-            <h3>{displayDate(pickedDay)}</h3>
-            <div className="hr-history-table">
-              <table className="employees-table">
-                <thead>
-                  <tr>
-                    <th>Employee</th>
-                    <th>Check in</th>
-                    <th>Check out</th>
-                    <th>Working hours</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pickedLoading ? (
-                    <tr>
-                      <td colSpan={4}>Loading {displayDate(pickedDay)}...</td>
-                    </tr>
-                  ) : activePeople.length === 0 ? (
-                    <tr>
-                      <td colSpan={4}>No employees for this company.</td>
-                    </tr>
-                  ) : activePeople.map((person) => {
-                    const row = pickedRows.find((item) => item.employee?.id === person.id);
-                    const checkOut = shownCheckOut(row);
-                    return (
-                      <tr key={person.id}>
-                        <td>{person.fullName}</td>
-                        <td>{row?.checkInTime ? clock(row.checkInTime) : "—"}</td>
-                        <td>{checkOut ? clock(checkOut) : row?.checkInTime ? "Still in" : "—"}</td>
-                        <td>{row?.checkInTime ? formatHoursSeconds(dayCountedSeconds(row, clockNow)) : "No check-in"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </>
+          <div className="day-view-panel">
+            <strong>{displayDate(pickedDay)}</strong>
+            {pickedLoading ? (
+              <p>Loading...</p>
+            ) : pickedRows.filter((row) => row.checkInTime).length === 0 ? (
+              <p>No check-in</p>
+            ) : (
+              <ul>
+                {pickedRows.filter((row) => row.checkInTime).map((row) => {
+                  const checkOut = shownCheckOut(row);
+                  return (
+                    <li key={row.employee?.id ?? row.checkInTime}>
+                      <span>{row.employee?.fullName || "Employee"}</span>
+                      <span>
+                        {clock(row.checkInTime)}
+                        {" – "}
+                        {checkOut ? clock(checkOut) : "Still in"}
+                        {" · "}
+                        {formatHoursSeconds(dayCountedSeconds(row, clockNow))}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         )}
       </section>
 
