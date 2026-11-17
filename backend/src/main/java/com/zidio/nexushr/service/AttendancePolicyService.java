@@ -67,6 +67,13 @@ public class AttendancePolicyService {
         // system is inactive while they are away, and they check in again
         // after lunch. That gap is break time, not a warning. A warning is
         // only raised while they are still checked in.
+        int gap = AttendanceRules.countableInactiveMinutes(record.getLastActivityAt(), now);
+        int idle = zero(record.getSessionIdleMinutes());
+        if (Boolean.TRUE.equals(record.getYellowFlag())
+                && gap > AttendanceRules.INACTIVE_LIMIT_MINUTES
+                && idle <= gap) {
+            record.setYellowFlag(false);
+        }
         record.setSessionIdleMinutes(0);
         record.setLastActivityAt(now);
         applyMonthPenalties(record);
@@ -89,7 +96,9 @@ public class AttendancePolicyService {
             record.setLastActivityAt(now);
             return attendanceRepository.save(record);
         }
-        int gap = AttendanceRules.countableInactiveMinutes(record.getLastActivityAt(), now);
+        int gap = AttendanceRules.countableInactiveMinutes(
+                AttendanceRules.inactivityMeasuredFrom(record.getLastActivityAt(), record.getSessionStartedAt()),
+                now);
         if (gap > AttendanceRules.INACTIVE_LIMIT_MINUTES
                 && !AttendanceRules.duringInactivityGrace(now.toLocalTime())) {
             record.setSessionIdleMinutes(zero(record.getSessionIdleMinutes()) + gap);

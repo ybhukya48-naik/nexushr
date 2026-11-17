@@ -23,6 +23,7 @@ import {
   getLeaves,
   clockedWorkMinutes,
   dayCountedSeconds,
+  dayExtraSeconds,
   formatHoursSeconds,
   isWindowsComputer,
   monthDateKeys,
@@ -655,6 +656,7 @@ export default function Dashboard() {
               <ul>
                 {pickedRows.filter((row) => row.checkInTime).map((row) => {
                   const checkOut = shownCheckOut(row);
+                  const extra = dayExtraSeconds(row, clockNow);
                   return (
                     <li key={row.employee?.id ?? row.checkInTime}>
                       <span>{row.employee?.fullName || "Employee"}</span>
@@ -664,6 +666,7 @@ export default function Dashboard() {
                         {checkOut ? clock(checkOut) : "Still in"}
                         {" · "}
                         {formatHoursSeconds(dayCountedSeconds(row, clockNow))}
+                        {extra > 0 ? ` · Extra ${formatHoursSeconds(extra)}` : ""}
                       </span>
                     </li>
                   );

@@ -127,7 +127,9 @@ public class AttendanceInactivityService {
             if (Boolean.TRUE.equals(record.getYellowFlag()) || record.getLastActivityAt() == null) {
                 continue;
             }
-            int gap = AttendanceRules.countableInactiveMinutes(record.getLastActivityAt(), now);
+            int gap = AttendanceRules.countableInactiveMinutes(
+                    AttendanceRules.inactivityMeasuredFrom(record.getLastActivityAt(), record.getSessionStartedAt()),
+                    now);
             if (gap > AttendanceRules.INACTIVE_LIMIT_MINUTES) {
                 attendancePolicyService.markInactiveChrome(record, (int) gap);
                 attendanceRepository.save(record);

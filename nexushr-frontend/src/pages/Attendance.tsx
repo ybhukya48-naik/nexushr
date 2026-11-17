@@ -130,11 +130,13 @@ export function shownCheckOut(
 
 export const DAY_PRESENCE_MINUTES = 9 * 60;
 
+type PresenceRecord = (Pick<AttendanceRecord, "checkInTime" | "checkOutTime" | "breakMinutes" | "workMinutes" | "sessionStartedAt"> & {
+  attendanceDate?: string;
+}) | null;
+
 /** Time on the clock, without counting hours past 9 toward the day. */
 export function presenceMinutes(
-  record?: (Pick<AttendanceRecord, "checkInTime" | "checkOutTime" | "breakMinutes" | "workMinutes"> & {
-    attendanceDate?: string;
-  }) | null,
+  record?: PresenceRecord,
   now = new Date(),
 ) {
   if (!record?.checkInTime) {
@@ -165,17 +167,18 @@ export function dayCountedMinutes(
   return Math.min(DAY_PRESENCE_MINUTES, presenceMinutes(record, now));
 }
 
+/** Time after check-in plus 9 hours. Lunch inside those 9 hours does not hide it. */
 export function dayExtraMinutes(
   record?: Parameters<typeof presenceMinutes>[0],
   now = new Date(),
 ) {
-  return Math.max(0, presenceMinutes(record, now) - DAY_PRESENCE_MINUTES);
+  return Math.floor(dayExtraSeconds(record, now) / 60);
 }
 
 const DAY_PRESENCE_SECONDS = DAY_PRESENCE_MINUTES * 60;
 
 export function presenceSeconds(
-  record?: Parameters<typeof presenceMinutes>[0],
+  record?: PresenceRecord,
   now = new Date(),
 ) {
   if (!record?.checkInTime) {
@@ -207,10 +210,32 @@ export function dayCountedSeconds(
 }
 
 export function dayExtraSeconds(
-  record?: Parameters<typeof presenceMinutes>[0],
+  record?: PresenceRecord,
   now = new Date(),
 ) {
-  return Math.max(0, presenceSeconds(record, now) - DAY_PRESENCE_SECONDS);
+  if (!record?.checkInTime) {
+    return 0;
+  }
+  const start = new Date(record.checkInTime).getTime();
+  if (Number.isNaN(start)) {
+    return 0;
+  }
+  const deadline = start + DAY_PRESENCE_SECONDS * 1000;
+  const pastLogout = forgotCheckout(record, now);
+  const end = record.checkOutTime
+    ? new Date(record.checkOutTime).getTime()
+    : pastLogout
+      ? deadline
+      : now.getTime();
+  if (!end || end <= deadline) {
+    return 0;
+  }
+  let breakAfter = 0;
+  const sessionStart = record.sessionStartedAt ? new Date(record.sessionStartedAt).getTime() : Number.NaN;
+  if (!Number.isNaN(sessionStart) && sessionStart > deadline) {
+    breakAfter = Math.min(Math.max(0, (record.breakMinutes ?? 0) * 1000), sessionStart - deadline);
+  }
+  return Math.max(0, Math.floor((end - deadline - breakAfter) / 1000));
 }
 
 export function formatHoursSeconds(totalSeconds?: number) {

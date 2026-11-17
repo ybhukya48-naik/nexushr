@@ -119,6 +119,17 @@ public final class AttendanceRules {
         return raw > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) raw;
     }
 
+    /** Idle is measured only inside the current check-in. Time before it is the lunch break. */
+    public static LocalDateTime inactivityMeasuredFrom(LocalDateTime lastActivity, LocalDateTime sessionStartedAt) {
+        if (sessionStartedAt == null) {
+            return lastActivity;
+        }
+        if (lastActivity == null || lastActivity.isBefore(sessionStartedAt)) {
+            return sessionStartedAt;
+        }
+        return lastActivity;
+    }
+
     public static boolean duringInactivityGrace(LocalTime time) {
         return false;
     }

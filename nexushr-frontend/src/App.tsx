@@ -1515,6 +1515,7 @@ function EmployeeDashboard() {
         const warnings = monthRows.filter((row) => row.yellowFlag).length;
         const halfDay = warnings >= 3 ? Math.round(Number(employee.baseSalary || 0) / 26 / 2) : 0;
         const workday = new Date().getDay() !== 0;
+        const onLunchNow = Boolean(todayRecord?.checkInTime && todayRecord?.checkOutTime);
         const notices = [
           workday && !todayRecord?.checkInTime ? "Check-in is missing today." : "",
           todayRecord?.checkInTime && !todayRecord.checkOutTime && todaySeconds < 9 * 60 * 60
@@ -1526,7 +1527,7 @@ function EmployeeDashboard() {
           isCheckoutMissing(todayRecord)
             ? "Check-out was missed. It is saved 9 hours after check-in, and the attendance record stays."
             : "",
-          todayRecord?.yellowFlag
+          todayRecord?.yellowFlag && !onLunchNow
             ? "Desktop was inactive for more than 30 minutes. This is a warning."
             : "",
           warnings >= 3
