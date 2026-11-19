@@ -1,5 +1,6 @@
 ﻿import { isCompanyMatch } from "../utils/company";
 import { getWorkspaceCompany } from "../utils/workspace";
+import "./Dashboard.css";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { FormEvent } from "react";
@@ -161,6 +162,63 @@ function OrgChart({ people }: { people: EmployeeResponse[] }) {
   );
 }
 
+const TEAM_ORDER = [
+  "HR",
+  "TEAM-A",
+  "TEAM-B",
+  "TEAM-D",
+  "TEAM-E",
+  "TEAM-G",
+  "Architecture",
+  "Admin",
+  "Operations",
+  "Sales",
+  "Software",
+  "Technical",
+];
+
+function teamGroups(people: EmployeeResponse[]) {
+  const groups = new Map<string, EmployeeResponse[]>();
+  for (const person of people) {
+    const name = person.department?.trim() || "Team";
+    const rows = groups.get(name) ?? [];
+    rows.push(person);
+    groups.set(name, rows);
+  }
+  return [...groups.entries()].sort(([left], [right]) => {
+    const leftAt = TEAM_ORDER.indexOf(left);
+    const rightAt = TEAM_ORDER.indexOf(right);
+    if (leftAt === -1 && rightAt === -1) return left.localeCompare(right);
+    if (leftAt === -1) return 1;
+    if (rightAt === -1) return -1;
+    return leftAt - rightAt;
+  });
+}
+
+function TeamBoard({ people }: { people: EmployeeResponse[] }) {
+  if (people.length === 0) {
+    return <p className="hr-empty">No employees in this company.</p>;
+  }
+  return (
+    <div className="team-board">
+      {teamGroups(people).map(([department, members]) => (
+        <article key={department} className="team-card">
+          <h3>{department}</h3>
+          <ul>
+            {members.map((person) => (
+              <li key={person.id}>
+                <strong>{person.fullName}</strong>
+                <span>{person.designation || person.roleType}{person.employeeCode ? ` · ${person.employeeCode}` : ""}</span>
+                {person.email ? <span>{person.email}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 function roleLabel(role: EmployeeRole) {
   switch (role) {
     case "ADMIN":
@@ -259,6 +317,9 @@ export default function Employees() {
     }
   }, [searchParams]);
   const company = getWorkspaceCompany() ?? "CYOND";
+  const [role] = useState(getStoredRole);
+  const seesBothCompanies = role === "HR";
+  const scope = seesBothCompanies ? "All Companies" : company;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -266,7 +327,6 @@ export default function Employees() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [resetNotice, setResetNotice] = useState("");
-  const [role] = useState(getStoredRole);
 
   const managementAccess = canManageEmployees(role);
   const canEditDeleteEmployees = role === "HR" || role === "ADMIN" || role === "SUPER_ADMIN";
@@ -382,7 +442,7 @@ export default function Employees() {
       const matchesStatus = matchesLifecycle(status, employee.lifecycleStatus);
 
       const matchesCompany =
-        isCompanyMatch(employee.companyCode, company);
+        isCompanyMatch(employee.companyCode, scope);
 
       return (        matchesSearch &&
         matchesDepartment &&
@@ -390,12 +450,13 @@ export default function Employees() {
         matchesCompany
       );
     });
-  }, [employees, search, department, status, company]);
+  }, [employees, search, department, status, scope]);
 
   const companyPeople = useMemo(
-    () => employees.filter((employee) => isCompanyMatch(employee.companyCode, company)),
-    [employees, company],
+    () => employees.filter((employee) => isCompanyMatch(employee.companyCode, scope)),
+    [employees, scope],
   );
+  const hierarchyPeople = companyPeople.filter((person) => person.active !== false);
 
   const activeCount = companyPeople.filter(
     (employee) => employee.lifecycleStatus === "ACTIVE",
@@ -635,7 +696,7 @@ export default function Employees() {
           <p className="page-eyebrow">Directory</p>
           <h1>Employees</h1>
           <p>
-            People in this company.
+            {seesBothCompanies ? "Gorle Group and CYOND." : "People in this company."}
           </p>
         </div>
 
@@ -652,6 +713,23 @@ export default function Employees() {
         </button>
       </div>
 
+      <div className="employees-panel">
+        <div className="panel-header">
+          <h2>Employee hierarchy</h2>
+          <p>{seesBothCompanies ? "Gorle Group and CYOND, with name, role, and employee code." : "Teams in this company."}</p>
+        </div>
+        {seesBothCompanies ? (
+          <>
+            <h3 className="team-company">Gorle Group</h3>
+            <TeamBoard people={hierarchyPeople.filter((person) => isCompanyMatch(person.companyCode, "GORLE"))} />
+            <h3 className="team-company">CYOND</h3>
+            <TeamBoard people={hierarchyPeople.filter((person) => isCompanyMatch(person.companyCode, "CYOND"))} />
+          </>
+        ) : (
+          <TeamBoard people={hierarchyPeople} />
+        )}
+      </div>
+
       <div className="ux-tabs">
         <button type="button" className={directoryView === "list" ? "active" : ""} onClick={() => setDirectoryView("list")}>List</button>
         <button type="button" className={directoryView === "chart" ? "active" : ""} onClick={() => setDirectoryView("chart")}>Org chart</button>
@@ -661,7 +739,7 @@ export default function Employees() {
       {directoryView === "chart" && (
       <OrgChart
         people={employees.filter((employee) =>
-          isCompanyMatch(employee.companyCode, company),
+          isCompanyMatch(employee.companyCode, scope),
         )}
       />
       )}

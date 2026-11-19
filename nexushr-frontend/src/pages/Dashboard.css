@@ -335,6 +335,12 @@
   margin-top: 12px;
 }
 
+.team-company {
+  margin: 16px 0 0;
+  font-size: 18px;
+  color: #1d1633;
+}
+
 .team-board {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

@@ -48,7 +48,9 @@ export default function Payroll() {
 
   const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string>(
-    () => getWorkspaceCompany() ?? "CYOND",
+    () => (localStorage.getItem("nexushr_role") || "").toUpperCase() === "HR"
+      ? "All Companies"
+      : (getWorkspaceCompany() ?? "CYOND"),
   );
   const [records, setRecords] = useState<PayrollRecord[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");

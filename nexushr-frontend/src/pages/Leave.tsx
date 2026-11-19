@@ -18,7 +18,9 @@ import {
 export default function Leave() {
   const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string>(
-    () => getWorkspaceCompany() ?? "CYOND",
+    () => (localStorage.getItem("nexushr_role") || "").toUpperCase() === "HR"
+      ? "All Companies"
+      : (getWorkspaceCompany() ?? "CYOND"),
   );
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");

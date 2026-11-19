@@ -76,7 +76,7 @@ public class AuthorizationService {
     }
 
     public boolean canSeeEmployee(Employee employee, Authentication authentication) {
-        if (seesAllCompanies(authentication)) {
+        if (seesAllCompanies(authentication) || hasAuthority(authentication, "ROLE_HR")) {
             return true;
         }
         if (employee == null || employee.getCompany() == null || employee.getCompany().getCode() == null) {
@@ -105,6 +105,14 @@ public class AuthorizationService {
             return false;
         }
         return canSeeEmployee(employeeRepository.findById(employeeId).orElse(null), authentication);
+    }
+
+    private boolean hasAuthority(Authentication authentication, String authority) {
+        if (authentication == null || authentication.getAuthorities() == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .anyMatch(item -> authority.equals(item.getAuthority()));
     }
 
     public boolean hasManagementRole(

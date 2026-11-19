@@ -1393,14 +1393,15 @@ public class AttendanceService {
             company = requestedCompany.trim();
         }
         LocalDate today = LocalDate.now(COMPANY_ZONE);
-        if (company == null || company.isBlank()) {
+        List<String> companies = role == RoleType.HR
+                ? List.of("CYOND", "GORLE")
+                : (company == null || company.isBlank() ? List.of() : List.of(company));
+        if (companies.isEmpty()) {
             return List.of(new DailyCheckInCount(today, 0));
         }
         Map<LocalDate, Long> counts = new HashMap<>();
-        for (Object[] row : attendanceRepository.countCheckedInByDate(company)) {
-            if (row[0] instanceof LocalDate date && row[1] instanceof Number number) {
-                counts.put(date, number.longValue());
-            }
+        for (String code : companies) {
+            addCheckInCounts(counts, code);
         }
         LocalDate start = counts.keySet().stream().min(LocalDate::compareTo).orElse(today);
         List<DailyCheckInCount> days = new ArrayList<>();
@@ -1408,6 +1409,14 @@ public class AttendanceService {
             days.add(new DailyCheckInCount(date, counts.getOrDefault(date, 0L)));
         }
         return days;
+    }
+
+    private void addCheckInCounts(Map<LocalDate, Long> counts, String company) {
+        for (Object[] row : attendanceRepository.countCheckedInByDate(company)) {
+            if (row[0] instanceof LocalDate date && row[1] instanceof Number number) {
+                counts.merge(date, number.longValue(), Long::sum);
+            }
+        }
     }
 
     public Long findEmployeeIdByUsername(String username) {
