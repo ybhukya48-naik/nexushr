@@ -151,6 +151,7 @@ function isListedEmployee(role?: string) {
 }
 
 const TEAM_ORDER = [
+  "HR",
   "TEAM-A",
   "TEAM-B",
   "TEAM-D",
@@ -164,7 +165,7 @@ const TEAM_ORDER = [
   "Technical",
 ];
 
-function teamGroups(people: Array<{ id: number; fullName: string; department?: string; designation?: string; employeeCode?: string; roleType?: string }>) {
+function teamGroups(people: Array<{ id: number; fullName: string; email?: string; department?: string; designation?: string; employeeCode?: string; roleType?: string }>) {
   const groups = new Map<string, typeof people>();
   for (const person of people) {
     const name = person.department?.trim() || "Team";
@@ -640,7 +641,11 @@ export default function Dashboard() {
         <div className="hr-card-title">
           <h3>Teams</h3>
         </div>
-        <p>Everyone in this company, with name, role, and employee code.</p>
+        <p>
+          {company === "GORLE"
+            ? "HR email: hr@gorlegroup.com. Sign in on HR login with that email after creating the profile."
+            : "HR email: hr@cyond.com. Sign in on HR login with that email after creating the profile."}
+        </p>
         {directory.length === 0 ? (
           <p className="hr-empty">No employees for this company.</p>
         ) : (
@@ -653,6 +658,7 @@ export default function Dashboard() {
                     <li key={person.id}>
                       <strong>{person.fullName}</strong>
                       <span>{person.designation || person.roleType}{person.employeeCode ? ` · ${person.employeeCode}` : ""}</span>
+                      {person.email ? <span>{person.email}</span> : null}
                     </li>
                   ))}
                 </ul>

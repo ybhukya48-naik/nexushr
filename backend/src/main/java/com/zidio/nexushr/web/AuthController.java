@@ -336,7 +336,7 @@ public class AuthController {
                 if (name == null || name.isBlank()) {
                     name = email;
                 }
-                String identifierError = signInIdentifierError(text(row, 7), text(row, 2), normalizedUsername);
+                String identifierError = signInIdentifierError(text(row, 7), text(row, 2), normalizedUsername, role);
                 if (identifierError != null) {
                     return ResponseEntity.status(401).body(Map.of("message", identifierError));
                 }
@@ -363,12 +363,15 @@ public class AuthController {
         }
     }
 
-    static String signInIdentifierError(String companyCode, String employeeCode, String typed) {
+    static String signInIdentifierError(String companyCode, String employeeCode, String typed, String role) {
         String value = typed == null ? "" : typed.trim();
         boolean email = value.contains("@");
         boolean code = employeeCode != null && employeeCode.equalsIgnoreCase(value);
         if ("GORLE".equalsIgnoreCase(companyCode)) {
-            return code ? null : "Gorle Group signs in with the employee code, not the email.";
+            if (code || (email && "HR".equalsIgnoreCase(role))) {
+                return null;
+            }
+            return "Gorle Group signs in with the employee code, not the email.";
         }
         return email ? null : "cyond signs in with the email, not the employee code.";
     }

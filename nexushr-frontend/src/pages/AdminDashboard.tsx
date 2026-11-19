@@ -35,7 +35,7 @@ function punchLine(row: AdminEmployeeRow) {
   return `In ${formatClock(row.checkInTime)} · Out ${formatClock(row.checkOutTime)}`;
 }
 
-const TEAM_ORDER = ["TEAM-A", "TEAM-B", "TEAM-D", "TEAM-E", "TEAM-G", "Architecture", "Admin", "Operations", "Sales", "Software", "Technical"];
+const TEAM_ORDER = ["HR", "TEAM-A", "TEAM-B", "TEAM-D", "TEAM-E", "TEAM-G", "Architecture", "Admin", "Operations", "Sales", "Software", "Technical"];
 
 function teamGroups(rows: AdminEmployeeRow[]) {
   const groups = new Map<string, AdminEmployeeRow[]>();
@@ -178,7 +178,11 @@ export default function AdminDashboard() {
         <div className="hr-card-title">
           <h3>Teams</h3>
         </div>
-        <p>{companyName} people from the staff list. Names, roles, and codes stay fully visible.</p>
+        <p>
+          {company === "GORLE"
+            ? "HR email: hr@gorlegroup.com. Admin example: employee code 310310."
+            : "HR email: hr@cyond.com. Admin example: employee code 310310 on Admin login."}
+        </p>
         {loading ? (
           <p className="hr-empty">Loading teams...</p>
         ) : active.length === 0 ? (
@@ -193,6 +197,7 @@ export default function AdminDashboard() {
                     <li key={person.id}>
                       <strong>{person.fullName}</strong>
                       <span>{person.designation || person.role}{person.employeeCode ? ` · ${person.employeeCode}` : ""}</span>
+                      {person.email ? <span>{person.email}</span> : null}
                     </li>
                   ))}
                 </ul>
