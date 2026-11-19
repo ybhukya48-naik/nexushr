@@ -1034,8 +1034,8 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
                   : kind === "manager"
                   ? "A cyond manager signs in with their own email and password. A Gorle manager signs in with the employee code and password."
                   : kind === "admin"
-                  ? "Example: employee code 310304 opens the admin panel. After sign-in, set a new password. Gorle email on that panel is hr@gorlegroup.com. CYOND HR is hr@cyond.com."
-                  : "Example: hr@cyond.com opens the CYOND HR dashboard. Create your profile once, then sign in with that email."}
+                  ? "Example: employee code 310310 opens the admin panel. hr@gorlegroup.com and hr@cyond.com use HR login."
+                  : "hr@gorlegroup.com opens the Gorle HR dashboard. hr@cyond.com opens the CYOND HR dashboard."}
               </p>
 
             </div>
@@ -1169,7 +1169,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
 
               {creating ? (
                 <p className="login-notice">
-                  Admin panel example: employee code 310304, then set a new password. CYOND HR example: hr@cyond.com. Other Gorle people use their employee code. Other cyond people use their @cyond.com email.
+                  HR login uses hr@gorlegroup.com or hr@cyond.com. Admin panel example: employee code 310310. Other Gorle people use their employee code. Other cyond people use their @cyond.com email.
                 </p>
               ) : employee ? (
                 <p className="login-notice">
