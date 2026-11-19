@@ -343,16 +343,17 @@
 
 .team-board {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
-  margin-top: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 210px));
+  gap: 8px;
+  margin-top: 8px;
+  justify-content: start;
 }
 
 .team-card {
   border: 1px solid #e4e7ec;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #f8fafc;
-  padding: 12px 14px;
+  padding: 8px 10px;
 }
 
 .team-card h3 {
@@ -366,7 +367,7 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: 4px;
 }
 
 .team-card li {

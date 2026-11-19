@@ -1389,13 +1389,17 @@ public class AttendanceService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Employee not found for authenticated user"));
         String company = employee.getCompany() == null ? null : employee.getCompany().getCode();
         RoleType role = employee.getRoleType();
-        if (role == RoleType.SUPER_ADMIN && requestedCompany != null && !requestedCompany.isBlank()) {
-            company = requestedCompany.trim();
+        boolean canPickCompany = role == RoleType.SUPER_ADMIN
+                || role == RoleType.HR
+                || role == RoleType.ADMIN;
+        if (canPickCompany && requestedCompany != null && !requestedCompany.isBlank()) {
+            String picked = requestedCompany.trim();
+            if (picked.equalsIgnoreCase("CYOND") || picked.equalsIgnoreCase("GORLE")) {
+                company = picked;
+            }
         }
         LocalDate today = LocalDate.now(COMPANY_ZONE);
-        List<String> companies = role == RoleType.HR
-                ? List.of("CYOND", "GORLE")
-                : (company == null || company.isBlank() ? List.of() : List.of(company));
+        List<String> companies = company == null || company.isBlank() ? List.of() : List.of(company);
         if (companies.isEmpty()) {
             return List.of(new DailyCheckInCount(today, 0));
         }

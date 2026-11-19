@@ -129,9 +129,19 @@ function AppRoutes() {
   const role =
     localStorage.getItem("nexushr_role") || "HR";
 
-  const [workspace, setWorkspace] = useState<WorkspaceCompany | null>(
-    getWorkspaceCompany(),
-  );
+  const [workspace, setWorkspace] = useState<WorkspaceCompany | null>(() => {
+    const saved = getWorkspaceCompany();
+    if (saved) {
+      return saved;
+    }
+    const signed = (localStorage.getItem("nexushr_role") || "").toUpperCase();
+    if (signed === "HR" || signed === "ADMIN" || signed === "SUPER_ADMIN") {
+      const next = window.location.hostname.includes("gorle") ? "GORLE" : "CYOND";
+      setWorkspaceCompany(next);
+      return next;
+    }
+    return null;
+  });
   const [attendanceAlert, setAttendanceAlert] = useState("");
   const [me, setMe] = useState<EmployeeResponse | null>(null);
   const [myPhoto, setMyPhoto] = useState("");
@@ -177,7 +187,8 @@ function AppRoutes() {
       .then((employee) => {
         if (!cancelled) {
           setMe(employee);
-          if (employee?.companyCode && role !== "SUPER_ADMIN") {
+          const canChooseEntity = role === "SUPER_ADMIN" || role === "HR" || role === "ADMIN";
+          if (employee?.companyCode && !canChooseEntity) {
             const own = asWorkspaceCompany(employee.companyCode);
             setWorkspaceCompany(own);
             setWorkspace(own);
@@ -475,7 +486,8 @@ function AppRoutes() {
 
   const signedRole = (me?.roleType || role || "HR").toUpperCase();
   const isAdmin = signedRole === "ADMIN" || signedRole === "SUPER_ADMIN";
-  const canSwitchWorkspace = role === "SUPER_ADMIN";
+  const canSwitchWorkspace = role === "SUPER_ADMIN" || role === "HR" || role === "ADMIN";
+  const entityName = workspace === "GORLE" ? "Gorle" : "CYOND";
 
   return (
     <div className={isAdmin ? "app-shell admin-panel" : "app-shell"} data-company={workspace}>
@@ -490,7 +502,7 @@ function AppRoutes() {
           />
           <div>
             <strong>{workspaceName(workspace)}</strong>
-            <span>{isAdmin ? "Admin panel" : workspaceTagline(workspace)}</span>
+            <span>{isAdmin ? `${entityName} admin panel` : workspaceTagline(workspace)}</span>
           </div>
         </div>
         {canSwitchWorkspace && (
@@ -502,8 +514,8 @@ function AppRoutes() {
                 enterWorkspace(asWorkspaceCompany(event.target.value))
               }
             >
-              <option value="CYOND">CYOND</option>
-              <option value="GORLE">Gorle Group</option>
+              <option value="CYOND">{isAdmin ? "CYOND admin panel" : "CYOND"}</option>
+              <option value="GORLE">{isAdmin ? "Gorle admin panel" : "Gorle Group"}</option>
             </select>
           </label>
         )}
@@ -543,7 +555,7 @@ function AppRoutes() {
         <div className="sidebar-footer">
           <div className={attendanceAlert && !isAdmin ? "status-dot status-dot-alert" : "status-dot"}></div>
           <div>
-            <strong>{isAdmin ? "Admin panel" : attendanceAlert ? "Check in needed" : "Signed in"}</strong>
+            <strong>{isAdmin ? `${entityName} admin panel` : attendanceAlert ? "Check in needed" : "Signed in"}</strong>
             <span>{isAdmin ? workspaceName(workspace) : attendanceAlert || me?.fullName || "Your account is active"}</span>
           </div>
         </div>
@@ -554,7 +566,7 @@ function AppRoutes() {
           {isAdmin ? (
             <div className="admin-panel-mark">
               <p className="eyebrow">Administration</p>
-              <h1>Admin panel</h1>
+              <h1>{entityName} admin panel</h1>
             </div>
           ) : (
             <div />
@@ -1034,8 +1046,8 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
                   : kind === "manager"
                   ? "A cyond manager signs in with their own email and password. A Gorle manager signs in with the employee code and password."
                   : kind === "admin"
-                  ? "Example: employee code 310310 opens the admin panel. hr@gorlegroup.com and hr@cyond.com use HR login."
-                  : "hr@gorlegroup.com opens the Gorle HR dashboard. hr@cyond.com opens the CYOND HR dashboard."}
+                  ? "Example: employee code 310310 opens the admin panel. Use Entity to open the Gorle admin panel or the CYOND admin panel."
+                  : "hr@gorlegroup.com opens HR. Use Entity to switch between Gorle Group and CYOND without signing in again."}
               </p>
 
             </div>
@@ -1169,7 +1181,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
 
               {creating ? (
                 <p className="login-notice">
-                  HR login uses hr@gorlegroup.com or hr@cyond.com. Admin panel example: employee code 310310. Other Gorle people use their employee code. Other cyond people use their @cyond.com email.
+                  HR login uses hr@gorlegroup.com, then Entity switches Gorle Group and CYOND. Admin panel example: employee code 310310. Other Gorle people use their employee code. Other cyond people use their @cyond.com email.
                 </p>
               ) : employee ? (
                 <p className="login-notice">

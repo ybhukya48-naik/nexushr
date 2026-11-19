@@ -180,8 +180,8 @@ export default function AdminDashboard() {
         </div>
         <p>
           {company === "GORLE"
-            ? "HR login: hr@gorlegroup.com. Admin panel: employee code 310310."
-            : "HR login: hr@cyond.com. Admin panel: employee code 310310."}
+            ? "Gorle admin panel. Switch Entity for the CYOND admin panel."
+            : "CYOND admin panel. Switch Entity for the Gorle admin panel."}
         </p>
         {loading ? (
           <p className="hr-empty">Loading teams...</p>

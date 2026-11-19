@@ -164,8 +164,6 @@ function displayDate(value?: string) {
 export default function Dashboard() {
   const navigate = useNavigate();
   const company = getWorkspaceCompany() ?? "CYOND";
-  const seesBothCompanies = (localStorage.getItem("nexushr_role") || "").toUpperCase() === "HR";
-  const scope = seesBothCompanies ? "All Companies" : company;
   const [me, setMe] = useState<EmployeeResponse | null>(null);
   const [selfRecord, setSelfRecord] = useState<AttendanceRecord | null>(null);
   const [people, setPeople] = useState<EmployeeResponse[]>([]);
@@ -216,12 +214,12 @@ export default function Dashboard() {
         }
         setMe(current);
         const companyPeople = asList<EmployeeResponse>(employees).filter((employee) =>
-          isCompanyMatch(employee.companyCode, scope) && employee.active);
+          isCompanyMatch(employee.companyCode, company) && employee.active);
         const listedPeople = companyPeople.filter((employee) => isListedEmployee(employee.roleType));
         const listedIds = new Set(listedPeople.map((employee) => employee.id));
         const rows = asList<AttendanceRecord>(attendance).filter((row) =>
           isListedEmployee(row.employee?.roleType)
-          && (isCompanyMatch(row.employee?.companyCode, scope) || listedIds.has(row.employee?.id ?? -1)));
+          && (isCompanyMatch(row.employee?.companyCode, company) || listedIds.has(row.employee?.id ?? -1)));
         setPeople(listedPeople);
         setTodayRows(rows);
         setSelfRecord(current?.id
@@ -248,10 +246,10 @@ export default function Dashboard() {
       if (cancelled) {
         return;
       }
-      setLeaves(asList<LeaveRequest>(leaveRows).filter((leave) => isCompanyMatch(leave.employee?.companyCode, scope)));
-      setHolidays(upcomingHolidays(asList<CompanyHoliday>(extraHolidays), scope));
+      setLeaves(asList<LeaveRequest>(leaveRows).filter((leave) => isCompanyMatch(leave.employee?.companyCode, company)));
+      setHolidays(upcomingHolidays(asList<CompanyHoliday>(extraHolidays), company));
       const slips = asList<PayrollRecord>(payroll)
-        .filter((row) => row?.employee && isCompanyMatch(row.employee.companyCode, scope))
+        .filter((row) => row?.employee && isCompanyMatch(row.employee.companyCode, company))
         .sort((a, b) => b.payMonth.localeCompare(a.payMonth));
       setPayrollRows(slips);
       setPayslipId((currentId) => currentId || (slips[0] ? String(slips[0].id) : ""));
@@ -268,7 +266,7 @@ export default function Dashboard() {
           return;
         }
         const monthRows = asList<AttendanceRecord>(history).filter((row) =>
-          isCompanyMatch(row.employee?.companyCode, scope) && isListedEmployee(row.employee?.roleType),
+          isCompanyMatch(row.employee?.companyCode, company) && isListedEmployee(row.employee?.roleType),
         );
         const byDate = new Map<string, AttendanceRecord[]>();
         for (const row of monthRows) {
@@ -298,7 +296,7 @@ export default function Dashboard() {
       cancelled = true;
       document.removeEventListener("visibilitychange", refreshWhenShown);
     };
-  }, [company, scope, refreshTick]);
+  }, [company, refreshTick]);
 
   useEffect(() => {
     if (!lunchEmployeeId) {
@@ -442,7 +440,7 @@ export default function Dashboard() {
       const rows = await getAttendanceByDate(day);
       setPickedRows(asList<AttendanceRecord>(rows).filter((row) =>
         isListedEmployee(row.employee?.roleType)
-        && (isCompanyMatch(row.employee?.companyCode, scope) || people.some((person) => person.id === row.employee?.id)),
+        && (isCompanyMatch(row.employee?.companyCode, company) || people.some((person) => person.id === row.employee?.id)),
       ));
     } catch {
       setPickedRows([]);
@@ -540,7 +538,7 @@ export default function Dashboard() {
     <div className="hr-home">
       <header className="hr-home-head">
         <div>
-          <p>Operations · {seesBothCompanies ? "Gorle Group and CYOND" : company === "GORLE" ? "Gorle Group" : "CYOND"} · as of {now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</p>
+          <p>Operations · {company === "GORLE" ? "Gorle Group" : "CYOND"} · as of {now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</p>
           <h2 title="A day is 9 hours from check-in: 8 hours of work and 1 flexible lunch hour. Three idle warnings cut half a day.">
             Good day, {displayName}
           </h2>
@@ -569,7 +567,7 @@ export default function Dashboard() {
         <button type="button" onClick={() => navigate("/employees")}>
           <span>Headcount</span>
           <strong>{activePeople.length}</strong>
-          <em>{seesBothCompanies ? "Gorle and CYOND" : company === "GORLE" ? "Gorle Group employees" : "CYOND employees"}</em>
+          <em>{company === "GORLE" ? "Gorle Group employees" : "CYOND employees"}</em>
         </button>
         <button type="button" onClick={() => navigate("/attendance")}>
           <span>Present</span>

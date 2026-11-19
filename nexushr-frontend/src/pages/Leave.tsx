@@ -18,10 +18,13 @@ import {
 export default function Leave() {
   const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string>(
-    () => (localStorage.getItem("nexushr_role") || "").toUpperCase() === "HR"
-      ? "All Companies"
-      : (getWorkspaceCompany() ?? "CYOND"),
+    () => getWorkspaceCompany() ?? "CYOND",
   );
+  useEffect(() => {
+    const sync = () => setSelectedCompany(getWorkspaceCompany() ?? "CYOND");
+    window.addEventListener("nexushr-company", sync);
+    return () => window.removeEventListener("nexushr-company", sync);
+  }, []);
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [startDate, setStartDate] = useState("");

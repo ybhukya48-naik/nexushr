@@ -76,7 +76,9 @@ public class AuthorizationService {
     }
 
     public boolean canSeeEmployee(Employee employee, Authentication authentication) {
-        if (seesAllCompanies(authentication) || hasAuthority(authentication, "ROLE_HR")) {
+        if (seesAllCompanies(authentication)
+                || hasAuthority(authentication, "ROLE_HR")
+                || hasAuthority(authentication, "ROLE_ADMIN")) {
             return true;
         }
         if (employee == null || employee.getCompany() == null || employee.getCompany().getCode() == null) {

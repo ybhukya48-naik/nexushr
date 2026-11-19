@@ -318,8 +318,7 @@ export default function Employees() {
   }, [searchParams]);
   const company = getWorkspaceCompany() ?? "CYOND";
   const [role] = useState(getStoredRole);
-  const seesBothCompanies = role === "HR";
-  const scope = seesBothCompanies ? "All Companies" : company;
+  const scope = company;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -696,7 +695,7 @@ export default function Employees() {
           <p className="page-eyebrow">Directory</p>
           <h1>Employees</h1>
           <p>
-            {seesBothCompanies ? "Gorle Group and CYOND." : "People in this company."}
+            People in this company.
           </p>
         </div>
 
@@ -716,18 +715,9 @@ export default function Employees() {
       <div className="employees-panel">
         <div className="panel-header">
           <h2>Employee hierarchy</h2>
-          <p>{seesBothCompanies ? "Gorle Group and CYOND, with name, role, and employee code." : "Teams in this company."}</p>
+          <p>Teams in this company, with name, role, and employee code.</p>
         </div>
-        {seesBothCompanies ? (
-          <>
-            <h3 className="team-company">Gorle Group</h3>
-            <TeamBoard people={hierarchyPeople.filter((person) => isCompanyMatch(person.companyCode, "GORLE"))} />
-            <h3 className="team-company">CYOND</h3>
-            <TeamBoard people={hierarchyPeople.filter((person) => isCompanyMatch(person.companyCode, "CYOND"))} />
-          </>
-        ) : (
-          <TeamBoard people={hierarchyPeople} />
-        )}
+        <TeamBoard people={hierarchyPeople} />
       </div>
 
       <div className="ux-tabs">

@@ -723,10 +723,13 @@ export default function Attendance() {
   const [metrics, setMetrics] = useState<AttendanceMetrics | null>(null);
   const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string>(
-    () => (localStorage.getItem("nexushr_role") || "").toUpperCase() === "HR"
-      ? "All Companies"
-      : (getWorkspaceCompany() ?? "CYOND"),
+    () => getWorkspaceCompany() ?? "CYOND",
   );
+  useEffect(() => {
+    const sync = () => setSelectedCompany(getWorkspaceCompany() ?? "CYOND");
+    window.addEventListener("nexushr-company", sync);
+    return () => window.removeEventListener("nexushr-company", sync);
+  }, []);
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
