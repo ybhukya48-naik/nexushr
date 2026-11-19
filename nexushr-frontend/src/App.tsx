@@ -1046,7 +1046,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
                   : kind === "manager"
                   ? "A cyond manager signs in with their own email and password. A Gorle manager signs in with the employee code and password."
                   : kind === "admin"
-                  ? "Example: employee code 310310 opens the admin panel. Use Entity to open the Gorle admin panel or the CYOND admin panel."
+                  ? "Example: employee code 310310 opens the admin panel. Use Entity for the Gorle admin panel or the CYOND admin panel."
                   : "hr@gorlegroup.com opens HR. Use Entity to switch between Gorle Group and CYOND without signing in again."}
               </p>
 
