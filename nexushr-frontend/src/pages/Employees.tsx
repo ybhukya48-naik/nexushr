@@ -209,9 +209,12 @@ function TeamBoard({ people }: { people: EmployeeResponse[] }) {
               <li key={person.id}>
                 <strong>{person.fullName}</strong>
                 <span>
-                  {[person.designation || person.roleType, person.employeeCode].filter(Boolean).join(" · ")}
+                  {[
+                    person.designation || person.roleType,
+                    person.roleType === "MANAGER" ? "Manager" : null,
+                    person.employeeCode,
+                  ].filter(Boolean).join(" · ")}
                 </span>
-                {person.email ? <span>{person.email}</span> : null}
               </li>
             ))}
           </ul>
@@ -980,7 +983,11 @@ export default function Employees() {
         </form>
       )}
 
-      <div className="employees-panel">
+      <div className="employees-panel employee-list-panel">
+        <div className="panel-header">
+          <h2>Employee list</h2>
+          <p>Name, code, department, and role.</p>
+        </div>
         {resetNotice && <div role="status" className="payroll-message">{resetNotice}</div>}
         <div className="employee-filters">
           <label className="employee-search">

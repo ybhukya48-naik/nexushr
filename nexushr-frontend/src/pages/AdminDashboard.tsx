@@ -196,8 +196,13 @@ export default function AdminDashboard() {
                   {members.map((person) => (
                     <li key={person.id}>
                       <strong>{person.fullName}</strong>
-                      <span>{person.designation || person.role}{person.employeeCode ? ` · ${person.employeeCode}` : ""}</span>
-                      {person.email ? <span>{person.email}</span> : null}
+                      <span>
+                        {[
+                          person.designation || person.role,
+                          person.role === "MANAGER" ? "Manager" : null,
+                          person.employeeCode,
+                        ].filter(Boolean).join(" · ")}
+                      </span>
                     </li>
                   ))}
                 </ul>

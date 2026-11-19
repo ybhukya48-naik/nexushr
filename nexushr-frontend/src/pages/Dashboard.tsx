@@ -1012,7 +1012,7 @@ export default function Dashboard() {
                         {person.fullName}
                       </button>
                       <span>
-                        {person.email}{person.designation ? ` · ${person.designation}` : ""}
+                        {person.designation || person.employeeCode || ""}
                         {person.siteVisitor ? " · Site" : ""}
                         {dutyToday.some((leave) => leave.employee?.id === person.id)
                           ? ` · ${dutyToday.filter((leave) => leave.employee?.id === person.id).map((leave) =>

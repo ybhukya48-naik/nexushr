@@ -412,6 +412,10 @@
   font-size: 12px;
 }
 
+.employee-list-panel {
+  margin-top: 8px;
+}
+
 .app-shell .hr-history-table .day-view {
   min-height: 26px;
   height: 26px;
