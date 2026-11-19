@@ -208,7 +208,9 @@ function TeamBoard({ people }: { people: EmployeeResponse[] }) {
             {members.map((person) => (
               <li key={person.id}>
                 <strong>{person.fullName}</strong>
-                <span>{person.designation || person.roleType}{person.employeeCode ? ` · ${person.employeeCode}` : ""}</span>
+                <span>
+                  {[person.designation || person.roleType, person.employeeCode].filter(Boolean).join(" · ")}
+                </span>
                 {person.email ? <span>{person.email}</span> : null}
               </li>
             ))}
@@ -712,7 +714,7 @@ export default function Employees() {
         </button>
       </div>
 
-      <div className="employees-panel">
+      <div className="employees-panel hierarchy-panel">
         <div className="panel-header">
           <h2>Employee hierarchy</h2>
           <p>Teams in this company, with name, role, and employee code.</p>
