@@ -335,6 +335,53 @@
   margin-top: 12px;
 }
 
+.team-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.team-card {
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 12px 14px;
+}
+
+.team-card h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  color: #1d1633;
+}
+
+.team-card ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.team-card li {
+  display: grid;
+  gap: 2px;
+}
+
+.team-card strong {
+  font-size: 14px;
+  line-height: 1.3;
+  color: #101828;
+  overflow-wrap: anywhere;
+}
+
+.team-card span {
+  font-size: 12px;
+  line-height: 1.35;
+  color: #475467;
+  overflow-wrap: anywhere;
+}
+
 .app-shell .hr-history-table .day-view {
   min-height: 26px;
   height: 26px;

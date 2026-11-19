@@ -19,7 +19,10 @@ function formatClock(value?: string | null) {
 
 function isChairman(row: AdminEmployeeRow) {
   const text = `${row.designation ?? ""} ${row.department ?? ""}`.toLowerCase();
-  return text.includes("chairman") || text.includes("founder");
+  return row.role === "SUPER_ADMIN"
+    || text.includes("chairman")
+    || text.includes("founder")
+    || text.includes("head");
 }
 
 function punchLine(row: AdminEmployeeRow) {
@@ -30,6 +33,26 @@ function punchLine(row: AdminEmployeeRow) {
     return `In ${formatClock(row.checkInTime)} · Still in`;
   }
   return `In ${formatClock(row.checkInTime)} · Out ${formatClock(row.checkOutTime)}`;
+}
+
+const TEAM_ORDER = ["TEAM-A", "TEAM-B", "TEAM-D", "TEAM-E", "TEAM-G", "Architecture", "Admin", "Operations", "Sales", "Software", "Technical"];
+
+function teamGroups(rows: AdminEmployeeRow[]) {
+  const groups = new Map<string, AdminEmployeeRow[]>();
+  for (const row of rows) {
+    const name = row.department?.trim() || "Team";
+    const list = groups.get(name) ?? [];
+    list.push(row);
+    groups.set(name, list);
+  }
+  return [...groups.entries()].sort(([left], [right]) => {
+    const leftAt = TEAM_ORDER.indexOf(left);
+    const rightAt = TEAM_ORDER.indexOf(right);
+    if (leftAt === -1 && rightAt === -1) return left.localeCompare(right);
+    if (leftAt === -1) return 1;
+    if (rightAt === -1) return -1;
+    return leftAt - rightAt;
+  });
 }
 
 export default function AdminDashboard() {
@@ -153,6 +176,34 @@ export default function AdminDashboard() {
 
       <section className="hr-card">
         <div className="hr-card-title">
+          <h3>Teams</h3>
+        </div>
+        <p>{companyName} people from the staff list. Names, roles, and codes stay fully visible.</p>
+        {loading ? (
+          <p className="hr-empty">Loading teams...</p>
+        ) : active.length === 0 ? (
+          <p className="hr-empty">No employees for this company.</p>
+        ) : (
+          <div className="team-board">
+            {teamGroups(active).map(([department, members]) => (
+              <article key={department} className="team-card">
+                <h3>{department}</h3>
+                <ul>
+                  {members.map((person) => (
+                    <li key={person.id}>
+                      <strong>{person.fullName}</strong>
+                      <span>{person.designation || person.role}{person.employeeCode ? ` · ${person.employeeCode}` : ""}</span>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="hr-card">
+        <div className="hr-card-title">
           <h3>Checked in today</h3>
         </div>
         <p>
@@ -180,12 +231,12 @@ export default function AdminDashboard() {
       <section className="hr-split">
         <article className="hr-card">
           <div className="hr-card-title">
-            <h3>Chairman</h3>
+            <h3>Heads</h3>
           </div>
           {loading ? (
             <p className="hr-empty">Loading the admin dashboard...</p>
           ) : chairmen.length === 0 ? (
-            <p className="hr-empty">No chairman in this company. A chairman is the founder, or a person whose designation says Chairman.</p>
+            <p className="hr-empty">No head in this company yet.</p>
           ) : chairmen.map((person) => (
             <Leader key={person.id} person={person} reports={reportsOf(person, true)} />
           ))}

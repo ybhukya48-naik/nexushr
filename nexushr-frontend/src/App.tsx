@@ -757,6 +757,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
   const [phone, setPhone] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [companyCode, setCompanyCode] = useState<"CYOND" | "GORLE">("CYOND");
+  const [ownEmail, setOwnEmail] = useState("");
   const [creating, setCreating] = useState(false);
   const [passwordHelp, setPasswordHelp] = useState<null | "change" | "forgot">(null);
   const [newPassword, setNewPassword] = useState("");
@@ -855,13 +856,19 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
     event.preventDefault();
     setError("");
     setNotice("");
-    const email = username.trim();
+    const identity = username.trim();
+    const gorleCode = identity.length > 0 && !identity.includes("@");
+    const email = gorleCode ? ownEmail.trim() : identity;
     if (!fullName.trim()) {
       setError("Enter your name.");
       return;
     }
-    if (!email) {
-      setError("Enter your email.");
+    if (!identity) {
+      setError(gorleCode ? "Enter your employee code." : "Enter your email.");
+      return;
+    }
+    if (!email || !email.includes("@")) {
+      setError("Enter your email address.");
       return;
     }
     if (password.length < 8) {
@@ -879,9 +886,10 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
         email,
         password,
         phone: phone.trim() || undefined,
-        companyCode,
+        companyCode: gorleCode ? "GORLE" : companyCode,
+        employeeCode: gorleCode ? identity : undefined,
       });
-      const response = await apiLogin(email, password);
+      const response = await apiLogin(gorleCode ? identity : email, password);
       await openSession(response);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the profile.");
@@ -1074,7 +1082,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
               )}
 
               <label>
-                <span>{passwordHelp === "forgot" ? "cyond email or Gorle employee code" : "Email or employee code"}</span>
+                <span>{creating ? "cyond email or Gorle employee code" : passwordHelp === "forgot" ? "cyond email or Gorle employee code" : "Email or employee code"}</span>
                 <div className="login-input-wrap">
                   <input
                     type="text"
@@ -1124,6 +1132,15 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
                 </>
               )}
 
+              {creating && !username.includes("@") && username.trim() !== "" && (
+                <label>
+                  <span>Your email</span>
+                  <div className="login-input-wrap">
+                    <input type="email" value={ownEmail} onChange={(event) => setOwnEmail(event.target.value)} placeholder="name@email.com" autoComplete="email" required />
+                  </div>
+                </label>
+              )}
+
               {creating && (
                 <>
                   <label>
@@ -1150,11 +1167,15 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
                 </>
               )}
 
-              {employee && !creating && (
+              {creating ? (
+                <p className="login-notice">
+                  Gorle Group enters the employee code, then an email and a new password. cyond enters the @cyond.com email and a new password. Kaushik and Prathyush Annepu use manager login with that email.
+                </p>
+              ) : employee ? (
                 <p className="login-notice">
                   cyond uses the email. Gorle Group uses the employee code. If you are new, create your profile. HR does not add it.
                 </p>
-              )}
+              ) : null}
 
             </div>
 

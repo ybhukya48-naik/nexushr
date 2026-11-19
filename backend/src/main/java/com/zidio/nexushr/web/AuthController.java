@@ -203,6 +203,8 @@ public class AuthController {
         existing.setFullName(fullName);
         existing.setEmail(email);
         existing.setPassword(passwordEncoder.encode(password));
+        existing.setProfileCompleted(true);
+        existing.setPasswordChangeRequired(false);
         if (!phone.isBlank()) {
             existing.setPhone(phone.trim());
         }

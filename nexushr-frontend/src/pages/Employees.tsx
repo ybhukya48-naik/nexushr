@@ -84,8 +84,8 @@ function OrgChart({ people }: { people: EmployeeResponse[] }) {
       <li className="org-node">
         <div className="org-person">
           <strong>{person.fullName}</strong>
-          <span>{person.designation}</span>
-          <span className="org-dept">{person.department}</span>
+          <span>{person.designation || "No designation yet"}</span>
+          <span className="org-dept">{person.employeeCode} · {person.department}</span>
         </div>
         {reports.length > 0 && (
           <ul className="org-reports">
