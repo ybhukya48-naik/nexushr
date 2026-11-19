@@ -180,8 +180,8 @@ export default function AdminDashboard() {
         </div>
         <p>
           {company === "GORLE"
-            ? "HR email: hr@gorlegroup.com. Admin example: employee code 310310."
-            : "HR email: hr@cyond.com. Admin example: employee code 310310 on Admin login."}
+            ? "Admin sign-in: employee code 310304. Email: hr@gorlegroup.com. Set a new password after sign-in."
+            : "HR email: hr@cyond.com. Admin sign-in: employee code 310304 on Admin login."}
         </p>
         {loading ? (
           <p className="hr-empty">Loading teams...</p>

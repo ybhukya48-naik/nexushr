@@ -643,7 +643,7 @@ export default function Dashboard() {
         </div>
         <p>
           {company === "GORLE"
-            ? "HR email: hr@gorlegroup.com. Sign in on HR login with that email after creating the profile."
+            ? "Admin sign-in for this company is employee code 310304. Email: hr@gorlegroup.com."
             : "HR email: hr@cyond.com. Sign in on HR login with that email after creating the profile."}
         </p>
         {directory.length === 0 ? (
