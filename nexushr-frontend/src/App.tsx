@@ -478,7 +478,7 @@ function AppRoutes() {
   const canSwitchWorkspace = role === "SUPER_ADMIN";
 
   return (
-    <div className="app-shell" data-company={workspace}>
+    <div className={isAdmin ? "app-shell admin-panel" : "app-shell"} data-company={workspace}>
       <aside className="sidebar">
         <div className="brand">
           <img
@@ -490,7 +490,7 @@ function AppRoutes() {
           />
           <div>
             <strong>{workspaceName(workspace)}</strong>
-            <span>{workspaceTagline(workspace)}</span>
+            <span>{isAdmin ? "Admin panel" : workspaceTagline(workspace)}</span>
           </div>
         </div>
         {canSwitchWorkspace && (
@@ -541,17 +541,24 @@ function AppRoutes() {
         </nav>
 
         <div className="sidebar-footer">
-          <div className={attendanceAlert ? "status-dot status-dot-alert" : "status-dot"}></div>
+          <div className={attendanceAlert && !isAdmin ? "status-dot status-dot-alert" : "status-dot"}></div>
           <div>
-            <strong>{attendanceAlert ? "Check in needed" : "Signed in"}</strong>
-            <span>{attendanceAlert || me?.fullName || "Your account is active"}</span>
+            <strong>{isAdmin ? "Admin panel" : attendanceAlert ? "Check in needed" : "Signed in"}</strong>
+            <span>{isAdmin ? workspaceName(workspace) : attendanceAlert || me?.fullName || "Your account is active"}</span>
           </div>
         </div>
       </aside>
 
       <main className="main-area">
         <header className="topbar">
-          <div />
+          {isAdmin ? (
+            <div className="admin-panel-mark">
+              <p className="eyebrow">Administration</p>
+              <h1>Admin panel</h1>
+            </div>
+          ) : (
+            <div />
+          )}
 
           <div className="user-area">
             <div className="bell-wrap">

@@ -7379,6 +7379,27 @@ textarea {
   background: linear-gradient(180deg, #24143f 0%, #140c28 100%);
 }
 
+.app-shell.admin-panel .sidebar {
+  background: linear-gradient(180deg, #10233f 0%, #071221 100%);
+}
+
+.app-shell.admin-panel .nav-link.active {
+  background: linear-gradient(90deg, rgba(90, 148, 255, 0.32), rgba(90, 148, 255, 0.08));
+  border-color: rgba(150, 186, 255, 0.4);
+}
+
+.app-shell.admin-panel .nav-link.active::before,
+.app-shell.admin-panel .status-dot {
+  background: #8eb4ff;
+}
+
+.admin-panel-mark h1 {
+  margin: 2px 0 0;
+  font-size: 22px;
+  line-height: 1.2;
+  color: #101828;
+}
+
 .app-shell[data-company="GORLE"] .sidebar {
   background: linear-gradient(180deg, #3d2b16 0%, #24180d 100%);
 }

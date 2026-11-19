@@ -107,3 +107,28 @@
 .app-shell[data-company="GORLE"] .content {
   background: #f6f1e7;
 }
+
+.app-shell.admin-panel .sidebar,
+.app-shell.admin-panel[data-company="GORLE"] .sidebar,
+.app-shell.admin-panel[data-company="CYOND"] .sidebar {
+  background: linear-gradient(180deg, #10233f 0%, #071221 100%) !important;
+}
+
+.app-shell.admin-panel .nav-link.active,
+.app-shell.admin-panel[data-company="GORLE"] .nav-link.active {
+  background: linear-gradient(90deg, rgba(90, 148, 255, 0.32), rgba(90, 148, 255, 0.08)) !important;
+  border-color: rgba(150, 186, 255, 0.4) !important;
+  color: #fff !important;
+}
+
+.app-shell.admin-panel .nav-link.active::before,
+.app-shell.admin-panel .status-dot,
+.app-shell.admin-panel[data-company="GORLE"] .nav-link.active::before,
+.app-shell.admin-panel[data-company="GORLE"] .status-dot {
+  background: #8eb4ff !important;
+}
+
+.app-shell.admin-panel[data-company="GORLE"] .main-area,
+.app-shell.admin-panel[data-company="GORLE"] .content {
+  background: #f5f7fb;
+}
