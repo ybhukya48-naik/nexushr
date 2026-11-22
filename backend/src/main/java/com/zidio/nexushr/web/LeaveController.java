@@ -88,7 +88,7 @@ public class LeaveController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER')")
+    @PreAuthorize("hasAnyRole('HR','ADMIN','MANAGER') and @authorizationService.canAccessLeave(#id, authentication)")
     public LeaveRequest updateStatus(
             @PathVariable Long id,
             @RequestParam LeaveStatus status) {

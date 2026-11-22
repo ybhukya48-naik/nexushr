@@ -214,6 +214,7 @@ class AttendanceControllerTest {
         AttendanceRecord record = new AttendanceRecord();
         record.setId(20L);
 
+        when(authorizationService.canSeeEmployee(any(), any())).thenReturn(true);
         when(attendanceService.listByDate(
                 eq(LocalDate.of(2026, 7, 1))))
                 .thenReturn(List.of(record));

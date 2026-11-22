@@ -258,6 +258,7 @@ public class PayrollController {
     }
 
     @PostMapping("/{id}/mark-paid")
+    @PreAuthorize("@authorizationService.canAccessPayroll(#id, authentication)")
     public PayrollResponse markPaid(
             @PathVariable Long id) {
 

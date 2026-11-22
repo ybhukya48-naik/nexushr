@@ -1,101 +1,13 @@
-/* Gorle Group uses gold and brown. CYOND keeps the purple theme. */
-
-.app-shell[data-company="GORLE"] {
-  background: #f6f1e7;
-}
-
-.app-shell[data-company="GORLE"] .sidebar {
-  background: linear-gradient(180deg, #3d2b16 0%, #24180d 100%) !important;
-}
-
-.app-shell[data-company="GORLE"] .nav-link.active {
-  background: linear-gradient(90deg, rgba(212, 164, 74, 0.38), rgba(212, 164, 74, 0.12)) !important;
-  border-color: rgba(212, 164, 74, 0.4) !important;
-  color: #fff !important;
-}
-
-.app-shell[data-company="GORLE"] .nav-link.active::before,
-.app-shell[data-company="GORLE"] .status-dot {
-  background: #d4a44a !important;
-}
+/* Company accents ride design-system tokens on [data-company].
+   Keep only edge cases that still need explicit overrides. */
 
 .app-shell[data-company="GORLE"] .brand-mark {
   background: linear-gradient(135deg, #c4923a, #8a5a12) !important;
   box-shadow: 0 8px 20px rgba(138, 90, 18, 0.28) !important;
 }
 
-.app-shell[data-company="GORLE"] .primary-button,
-.app-shell[data-company="GORLE"] .primary-action,
-.app-shell[data-company="GORLE"] .login-submit,
-.app-shell[data-company="GORLE"] .hr-view-tabs button.active,
-.app-shell[data-company="GORLE"] .hr-cal-today,
-.app-shell[data-company="GORLE"] .ux-tabs button.active,
-.app-shell[data-company="GORLE"] .ux-tabs span.active,
-.app-shell[data-company="GORLE"] .ux-tabs .ux-tabs-action,
-.app-shell[data-company="GORLE"] .hr-exception-line button.active {
-  background: linear-gradient(135deg, #8a5a12 0%, #c4923a 100%) !important;
-  border-color: #8a5a12 !important;
-  color: #fff !important;
-  box-shadow: 0 4px 10px rgba(138, 90, 18, 0.18) !important;
-}
-
-.app-shell[data-company="GORLE"] .primary-button:hover,
-.app-shell[data-company="GORLE"] .primary-action:hover:not(:disabled) {
-  background: #6f4710 !important;
-  border-color: #6f4710 !important;
-}
-
-.app-shell[data-company="GORLE"] .eyebrow,
-.app-shell[data-company="GORLE"] .page-eyebrow,
-.app-shell[data-company="GORLE"] .topbar .eyebrow,
-.app-shell[data-company="GORLE"] .dashboard-hero-copy .eyebrow,
-.app-shell[data-company="GORLE"] .panel-link,
-.app-shell[data-company="GORLE"] .employee-profile-link,
-.app-shell[data-company="GORLE"] .hr-card-title button,
-.app-shell[data-company="GORLE"] .ux-tabs button,
-.app-shell[data-company="GORLE"] .ux-balances em,
-.app-shell[data-company="GORLE"] .avatar,
-.app-shell[data-company="GORLE"] .hr-view-tabs button,
-.app-shell[data-company="GORLE"] .hr-actions button,
-.app-shell[data-company="GORLE"] .hr-approvals button,
-.app-shell[data-company="GORLE"] .hr-exception-line button {
-  color: #8a5a12 !important;
-}
-
-.app-shell[data-company="GORLE"] .avatar {
-  background: linear-gradient(135deg, #f8ecd4, #f3e0b5) !important;
-}
-
-.app-shell[data-company="GORLE"] .dashboard-hero,
-.app-shell[data-company="GORLE"] .ux-balances article,
-.app-shell[data-company="GORLE"] .ux-clock {
-  border-color: #eadcbe !important;
-  background:
-    radial-gradient(circle at 88% 15%, rgba(196, 146, 58, 0.16), transparent 32%),
-    linear-gradient(135deg, #fffdf8 0%, #f8f1e3 100%) !important;
-}
-
-.app-shell[data-company="GORLE"] .hr-card,
-.app-shell[data-company="GORLE"] .panel,
-.app-shell[data-company="GORLE"] .employees-panel {
-  border-color: #eadcbe !important;
-  background: #fffdf8 !important;
-}
-
 .app-shell[data-company="GORLE"] .dashboard-hero::after {
   background: rgba(196, 146, 58, 0.16) !important;
-}
-
-.app-shell[data-company="GORLE"] .ux-tabs {
-  background: #fbf6ea !important;
-}
-
-.app-shell[data-company="GORLE"] .hr-view-tabs button,
-.app-shell[data-company="GORLE"] .hr-approvals button,
-.app-shell[data-company="GORLE"] .hr-exception-line button,
-.app-shell[data-company="GORLE"] .duty-choices button {
-  border-color: #e4d2a8 !important;
-  background: #fffdf8 !important;
 }
 
 .app-shell[data-company="GORLE"] .hr-cal-holiday {
@@ -103,32 +15,7 @@
   color: #8a5a12 !important;
 }
 
-.app-shell[data-company="GORLE"] .main-area,
-.app-shell[data-company="GORLE"] .content {
-  background: #f6f1e7;
-}
-
-.app-shell.admin-panel .sidebar,
-.app-shell.admin-panel[data-company="GORLE"] .sidebar,
-.app-shell.admin-panel[data-company="CYOND"] .sidebar {
-  background: linear-gradient(180deg, #10233f 0%, #071221 100%) !important;
-}
-
-.app-shell.admin-panel .nav-link.active,
-.app-shell.admin-panel[data-company="GORLE"] .nav-link.active {
-  background: linear-gradient(90deg, rgba(90, 148, 255, 0.32), rgba(90, 148, 255, 0.08)) !important;
-  border-color: rgba(150, 186, 255, 0.4) !important;
-  color: #fff !important;
-}
-
-.app-shell.admin-panel .nav-link.active::before,
-.app-shell.admin-panel .status-dot,
-.app-shell.admin-panel[data-company="GORLE"] .nav-link.active::before,
-.app-shell.admin-panel[data-company="GORLE"] .status-dot {
-  background: #8eb4ff !important;
-}
-
-.app-shell.admin-panel[data-company="GORLE"] .main-area,
-.app-shell.admin-panel[data-company="GORLE"] .content {
-  background: #f5f7fb;
+.app-shell.admin-panel .brand-mark {
+  background: linear-gradient(135deg, #5a94ff, #2f6fed) !important;
+  box-shadow: 0 8px 20px rgba(47, 111, 237, 0.28) !important;
 }

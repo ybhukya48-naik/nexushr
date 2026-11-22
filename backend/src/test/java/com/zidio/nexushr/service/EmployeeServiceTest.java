@@ -7,6 +7,8 @@ import com.zidio.nexushr.domain.RoleType;
 import com.zidio.nexushr.repository.CompanyRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.web.dto.EmployeeRequest;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -35,6 +38,12 @@ class EmployeeServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private EntityManager entityManager;
+
+    @Mock
+    private Query nativeQuery;
 
     @InjectMocks
     private EmployeeService employeeService;
@@ -70,6 +79,7 @@ class EmployeeServiceTest {
         company.setName("Cyond");
         lenient().when(companyRepository.findByCodeIgnoreCase("CYOND"))
                 .thenReturn(Optional.of(company));
+        ReflectionTestUtils.setField(employeeService, "entityManager", entityManager);
     }
 
     @Test
@@ -324,22 +334,20 @@ class EmployeeServiceTest {
     }
 
     @Test
-    void delete_deactivatesEmployee() {
+    void delete_removesEmployeeAndRelatedRows() {
 
+        employee.setRoleType(RoleType.EMPLOYEE);
         when(employeeRepository.findById(1L))
                 .thenReturn(Optional.of(employee));
+        when(entityManager.createNativeQuery(anyString())).thenReturn(nativeQuery);
+        when(nativeQuery.setParameter(anyString(), any())).thenReturn(nativeQuery);
 
         employeeService.delete(1L);
 
-        verify(employeeRepository)
-                .findById(1L);
-
-        verify(employeeRepository)
-                .save(employee);
-
-        assertThat(employee.getActive()).isFalse();
-        assertThat(employee.getLifecycleStatus())
-                .isEqualTo(EmployeeLifecycleStatus.OFFBOARDED);
+        verify(employeeRepository).deleteById(1L);
+        verify(entityManager, atLeastOnce()).createNativeQuery(anyString());
+        verify(entityManager).flush();
+        verify(entityManager).clear();
     }
 }
 

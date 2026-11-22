@@ -249,15 +249,10 @@ export default function Performance() {
 
   return (
     <div className="performance-page">
-      <div className="ux-tabs">
-        <button type="button" className={reviewTab === "reviews" ? "active" : ""} onClick={() => setReviewTab("reviews")}>Reviews</button>
-        <button type="button" className={reviewTab === "hours" ? "active" : ""} onClick={() => setReviewTab("hours")}>Hours</button>
-        <button type="button" className={reviewTab === "feedback" ? "active" : ""} onClick={() => setReviewTab("feedback")}>Feedback</button>
-      </div>
       <section className="performance-hero">
         <div>
-          <p className="performance-eyebrow">{role === "EMPLOYEE" ? "My Reviews" : "Performance"}</p>
-          <h2>{role === "EMPLOYEE" ? "My Reviews" : "Performance"}</h2>
+          <p className="performance-eyebrow">{role === "EMPLOYEE" ? "Growth" : "Talent"}</p>
+          <h2>{role === "EMPLOYEE" ? "My reviews" : "Performance"}</h2>
           <p className="performance-subtitle">
             Reviews are separate from attendance hours.
           </p>
@@ -286,6 +281,12 @@ export default function Performance() {
           </select>
         )}
       </section>
+
+      <div className="ux-tabs">
+        <button type="button" className={reviewTab === "reviews" ? "active" : ""} onClick={() => setReviewTab("reviews")}>Reviews</button>
+        <button type="button" className={reviewTab === "hours" ? "active" : ""} onClick={() => setReviewTab("hours")}>Hours</button>
+        <button type="button" className={reviewTab === "feedback" ? "active" : ""} onClick={() => setReviewTab("feedback")}>Feedback</button>
+      </div>
 
       {selected && (
         <section className="performance-panel">

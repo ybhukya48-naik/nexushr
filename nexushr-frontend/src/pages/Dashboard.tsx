@@ -538,10 +538,11 @@ export default function Dashboard() {
     <div className="hr-home">
       <header className="hr-home-head">
         <div>
-          <p>Operations · {company === "GORLE" ? "Gorle Group" : "CYOND"} · as of {now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</p>
+          <p className="eyebrow">Operations · {company === "GORLE" ? "Gorle Group" : "CYOND"}</p>
           <h2 title="A day is 9 hours from check-in: 8 hours of work and 1 flexible lunch hour. Three idle warnings cut half a day.">
             Good day, {displayName}
           </h2>
+          <p>As of {now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} · live workforce view</p>
         </div>
         <time dateTime={today}>
           {now.toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}

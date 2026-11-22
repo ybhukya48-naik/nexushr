@@ -7,6 +7,7 @@ import com.zidio.nexushr.security.JwtTokenService;
 import com.zidio.nexushr.security.SecurityConfig;
 import com.zidio.nexushr.service.EmployeeService;
 import com.zidio.nexushr.web.dto.EmployeeRequest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -19,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -41,6 +43,12 @@ class EmployeeControllerTest {
 
     @MockitoBean
     private AuthorizationService authorizationService;
+
+    @BeforeEach
+    void allowHrToSeeEmployees() {
+        lenient().when(authorizationService.canSeeEmployee(any(), any())).thenReturn(true);
+        lenient().when(authorizationService.seesAllCompanies(any())).thenReturn(true);
+    }
 
     @Test
     @WithMockUser(roles = "HR")
@@ -120,6 +128,7 @@ class EmployeeControllerTest {
         e.setFullName("Alice Updated");
         e.setEmail("alice.updated@example.com");
 
+        when(employeeService.findById(1L)).thenReturn(e);
         when(employeeService.update(
                 any(Long.class),
                 any(EmployeeRequest.class)
@@ -165,6 +174,8 @@ class EmployeeControllerTest {
     @Test
     @WithMockUser(roles = "HR")
     void delete_returnsNoContent() throws Exception {
+
+        when(employeeService.findById(1L)).thenReturn(new Employee());
 
         mockMvc.perform(
                 delete("/api/v1/employees/1")

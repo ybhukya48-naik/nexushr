@@ -124,10 +124,9 @@ export default function AdminDashboard() {
     <div className="hr-home admin-dashboard">
       <header className="hr-home-head">
         <div>
-          <p>
-            Admin · {companyName} · as of {now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-          </p>
+          <p className="eyebrow">Administration · {companyName}</p>
           <h2>Good day, {displayName}</h2>
+          <p>As of {now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} · company control center</p>
         </div>
         <time dateTime={now.toISOString()}>
           {now.toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}

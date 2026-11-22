@@ -238,6 +238,18 @@ export default function Leave() {
 
   return (
     <section className="leave-page">
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">{isEmployee ? "My day" : "Operations"}</p>
+          <h2>{isEmployee ? "My leave" : "Leave"}</h2>
+          <p>
+            {isEmployee
+              ? "Check balances, apply for time off, and follow approvals."
+              : "Balances, team calendar, approvals, holidays, and policy in one place."}
+          </p>
+        </div>
+      </div>
+
       <div className="ux-tabs">
         <button type="button" className={tab === "mine" ? "active" : ""} onClick={() => setTab("mine")}>{isEmployee ? "My leave" : "Leave"}</button>
         <button type="button" className={tab === "calendar" ? "active" : ""} onClick={() => setTab("calendar")}>Team calendar</button>

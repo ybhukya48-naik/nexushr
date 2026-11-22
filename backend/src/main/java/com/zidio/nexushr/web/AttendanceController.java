@@ -253,10 +253,15 @@ public class AttendanceController {
     }
 
     private Long punchTarget(Long requestedId, Long selfId, Authentication authentication) {
-        if (!isManagement(authentication)) {
+        if (!isManagement(authentication) || requestedId == null || requestedId.equals(selfId)) {
             return selfId;
         }
-        return requestedId != null ? requestedId : selfId;
+        if (!authorizationService.canSeeEmployeeId(requestedId, authentication)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.NOT_FOUND,
+                    "Employee not found");
+        }
+        return requestedId;
     }
 
     private boolean isManagement(Authentication authentication) {

@@ -31,8 +31,8 @@ services:
   backend:
     container_name: nexushr-backend
     build:
-      context: ./backend
-      dockerfile: ../infra/docker/backend.Dockerfile
+      context: .
+      dockerfile: ./infra/docker/backend.Dockerfile
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/nexushr
       DB_USER: nexushr
@@ -55,7 +55,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 8
-      start_period: 30s
+      start_period: 120s
 
   frontend:
     build:

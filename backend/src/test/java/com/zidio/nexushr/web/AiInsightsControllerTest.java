@@ -1,6 +1,7 @@
 package com.zidio.nexushr.web;
 
 import com.zidio.nexushr.domain.Employee;
+import com.zidio.nexushr.security.AuthorizationService;
 import com.zidio.nexushr.security.JwtTokenService;
 import com.zidio.nexushr.security.SecurityConfig;
 import com.zidio.nexushr.service.AiInsightService;
@@ -38,6 +39,9 @@ class AiInsightsControllerTest {
 
     @MockitoBean
     private JwtTokenService jwtTokenService;
+
+    @MockitoBean
+    private AuthorizationService authorizationService;
 
     // ============================================================
     // ATTRITION

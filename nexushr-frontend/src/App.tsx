@@ -120,8 +120,76 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function topbarChrome(
+  pathname: string,
+  role: string,
+  isAdmin: boolean,
+): { eyebrow: string; title: string } {
+  if (isAdmin) {
+    if (pathname.startsWith("/admin/companies")) {
+      return { eyebrow: "Administration", title: "Company management" };
+    }
+    if (pathname.startsWith("/admin/users")) {
+      return { eyebrow: "Administration", title: "Users & HR" };
+    }
+    if (pathname.startsWith("/admin/roles")) {
+      return { eyebrow: "Administration", title: "Roles & permissions" };
+    }
+    if (pathname.startsWith("/admin/audit")) {
+      return { eyebrow: "Administration", title: "Audit logs" };
+    }
+    if (pathname.startsWith("/admin")) {
+      return { eyebrow: "Administration", title: "System settings" };
+    }
+    if (pathname.startsWith("/employees")) {
+      return { eyebrow: "Administration", title: "Employee management" };
+    }
+    if (pathname.startsWith("/attendance")) {
+      return { eyebrow: "Administration", title: "Attendance management" };
+    }
+    if (pathname.startsWith("/payroll")) {
+      return { eyebrow: "Administration", title: "Payroll management" };
+    }
+    if (pathname.startsWith("/ai")) {
+      return { eyebrow: "Administration", title: "Reports & analytics" };
+    }
+    return { eyebrow: "Administration", title: "Admin dashboard" };
+  }
+
+  const employee = role === "EMPLOYEE";
+  if (pathname.startsWith("/employees")) {
+    return { eyebrow: "People", title: "Employees" };
+  }
+  if (pathname.startsWith("/attendance")) {
+    return { eyebrow: employee ? "My day" : "Operations", title: employee ? "My attendance" : "Attendance" };
+  }
+  if (pathname.startsWith("/leave")) {
+    return { eyebrow: employee ? "My day" : "Operations", title: employee ? "My leave" : "Leave" };
+  }
+  if (pathname.startsWith("/payroll")) {
+    return { eyebrow: employee ? "My pay" : "Finance", title: employee ? "My pay" : "Payroll" };
+  }
+  if (pathname.startsWith("/performance")) {
+    return { eyebrow: employee ? "Growth" : "Talent", title: employee ? "My reviews" : "Performance" };
+  }
+  if (pathname.startsWith("/ai")) {
+    return { eyebrow: "Insights", title: "Reports" };
+  }
+  if (pathname.startsWith("/notifications")) {
+    return { eyebrow: "Inbox", title: "Updates" };
+  }
+  if (pathname.startsWith("/profile")) {
+    return { eyebrow: "Account", title: "My profile" };
+  }
+  return {
+    eyebrow: employee ? "Today" : "Operations",
+    title: employee ? "Home" : "Home",
+  };
+}
+
 function AppRoutes() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const username =
     localStorage.getItem("nexushr_user") || "HR Manager";
@@ -488,6 +556,7 @@ function AppRoutes() {
   const isAdmin = signedRole === "ADMIN" || signedRole === "SUPER_ADMIN";
   const canSwitchWorkspace = role === "SUPER_ADMIN" || role === "HR" || role === "ADMIN";
   const entityName = workspace === "GORLE" ? "Gorle" : "CYOND";
+  const chrome = topbarChrome(location.pathname, signedRole, isAdmin);
 
   return (
     <div className={isAdmin ? "app-shell admin-panel" : "app-shell"} data-company={workspace}>
@@ -563,14 +632,10 @@ function AppRoutes() {
 
       <main className="main-area">
         <header className="topbar">
-          {isAdmin ? (
-            <div className="admin-panel-mark">
-              <p className="eyebrow">Administration</p>
-              <h1>{entityName} admin panel</h1>
-            </div>
-          ) : (
-            <div />
-          )}
+          <div className={isAdmin ? "admin-panel-mark topbar-title" : "topbar-title"}>
+            <p className="eyebrow">{chrome.eyebrow}</p>
+            <h1>{chrome.title}</h1>
+          </div>
 
           <div className="user-area">
             <div className="bell-wrap">
@@ -852,10 +917,16 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
     } catch (err) {
       console.error(err);
       const message = err instanceof Error ? err.message : "Invalid username or password.";
-      if (employee && message.toLowerCase().includes("not saved yet")) {
+      const needsProfile = message.toLowerCase().includes("not saved yet")
+        || message.toLowerCase().includes("create your profile");
+      if (needsProfile) {
         setCreating(true);
         setError("");
-        setNotice("This email is new. Create your profile with your own password.");
+        setNotice(
+          employee
+            ? "This account needs a password. Create your profile with your own password."
+            : "This account needs a password. Create your profile, then sign in on the correct login page for your role.",
+        );
         return;
       }
       setError(message);
@@ -1521,15 +1592,13 @@ function EmployeeDashboard() {
 
       <div className="dashboard-hero">
         <div className="dashboard-hero-copy">
-
-          <p className="eyebrow">Home</p>
+          <p className="eyebrow">Today</p>
           <h2>Good day, {employee.fullName}</h2>
           <p>
             {new Date().toLocaleDateString("en-IN", { weekday: "short", day: "2-digit", month: "short" })}
             {" · "}General shift 9:30–6:30
             {" · "}Next holiday {nextHoliday}
           </p>
-
         </div>
       </div>
 

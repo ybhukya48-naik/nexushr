@@ -416,7 +416,8 @@ public class EmployeeService {
     }
 
     private String applyDefaultPassword(Employee employee) {
-        String temporary = CompanyPasswords.initialPassword(companyCode(employee));
+        // Always issue a fresh random temporary — never reuse company-wide defaults.
+        String temporary = newSignInPassword();
         employee.setPassword(passwordEncoder.encode(temporary));
         employee.setPasswordChangeRequired(true);
         employeeRepository.save(employee);

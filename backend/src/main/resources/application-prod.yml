@@ -1,5 +1,7 @@
 server:
-  address: 0.0.0.0
+  # Bind loopback by default when Nginx terminates TLS on this host.
+  # Override with SERVER_ADDRESS=0.0.0.0 only if you intentionally expose Tomcat.
+  address: ${SERVER_ADDRESS:127.0.0.1}
   port: ${PORT:8080}
   error:
     include-stacktrace: never
@@ -60,13 +62,6 @@ app:
 
   auth:
     demo-users-enabled: ${DEMO_USERS_ENABLED:false}
-
-aws:
-  region: ${AWS_REGION}
-  s3-bucket: ${AWS_S3_BUCKET}
-  endpoint-url-s3: ${AWS_ENDPOINT_URL_S3}
-  access-key-id: ${AWS_ACCESS_KEY_ID}
-  secret-access-key: ${AWS_SECRET_ACCESS_KEY}
 
 logging:
   level:

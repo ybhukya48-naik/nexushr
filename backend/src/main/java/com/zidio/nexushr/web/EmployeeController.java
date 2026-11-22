@@ -138,8 +138,16 @@ public class EmployeeController {
     }
 
     @GetMapping("/{id}/photo")
-    public ResponseEntity<byte[]> photo(@PathVariable Long id) {
+    public ResponseEntity<byte[]> photo(
+            @PathVariable Long id,
+            Authentication authentication) {
         Employee employee = employeeService.findById(id);
+        if (!authorizationService.canSeeEmployee(employee, authentication)
+                && !authorizationService.isSelf(id, authentication)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Employee not found");
+        }
         byte[] bytes = employee.getProfilePhoto();
         if (bytes == null || bytes.length == 0 || employee.getProfilePhotoType() == null) {
             return ResponseEntity.notFound().build();

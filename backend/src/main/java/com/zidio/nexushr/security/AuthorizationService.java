@@ -76,6 +76,9 @@ public class AuthorizationService {
     }
 
     public boolean canSeeEmployee(Employee employee, Authentication authentication) {
+        // Shared HR/Admin mailboxes use Entity to switch companies in the UI,
+        // so they can read both Cyond and Gorle staff. Super admin can too.
+        // Managers and employees stay inside their own company only.
         if (seesAllCompanies(authentication)
                 || hasAuthority(authentication, "ROLE_HR")
                 || hasAuthority(authentication, "ROLE_ADMIN")) {
@@ -181,10 +184,6 @@ public class AuthorizationService {
             Long notificationId,
             Authentication authentication) {
 
-        if (hasManagementRole(authentication)) {
-            return true;
-        }
-
         if (notificationId == null) {
             return false;
         }
@@ -201,19 +200,13 @@ public class AuthorizationService {
             Long goalId,
             Authentication authentication) {
 
-        if (hasManagementRole(authentication)) {
-            return true;
-        }
-
         if (goalId == null) {
             return false;
         }
 
         return performanceGoalRepository.findById(goalId)
-                .map(goal ->
-                        isSelf(
-                                goal.getEmployee().getId(),
-                                authentication))
+                .map(goal -> goal.getEmployee() != null
+                        && isSelf(goal.getEmployee().getId(), authentication))
                 .orElse(false);
     }
 
@@ -221,22 +214,16 @@ public class AuthorizationService {
             Long feedbackId,
             Authentication authentication) {
 
-        if (hasManagementRole(authentication)) {
-            return true;
-        }
-
         if (feedbackId == null) {
             return false;
         }
 
         return performanceFeedbackRepository.findById(feedbackId)
                 .map(feedback ->
-                        isSelf(
-                                feedback.getEmployee().getId(),
-                                authentication)
-                        || isSelf(
-                                feedback.getReviewer().getId(),
-                                authentication))
+                        (feedback.getEmployee() != null
+                                && isSelf(feedback.getEmployee().getId(), authentication))
+                        || (feedback.getReviewer() != null
+                                && isSelf(feedback.getReviewer().getId(), authentication)))
                 .orElse(false);
     }
 

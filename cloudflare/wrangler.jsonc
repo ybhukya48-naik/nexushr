@@ -8,8 +8,7 @@
   },
   // The public API is this Worker. The Java service runs in one Container
   // because a Worker cannot run Spring Boot. Secrets stay in Cloudflare:
-  // JWT_SECRET, DB_URL, DB_USER, DB_PASSWORD, AWS_REGION, AWS_S3_BUCKET,
-  // AWS_ENDPOINT_URL_S3, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, RESEND_API_KEY
+  // JWT_SECRET, DB_URL, DB_USER, DB_PASSWORD, RESEND_API_KEY
   "containers": [
     {
       "name": "nexushr-api",

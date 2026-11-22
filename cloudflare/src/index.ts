@@ -6,11 +6,6 @@ interface Env {
   DB_URL?: string;
   DB_USER?: string;
   DB_PASSWORD?: string;
-  AWS_REGION?: string;
-  AWS_S3_BUCKET?: string;
-  AWS_ENDPOINT_URL_S3?: string;
-  AWS_ACCESS_KEY_ID?: string;
-  AWS_SECRET_ACCESS_KEY?: string;
   RESEND_API_KEY?: string;
 }
 
@@ -19,11 +14,6 @@ const SECRET_KEYS = [
   "DB_URL",
   "DB_USER",
   "DB_PASSWORD",
-  "AWS_REGION",
-  "AWS_S3_BUCKET",
-  "AWS_ENDPOINT_URL_S3",
-  "AWS_ACCESS_KEY_ID",
-  "AWS_SECRET_ACCESS_KEY",
   "RESEND_API_KEY",
 ] as const;
 

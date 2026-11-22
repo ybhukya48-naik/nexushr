@@ -2,11 +2,13 @@ package com.zidio.nexushr.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zidio.nexushr.domain.PerformanceReview;
+import com.zidio.nexushr.security.AuthorizationService;
 import com.zidio.nexushr.security.JwtTokenService;
 import com.zidio.nexushr.security.SecurityConfig;
 import com.zidio.nexushr.service.PerformanceService;
 import com.zidio.nexushr.service.PerformanceGoalService;
 import com.zidio.nexushr.service.PerformanceFeedbackService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -19,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -44,6 +47,15 @@ class PerformanceControllerTest {
 
     @MockitoBean
     private JwtTokenService jwtTokenService;
+
+    @MockitoBean(name = "authorizationService")
+    private AuthorizationService authorizationService;
+
+    @BeforeEach
+    void stubAuthorization() {
+        when(authorizationService.canSeeEmployee(any(), any())).thenReturn(true);
+        when(authorizationService.canSeeEmployeeId(any(), any())).thenReturn(true);
+    }
 
     @Test
     @WithMockUser(roles = "HR")
@@ -80,7 +92,7 @@ class PerformanceControllerTest {
 
         mockMvc.perform(post("/api/v1/performance")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
+                        .content("{\"employee\":{\"id\":5},\"score\":90}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(2))
                 .andExpect(jsonPath("$.score").value(90));

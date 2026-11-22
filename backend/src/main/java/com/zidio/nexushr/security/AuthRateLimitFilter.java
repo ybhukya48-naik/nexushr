@@ -40,6 +40,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
         String path = request.getServletPath();
         if (!LOGIN_PATH.equals(path)
+                && !"/api/v1/auth/register".equals(path)
                 && !"/api/v1/auth/create-password".equals(path)
                 && !"/api/v1/auth/set-password".equals(path)
                 && !"/api/v1/auth/reset-password".equals(path)) {
@@ -79,11 +80,24 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     }
 
     private String resolveClientIp(HttpServletRequest request) {
-        // Respect X-Forwarded-For when behind a trusted proxy / k8s ingress
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            return xff.split(",")[0].trim();
+        // Only trust X-Forwarded-For when the immediate peer is a local proxy
+        // (Nginx on this host). Otherwise clients can spoof the header and dodge limits.
+        String remote = request.getRemoteAddr();
+        if (isTrustedProxy(remote)) {
+            String xff = request.getHeader("X-Forwarded-For");
+            if (xff != null && !xff.isBlank()) {
+                return xff.split(",")[0].trim();
+            }
         }
-        return request.getRemoteAddr();
+        return remote == null || remote.isBlank() ? "unknown" : remote;
+    }
+
+    private static boolean isTrustedProxy(String remoteAddr) {
+        if (remoteAddr == null || remoteAddr.isBlank()) {
+            return false;
+        }
+        return "127.0.0.1".equals(remoteAddr)
+                || "0:0:0:0:0:0:0:1".equals(remoteAddr)
+                || "::1".equals(remoteAddr);
     }
 }

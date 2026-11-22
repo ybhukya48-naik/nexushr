@@ -14,7 +14,6 @@ import com.zidio.nexushr.service.email.ResendEmailService;
 import com.zidio.nexushr.security.SecurityConfig;
 import com.zidio.nexushr.web.dto.AuthDtos;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -247,9 +246,16 @@ class AuthControllerTest {
     }
 
     @Test
-    void createPassword_forExistingEmployee_storesNewPassword() throws Exception {
-        when(employeeRepository.updateEmployeePassword(eq("staff@gorlegroup.com"), anyString()))
-                .thenReturn(1);
+    void createPassword_forUnsetEmployee_storesNewPassword() throws Exception {
+        Employee staff = new Employee();
+        staff.setId(9L);
+        staff.setEmail("staff@gorlegroup.com");
+        staff.setRoleType(RoleType.EMPLOYEE);
+        staff.setPassword(ExcelPayrollService.UNSET_PASSWORD_HASH);
+        when(employeeRepository.findByEmailIgnoreCase("staff@gorlegroup.com"))
+                .thenReturn(Optional.of(staff));
+        when(employeeRepository.save(org.mockito.ArgumentMatchers.any(Employee.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         mockMvc.perform(post("/api/v1/auth/create-password")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -260,17 +266,36 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.message")
                         .value("Password created. Sign in with this email and the new password."));
 
-        ArgumentCaptor<String> hash = ArgumentCaptor.forClass(String.class);
-        verify(employeeRepository).updateEmployeePassword(eq("staff@gorlegroup.com"), hash.capture());
-        assertTrue(new BCryptPasswordEncoder().matches("newpassword1", hash.getValue()));
+        assertTrue(new BCryptPasswordEncoder().matches("newpassword1", staff.getPassword()));
+    }
+
+    @Test
+    void createPassword_whenPasswordAlreadySet_returnsConflict() throws Exception {
+        Employee staff = new Employee();
+        staff.setId(9L);
+        staff.setEmail("staff@gorlegroup.com");
+        staff.setRoleType(RoleType.EMPLOYEE);
+        staff.setPassword(new BCryptPasswordEncoder().encode("already-set-pass"));
+        when(employeeRepository.findByEmailIgnoreCase("staff@gorlegroup.com"))
+                .thenReturn(Optional.of(staff));
+
+        mockMvc.perform(post("/api/v1/auth/create-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"staff@gorlegroup.com","password":"newpassword1"}
+                                """))
+                .andExpect(status().isConflict());
     }
 
     @Test
     void createPassword_whenAccountIsNotEmployee_returnsForbidden() throws Exception {
-        when(employeeRepository.updateEmployeePassword(eq("hr@gorlegroup.com"), anyString()))
-                .thenReturn(0);
-        when(employeeRepository.findRoleTypesByEmail("hr@gorlegroup.com"))
-                .thenReturn(List.of("HR"));
+        Employee hr = new Employee();
+        hr.setId(2L);
+        hr.setEmail("hr@gorlegroup.com");
+        hr.setRoleType(RoleType.HR);
+        hr.setPassword(ExcelPayrollService.UNSET_PASSWORD_HASH);
+        when(employeeRepository.findByEmailIgnoreCase("hr@gorlegroup.com"))
+                .thenReturn(Optional.of(hr));
 
         mockMvc.perform(post("/api/v1/auth/create-password")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -281,13 +306,28 @@ class AuthControllerTest {
     }
 
     @Test
-    void register_withEmailAndEmployeeCode_createsProfile() throws Exception {
-        Company company = new Company();
-        company.setCode("CYOND");
+    void register_withoutStaffRecord_isRejected() throws Exception {
         when(employeeRepository.findByEmployeeCodeIgnoreCase("CY-01")).thenReturn(Optional.empty());
         when(employeeRepository.findByEmailIgnoreCase("asha@cyond.com")).thenReturn(Optional.empty());
-        when(companyRepository.findByCodeIgnoreCase("CYOND")).thenReturn(Optional.of(company));
-        when(employeeRepository.existsByEmployeeCode("CY-01")).thenReturn(false);
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"fullName":"Asha","email":"asha@cyond.com","employeeCode":"CY-01","password":"password12","companyCode":"CYOND"}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Ask HR to add you first")));
+    }
+
+    @Test
+    void register_withExistingUnsetStaff_setsPassword() throws Exception {
+        Employee existing = new Employee();
+        existing.setId(11L);
+        existing.setEmployeeCode("CY-01");
+        existing.setEmail("asha@cyond.com");
+        existing.setPassword(com.zidio.nexushr.service.ExcelPayrollService.UNSET_PASSWORD_HASH);
+        when(employeeRepository.findByEmployeeCodeIgnoreCase("CY-01")).thenReturn(Optional.of(existing));
+        when(employeeRepository.findByEmailIgnoreCase("asha@cyond.com")).thenReturn(Optional.of(existing));
         when(employeeRepository.save(org.mockito.ArgumentMatchers.any(Employee.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -296,17 +336,15 @@ class AuthControllerTest {
                         .content("""
                                 {"fullName":"Asha","email":"asha@cyond.com","employeeCode":"CY-01","password":"password12","companyCode":"CYOND"}
                                 """))
-                .andExpect(status().isCreated())
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.email").value("asha@cyond.com"))
                 .andExpect(jsonPath("$.employeeCode").value("CY-01"));
     }
 
     @Test
     void createPassword_whenEmailMissing_returnsNotFound() throws Exception {
-        when(employeeRepository.updateEmployeePassword(eq("missing@gorlegroup.com"), anyString()))
-                .thenReturn(0);
-        when(employeeRepository.findRoleTypesByEmail("missing@gorlegroup.com"))
-                .thenReturn(List.of());
+        when(employeeRepository.findByEmailIgnoreCase("missing@gorlegroup.com"))
+                .thenReturn(Optional.empty());
 
         mockMvc.perform(post("/api/v1/auth/create-password")
                         .contentType(MediaType.APPLICATION_JSON)

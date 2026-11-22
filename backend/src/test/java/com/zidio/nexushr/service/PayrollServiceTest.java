@@ -61,7 +61,7 @@ class PayrollServiceTest {
     }
 
     @Test
-    void create_calculatesGrossTaxDeductionsAndNetSalary() {
+    void create_rejectsDeductionsThatExceedEarnedPay() {
 
         PayrollRequest request = new PayrollRequest();
         request.setEmployeeId(4L);
@@ -76,27 +76,11 @@ class PayrollServiceTest {
                 "2026-09"
         )).thenReturn(false);
 
-        when(payrollRepository.save(any(PayrollRecord.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        assertThatThrownBy(() -> payrollService.create(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Total deductions cannot exceed gross salary");
 
-        PayrollRecord result = payrollService.create(request);
-
-        assertThat(result.getEmployee()).isSameAs(employee);
-        assertThat(result.getPayMonth()).isEqualTo("2026-09");
-        assertThat(result.getGrossSalary())
-                .isEqualByComparingTo("110000.00");
-        assertThat(result.getTaxAmount())
-                .isEqualByComparingTo("11000.00");
-        assertThat(result.getOtherDeductions())
-                .isEqualByComparingTo("2000.00");
-        assertThat(result.getDeductions())
-                .isEqualByComparingTo("13000.00");
-        assertThat(result.getNetSalary())
-                .isEqualByComparingTo("97000.00");
-        assertThat(result.getStatus())
-                .isEqualTo(PayrollStatus.GENERATED);
-
-        verify(payrollRepository).save(any(PayrollRecord.class));
+        verify(payrollRepository, never()).save(any(PayrollRecord.class));
     }
 
     @Test
@@ -121,10 +105,16 @@ class PayrollServiceTest {
 
         assertThat(result.getOtherDeductions())
                 .isEqualByComparingTo("0.00");
+        assertThat(result.getTaxAmount())
+                .isEqualByComparingTo("0.00");
         assertThat(result.getDeductions())
-                .isEqualByComparingTo("11000.00");
+                .isEqualByComparingTo("0.00");
+        assertThat(result.getGrossSalary())
+                .isEqualByComparingTo("0.00");
         assertThat(result.getNetSalary())
-                .isEqualByComparingTo("99000.00");
+                .isEqualByComparingTo("0.00");
+        assertThat(result.getStatus())
+                .isEqualTo(PayrollStatus.GENERATED);
     }
 
     @Test

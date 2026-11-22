@@ -2,6 +2,7 @@ package com.zidio.nexushr.web;
 
 import com.zidio.nexushr.domain.Employee;
 import com.zidio.nexushr.domain.PayrollRecord;
+import com.zidio.nexushr.security.AuthorizationService;
 import com.zidio.nexushr.security.JwtTokenService;
 import com.zidio.nexushr.security.SecurityConfig;
 import com.zidio.nexushr.service.AttendanceService;
@@ -10,6 +11,7 @@ import com.zidio.nexushr.service.PayrollPdfService;
 import com.zidio.nexushr.service.PayrollService;
 import com.zidio.nexushr.service.email.ResendEmailService;
 import com.zidio.nexushr.web.dto.PayrollRequest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -24,6 +26,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -53,6 +56,15 @@ class PayrollControllerTest {
 
     @MockitoBean
     private AttendanceService attendanceService;
+
+    @MockitoBean
+    private AuthorizationService authorizationService;
+
+    @BeforeEach
+    void allowPayrollVisibility() {
+        lenient().when(authorizationService.canSeeEmployee(any(), any())).thenReturn(true);
+        lenient().when(authorizationService.canSeeEmployeeId(any(), any())).thenReturn(true);
+    }
 
     private Employee testEmployee() {
         Employee employee = new Employee();

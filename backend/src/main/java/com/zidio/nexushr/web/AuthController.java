@@ -123,65 +123,11 @@ public class AuthController {
             return saveOwnCredentials(existing, fullName, email, phone, password);
         }
 
-        if (!phoneDigits.isBlank() && employeeRepository.existsByPhoneDigits(phoneDigits)) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("message",
-                            "An account with this phone number already exists. Sign in with your email or employee code."));
-        }
-
-        String companyCode = request.getCompanyCode() == null
-                ? ""
-                : request.getCompanyCode().trim().toUpperCase();
-        if (!companyCode.equals("CYOND") && !companyCode.equals("GORLE")) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "Choose CYOND or Gorle Group"));
-        }
-        Company company = companyRepository.findByCodeIgnoreCase(companyCode).orElse(null);
-        if (company == null) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "That company is not set up yet"));
-        }
-        if (employeeCode.isBlank()) {
-            employeeCode = generateEmployeeCode();
-        } else if (employeeRepository.existsByEmployeeCode(employeeCode)) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("message", "That employee code is already used"));
-        }
-
-        Employee employee = new Employee();
-
-        employee.setCompany(company);
-        employee.setEmployeeCode(employeeCode);
-        employee.setFullName(fullName);
-        employee.setEmail(email);
-        employee.setPhone(
-                request.getPhone() == null || request.getPhone().isBlank()
-                        ? null
-                        : request.getPhone().trim()
-        );
-
-        // Never store a plain-text password.
-        employee.setPassword(passwordEncoder.encode(password));
-
-        // Public registration can only create normal employee accounts.
-        employee.setRoleType(RoleType.EMPLOYEE);
-
-        employee.setDepartment("General");
-        employee.setDesignation("Employee");
-        employee.setJoiningDate(LocalDate.now());
-        employee.setBaseSalary(BigDecimal.ZERO);
-        employee.setActive(true);
-        employee.setGender(GenderType.PREFER_NOT_TO_SAY);
-        employee.setLifecycleStatus(EmployeeLifecycleStatus.ACTIVE);
-        employee.setProfileCompleted(true);
-        employee.setPasswordChangeRequired(false);
-
-        Employee saved = employeeRepository.save(employee);
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(profileBody(
-                        "Profile created. Sign in with your email or employee code and this password.",
-                        saved));
+        // Public self-serve signup can only finish an existing staff row.
+        // New people must be added by HR/Admin first.
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("message",
+                        "No staff record matches that email or employee code. Ask HR to add you first, then create your profile."));
     }
 
     private ResponseEntity<?> saveOwnCredentials(
@@ -312,6 +258,7 @@ public class AuthController {
         try {
             List<Object[]> rows = employeeRepository.findLoginMatches(normalizedUsername);
             boolean sawInactive = false;
+            boolean sawUnsetPassword = false;
             for (Object[] row : rows) {
                 String life = text(row, 5);
                 if (!isActiveFlag(row.length > 4 ? row[4] : null)
@@ -320,7 +267,14 @@ public class AuthController {
                     sawInactive = true;
                     continue;
                 }
-                if (!passwordMatches(request.password(), text(row, 1))) {
+                String storedHash = text(row, 1);
+                if (storedHash == null
+                        || storedHash.isBlank()
+                        || ExcelPayrollService.UNSET_PASSWORD_HASH.equals(storedHash)) {
+                    sawUnsetPassword = true;
+                    continue;
+                }
+                if (!passwordMatches(request.password(), storedHash)) {
                     continue;
                 }
 
@@ -352,6 +306,8 @@ public class AuthController {
                     ? "That account is not saved yet. cyond signs in with the email. Gorle Group signs in with the employee code."
                     : sawInactive
                     ? "This employee account is not active."
+                    : sawUnsetPassword
+                    ? "That account is not saved yet. Use Create your profile to set your password."
                     : "Password does not match. cyond uses the email. Gorle Group uses the employee code.";
             return ResponseEntity.status(401).body(Map.of("message", message));
         } catch (Exception ex) {
@@ -522,25 +478,35 @@ public class AuthController {
                         .body(Map.of("message", "Password must contain at least 8 characters"));
             }
 
-            int updated = employeeRepository.updateEmployeePassword(
-                    email,
-                    passwordEncoder.encode(password));
-            if (updated > 0) {
-                return ResponseEntity.ok(Map.of(
-                        "message", "Password created. Sign in with this email and the new password.",
-                        "email", email
-                ));
-            }
-
-            if (employeeRepository.findRoleTypesByEmail(email).isEmpty()) {
+            Employee existing = employeeRepository.findByEmailIgnoreCase(email).orElse(null);
+            if (existing == null) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(Map.of("message",
                                 "No employee account uses this email"));
             }
 
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("message",
-                            "Use Create your profile with your employee code and your own email."));
+            RoleType role = existing.getRoleType();
+            if (role == RoleType.ADMIN || role == RoleType.HR || role == RoleType.SUPER_ADMIN) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("message",
+                                "Use Create your profile with your employee code and your own email."));
+            }
+
+            // Never overwrite an already-set password from this public endpoint.
+            if (!passwordUnset(existing)) {
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body(Map.of("message",
+                                "This profile already has a password. Sign in, or use Forgot password."));
+            }
+
+            existing.setPassword(passwordEncoder.encode(password));
+            existing.setProfileCompleted(true);
+            existing.setPasswordChangeRequired(false);
+            employeeRepository.save(existing);
+            return ResponseEntity.ok(Map.of(
+                    "message", "Password created. Sign in with this email and the new password.",
+                    "email", email
+            ));
         } catch (Exception ex) {
             log.error("CREATE_PASSWORD_FAILED", ex);
             return ResponseEntity.status(HttpStatus.CONFLICT)

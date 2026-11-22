@@ -105,6 +105,7 @@ class LeaveControllerTest {
         approved.setId(1L);
         approved.setStatus(LeaveStatus.APPROVED);
 
+        when(authorizationService.canAccessLeave(eq(1L), any())).thenReturn(true);
         when(leaveService.updateStatus(
                 eq(1L),
                 eq(LeaveStatus.APPROVED)
@@ -123,6 +124,7 @@ class LeaveControllerTest {
         rejected.setId(1L);
         rejected.setStatus(LeaveStatus.REJECTED);
 
+        when(authorizationService.canAccessLeave(eq(1L), any())).thenReturn(true);
         when(leaveService.updateStatus(
                 eq(1L),
                 eq(LeaveStatus.REJECTED)
@@ -141,6 +143,7 @@ class LeaveControllerTest {
         approved.setId(1L);
         approved.setStatus(LeaveStatus.APPROVED);
 
+        when(authorizationService.canAccessLeave(eq(1L), any())).thenReturn(true);
         when(leaveService.updateStatus(
                 eq(1L),
                 eq(LeaveStatus.APPROVED)

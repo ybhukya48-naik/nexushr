@@ -36,14 +36,6 @@
                 <version>${spring-ai.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>            
-            <!-- AWS SDK v2 BOM -->
-            <dependency>
-                <groupId>software.amazon.awssdk</groupId>
-                <artifactId>bom</artifactId>
-                <version>2.48.0</version>
-                <type>pom</type>
-                <scope>import</scope>
             </dependency>
 </dependencies>
     </dependencyManagement>
@@ -198,15 +190,6 @@
         </dependency>
 
 
-        
-        <!-- ==================== -->
-        <!-- Neon S3 Object Storage -->
-        <!-- ==================== -->
-
-        <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>s3</artifactId>
-        </dependency>
         <!-- ==================== -->
         <!-- Testing -->
         <!-- ==================== -->
