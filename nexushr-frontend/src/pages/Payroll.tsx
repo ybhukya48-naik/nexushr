@@ -44,7 +44,8 @@ function toOptionalNumber(value: string): number | undefined {
 export default function Payroll() {
   const navigate = useNavigate();
   const role = (localStorage.getItem("nexushr_role") || "EMPLOYEE").toUpperCase();
-  const isManagementRole = ["ADMIN", "SUPER_ADMIN", "HR", "MANAGER"].includes(role);
+  const isManagementRole = ["ADMIN", "SUPER_ADMIN", "HR"].includes(role);
+  const isPersonalPayroll = !isManagementRole;
 
   const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string>(
@@ -131,8 +132,6 @@ export default function Payroll() {
     setError("");
 
     try {
-      const isManagementRole = ["ADMIN", "SUPER_ADMIN", "HR", "MANAGER"].includes(role);
-
       if (!isManagementRole) {
         const me = await getCurrentEmployee();
 
@@ -388,9 +387,9 @@ export default function Payroll() {
       <div className="employees-header">
         <div>
           <p className="page-eyebrow">{selectedCompany === "GORLE" ? "Gorle Group" : selectedCompany === "CYOND" ? "CYOND" : selectedCompany}</p>
-          <h1>{role === "EMPLOYEE" ? "My Pay" : "Payroll"}</h1>
+          <h1>{isPersonalPayroll ? "My Pay" : "Payroll"}</h1>
           <p>
-            {role === "EMPLOYEE"
+            {isPersonalPayroll
               ? "Download your payslip."
               : "Download a payslip, or email that payslip to the employee."}
           </p>
@@ -661,12 +660,12 @@ export default function Payroll() {
             <p className="page-eyebrow">Payroll Records</p>
             <h2>Salary Records</h2>
             <p>
-              {role === "EMPLOYEE"
+              {isPersonalPayroll
                 ? "Your salary records. Download a payslip here."
                 : "Generated payroll records and payment status."}
             </p>
           </div>
-          {role === "EMPLOYEE" && (
+          {isPersonalPayroll && (
             <div className="payroll-page-actions">
               <button
                 type="button"
@@ -700,12 +699,12 @@ export default function Payroll() {
         ) : visibleRecords.length === 0 ? (
           <div className="employee-empty-state">
             <strong>
-              {role === "EMPLOYEE"
+              {isPersonalPayroll
                 ? "No payslip yet"
                 : `No payroll records for ${payMonth}`}
             </strong>
             <span>
-              {role === "EMPLOYEE"
+              {isPersonalPayroll
                 ? "Your payslip appears here after pay is calculated."
                 : "Calculate pay from attendance for this month."}
             </span>
@@ -963,7 +962,6 @@ export default function Payroll() {
     </section>
   );
 }
-
 
 
 

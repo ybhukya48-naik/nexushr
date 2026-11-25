@@ -54,6 +54,12 @@ public class LeaveController {
         return leaveService.findByEmployee(employeeId);
     }
 
+    @GetMapping("/me")
+    public List<LeaveRequest> mine(Authentication authentication) {
+        return leaveService.findByEmployee(
+                attendanceService.findEmployeeIdByUsername(authentication.getName()));
+    }
+
     @PostMapping
     public LeaveRequest create(
             @RequestBody LeaveRequest request,
@@ -69,7 +75,7 @@ public class LeaveController {
                         authority ->
                                 authority.getAuthority().equals("ROLE_HR")
                                         || authority.getAuthority().equals("ROLE_ADMIN")
-                                        || authority.getAuthority().equals("ROLE_MANAGER")
+                                        || authority.getAuthority().equals("ROLE_SUPER_ADMIN")
                 );
 
         if (!management

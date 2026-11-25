@@ -3,9 +3,10 @@
 **Hold: do not deploy or change the production database until an authorized
 operator confirms access, backups, restore procedures, staging tests and
 approval.** This is a proposed procedure, not evidence that production has
-been updated. As of November 2026, `hr.cyond.com` resolves to an nginx server
-and responds to the proxied health endpoint; the actual server, upstream,
-service manager, database provider and backup status have not been verified.
+been updated. As of November 2026, `hr.cyond.com` resolves to an nginx server.
+Render service `nexushr-1` serves `hr-api.cyond.com` and tracks `main`. The
+frontend server owner, production database backup and restore status remain
+unverified.
 The repository CD workflow does not deploy to that server. Vercel previews
 are not the live site.
 
@@ -17,10 +18,10 @@ are not the live site.
   chat or in the repository.
 - Establish and test a backup and recovery plan on an isolated database.
   Production backup existence and restorability are currently **unconfirmed**.
-- Resolve the backend integration CI failures, run PostgreSQL migration and
-  concurrency tests, and perform authenticated end-to-end testing in staging
-  for both companies and all roles. Current GitHub backend CI fails in
-  integration tests; local Docker was unavailable.
+- Backend and frontend CI passed on PR head `990953b`. Re-run checks on the
+  actual release commit, rehearse migrations on a restored production copy,
+  run concurrency tests, and perform authenticated end-to-end testing in
+  staging for both companies and all roles.
 - Confirm treatment of overnight open lunches and operational response to
   failed inactivity sweeps. Browser heartbeats detect connectivity to the app,
   not actual desktop activity. Sleeping devices, network loss and browser
@@ -56,7 +57,7 @@ The backend production profile uses the following environment variable names:
 | `DB_URL`, `DB_USER`, `DB_PASSWORD` | Verified PostgreSQL JDBC connection, supplied through the host's protected secret mechanism. Explicitly set `DB_URL`; do not rely on the historical default. |
 | `JWT_SECRET` | Existing strong signing secret from the secret manager; changing it invalidates existing tokens. |
 | `CORS_ALLOWED_ORIGINS` | Exact approved HTTPS origins, comma-separated. |
-| `SERVER_ADDRESS`, `PORT` | Actual listening address and port; loopback and 8080 are defaults for a backend on the nginx host. Container networking may require different settings. |
+| `SERVER_ADDRESS`, `PORT` | Actual listening address and port; loopback and 8080 are defaults for a backend on the nginx host. On Render, set `SERVER_ADDRESS` to `0.0.0.0` and use the Render-provided port. Verify these on staging first. |
 | `DEMO_USERS_ENABLED`, `SWAGGER_ENABLED` | Confirm production policy; defaults in `prod` are false. |
 | `DB_MAX_POOL_SIZE`, `DB_MIN_IDLE`, `DB_CONNECTION_TIMEOUT_MS`, `DB_VALIDATION_TIMEOUT_MS` | Optional database pool tuning. |
 
@@ -65,6 +66,15 @@ document, source control, shell history, screenshots or chat. Confirm other
 integrations and mail settings against the actual installation. The frontend
 uses same-origin `/api/v1` on `hr.cyond.com`; `VITE_API_BASE_URL` is used for
 other hosts, and is embedded at build time, not a secret.
+
+The November 25 Render deploy of `06ce520` exited during startup because
+the database returned SQLSTATE `53000`, reporting that the account or project
+exceeded its quota. Flyway could not obtain a connection; the log does not show
+a V43 or V44 migration failure. The database owner must resolve the quota and
+securely verify connectivity. Render's listed service variables did not include
+`SERVER_ADDRESS`, so the loopback default is an independent networking risk
+after database startup succeeds. Do not retry production until release gates
+are met.
 
 ## Migration and backup
 
@@ -89,8 +99,13 @@ leave consumes its full allowance even if attendance reduces the credit. EARNED
 leave is not paid under this policy. Overtime is displayed separately and is not included in CTC
 earnings. A payroll entry's override affects that record only; existing payroll
 snapshots and paid records are preserved during bulk recalculation.
-Managers see their own attendance and same-company direct reports, not HR
-administration or leave approvals. HR/admin receive leave approval notifications.
+Managers can view their own attendance history and payslips and submit their
+own leave requests to HR. Managers see same-company direct reports, not HR
+administration or leave approvals. The manager team report exposes recorded
+work, overtime, leave status and payroll status, but not salary amounts or
+leave reasons. A manager's direct reports must be assigned through Reporting
+Manager; sharing a department alone does not grant access. HR/admin receive
+leave approval notifications.
 
 1. Arrange a consistent backup immediately before deployment with the database
    owner. Use the provider's point-in-time recovery where available and a

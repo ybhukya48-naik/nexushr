@@ -552,6 +552,39 @@ export function getTeamAttendanceToday() {
   return request<TeamAttendance[]>("/attendance/team-today");
 }
 
+export interface ManagerTeamReport {
+  month: string;
+  members: {
+    id: number;
+    code: string;
+    name: string;
+    department: string;
+    designation: string;
+    workedMinutes: number;
+    overtimeMinutes: number;
+    payrollStatus: string;
+    attendance: {
+      date: string;
+      checkIn: string | null;
+      checkOut: string | null;
+      onLunch: boolean;
+      workedMinutes: number;
+      overtimeMinutes: number;
+    }[];
+    leave: {
+      startDate: string;
+      endDate: string;
+      type: string | null;
+      halfDay: boolean;
+      status: string;
+    }[];
+  }[];
+}
+
+export function getManagerTeamReport(month: string) {
+  return request<ManagerTeamReport>(`/manager/team-report?month=${encodeURIComponent(month)}`);
+}
+
 export function defaultEmployeePassword(company?: string) {
   return company === "GORLE" ? "Gorle@1234" : "Cyond@1234";
 }

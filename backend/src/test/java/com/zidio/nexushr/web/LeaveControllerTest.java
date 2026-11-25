@@ -107,6 +107,29 @@ class LeaveControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "manager@example.com", roles = "MANAGER")
+    void managerCanReadOwnLeaveAndRequestOnlyForSelf() throws Exception {
+        when(attendanceService.findEmployeeIdByUsername("manager@example.com")).thenReturn(10L);
+        LeaveRequest own = new LeaveRequest();
+        own.setId(5L);
+        own.setStatus(LeaveStatus.PENDING);
+        when(leaveService.findByEmployee(10L)).thenReturn(List.of(own));
+        when(leaveService.create(any(LeaveRequest.class))).thenReturn(own);
+
+        mockMvc.perform(get("/api/v1/leaves/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(5));
+        mockMvc.perform(post("/api/v1/leaves").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"employee\":{\"id\":10},\"startDate\":\"2026-12-01\",\"endDate\":\"2026-12-01\",\"reason\":\"test\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/leaves").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"employee\":{\"id\":11},\"startDate\":\"2026-12-01\",\"endDate\":\"2026-12-01\",\"reason\":\"test\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/leaves"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @WithMockUser(roles = "HR")
     void hr_canRejectLeave() throws Exception {
         LeaveRequest rejected = new LeaveRequest();

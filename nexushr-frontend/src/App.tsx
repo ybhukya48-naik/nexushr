@@ -11,8 +11,8 @@ import {
 } from "react-router-dom";
 import {
   getCurrentEmployee,
-  getMyTeam,
   getTeamAttendanceToday,
+  getManagerTeamReport,
   getEmployeeNotifications,
   downloadPayslipPdf,
   getEmployeePayroll,
@@ -34,8 +34,8 @@ import {
   websiteSessionActive,
   type AiWorkforceDashboardResponse,
   type EmployeeResponse,
-  type TeamMember,
   type TeamAttendance,
+  type ManagerTeamReport,
   type NotificationResponse,
 } from "./api";
 import {
@@ -91,9 +91,9 @@ const navItems: ReadonlyArray<
 > = [
   ["Dashboard", "/", ["HR", "MANAGER", "EMPLOYEE", "ADMIN", "SUPER_ADMIN"]],
   ["Employees", "/employees", ["ADMIN", "HR", "SUPER_ADMIN"]],
-  ["Attendance", "/attendance", ["ADMIN", "HR", "EMPLOYEE", "SUPER_ADMIN"]],
-  ["Leave", "/leave", ["ADMIN", "HR", "EMPLOYEE", "SUPER_ADMIN"]],
-  ["Payroll", "/payroll", ["ADMIN", "HR", "EMPLOYEE", "SUPER_ADMIN"]],
+  ["Attendance", "/attendance", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
+  ["Leave", "/leave", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
+  ["Payroll", "/payroll", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
   ["Performance", "/performance", ["ADMIN", "HR", "EMPLOYEE", "SUPER_ADMIN"]],
   ["AI Insights", "/ai", ["ADMIN", "HR", "SUPER_ADMIN"]],
   ["Notifications", "/notifications", ["ADMIN", "HR", "EMPLOYEE", "SUPER_ADMIN"]],
@@ -611,11 +611,11 @@ function AppRoutes() {
               {label === "Dashboard"
                 ? signedRole === "ADMIN" || signedRole === "SUPER_ADMIN" ? "Dashboard" : "Home"
                 : label === "Attendance"
-                  ? role === "EMPLOYEE" ? "My Attendance" : "Attendance"
+                  ? role === "EMPLOYEE" || role === "MANAGER" ? "My Attendance" : "Attendance"
                   : label === "Leave"
-                    ? role === "EMPLOYEE" ? "My Leave" : "Leave"
+                    ? role === "EMPLOYEE" || role === "MANAGER" ? "My Leave" : "Leave"
                     : label === "Payroll"
-                      ? role === "EMPLOYEE" ? "My Pay" : "Payroll"
+                      ? role === "EMPLOYEE" || role === "MANAGER" ? "My Pay" : "Payroll"
                       : label === "Performance"
                         ? role === "EMPLOYEE" ? "My Reviews" : "Performance"
                         : label === "AI Insights"
@@ -675,7 +675,7 @@ function AppRoutes() {
                         type="button"
                         onClick={() => {
                           setBellOpen(false);
-                          navigate("/notifications");
+                          navigate(role === "MANAGER" ? "/#manager-notifications" : "/notifications");
                         }}
                       >
                         <strong>{item.title}</strong>
@@ -688,7 +688,7 @@ function AppRoutes() {
                     className="bell-all"
                     onClick={() => {
                       setBellOpen(false);
-                      navigate("/notifications");
+                      navigate(role === "MANAGER" ? "/#manager-notifications" : "/notifications");
                     }}
                   >
                     See all updates
@@ -754,9 +754,9 @@ function AppRoutes() {
               <Route path="/profile" element={<EmployeeProfile />} />
               <Route path="/employees" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <Employees />} />
               <Route path="/employees/:id" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <EmployeeProfile />} />
-              <Route path="/attendance" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <Attendance />} />
-              <Route path="/leave" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <Leave />} />
-              <Route path="/payroll" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <Payroll />} />
+              <Route path="/attendance" element={<Attendance />} />
+              <Route path="/leave" element={<Leave />} />
+              <Route path="/payroll" element={<Payroll />} />
               <Route path="/performance" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <Performance />} />
               <Route path="/ai" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <AIInsights />} />
               <Route path="/notifications" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <Notifications />} />
@@ -1379,24 +1379,37 @@ function formatTimer(totalSeconds: number) {
 }
 
 function ManagerDashboard() {
+  const location = useLocation();
   const [employee, setEmployee] = useState<EmployeeResponse | null>(null);
-  const [team, setTeam] = useState<TeamMember[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [teamAttendance, setTeamAttendance] = useState<TeamAttendance[]>([]);
   const [clockNow, setClockNow] = useState(() => new Date());
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [month, setMonth] = useState(() => todayKey().slice(0, 7));
+  const [selection, setSelection] = useState<{
+    key: string;
+    section: "team" | "attendance" | "leave" | "payroll" | "reports" | "notifications";
+  }>({ key: location.key, section: location.hash === "#manager-notifications" ? "notifications" : "team" });
+  const section = selection.key === location.key
+    ? selection.section
+    : location.hash === "#manager-notifications" ? "notifications" : "team";
+  const [report, setReport] = useState<ManagerTeamReport | null>(null);
+  const [reportError, setReportError] = useState("");
+  const [reportLoading, setReportLoading] = useState(true);
+  const [reportRefresh, setReportRefresh] = useState(0);
+  const [notifications, setNotifications] = useState<NotificationResponse[]>([]);
+  const [notificationError, setNotificationError] = useState("");
 
   useEffect(() => {
     let active = true;
     async function load() {
       try {
-        const [me, members, teamRecords] = await Promise.all([getCurrentEmployee(), getMyTeam(), getTeamAttendanceToday()]);
+        const [me, teamRecords] = await Promise.all([getCurrentEmployee(), getTeamAttendanceToday()]);
         const history = await getEmployeeAttendance(me.id);
         if (active) {
           setEmployee(me);
-          setTeam(members);
           setTeamAttendance(teamRecords);
           setRecords(history);
         }
@@ -1409,6 +1422,32 @@ function ManagerDashboard() {
     void load();
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    setReportLoading(true);
+    setReportError("");
+    setReport(null);
+    getManagerTeamReport(month).then((result) => {
+      if (active) setReport(result);
+    }).catch((err) => {
+      if (active) setReportError(err instanceof Error ? err.message : "Unable to load team report.");
+    }).finally(() => {
+      if (active) setReportLoading(false);
+    });
+    return () => { active = false; };
+  }, [month, reportRefresh]);
+
+  useEffect(() => {
+    if (!employee) return;
+    let active = true;
+    getEmployeeNotifications(employee.id).then((items) => {
+      if (active) setNotifications(items);
+    }).catch((err) => {
+      if (active) setNotificationError(err instanceof Error ? err.message : "Unable to load notifications.");
+    });
+    return () => { active = false; };
+  }, [employee]);
 
   const today = records.find((record) => record.attendanceDate?.slice(0, 10) === todayKey());
   const checkedIn = Boolean(today?.checkInTime && !today.checkOutTime);
@@ -1428,6 +1467,7 @@ function ManagerDashboard() {
         .catch((err) => setError(err instanceof Error ? err.message : "Unable to refresh attendance."));
       void getTeamAttendanceToday().then(setTeamAttendance)
         .catch((err) => setError(err instanceof Error ? err.message : "Unable to refresh team attendance."));
+      setReportRefresh((value) => value + 1);
     };
     window.addEventListener("nexushr-attendance-refresh", refresh);
     return () => window.removeEventListener("nexushr-attendance-refresh", refresh);
@@ -1471,18 +1511,45 @@ function ManagerDashboard() {
             {today?.lunchStartedAt && <p>End lunch before checking out.</p>}
           </section>
           <section className="panel">
-            <h3>My team</h3>
-            {team.length === 0 ? <p>No direct reports are assigned to you.</p> : (
-              <ul>
-                {team.map((member) => (
-                  <li key={member.id}>
-                    {member.fullName} · {member.employeeCode} · {member.designation} · {member.department} · {(() => {
-                      const status = teamAttendance.find((record) => record.employeeId === member.id);
-                      return !status ? "Not checked in" : status.checkOutTime ? `Checked out ${new Date(status.checkOutTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : status.onLunch ? "On lunch" : `Checked in ${status.checkInTime ? new Date(status.checkInTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : ""}`;
-                    })()}
-                  </li>
-                ))}
-              </ul>
+            <h3>My team workspace</h3>
+            <p>Only your assigned direct reports in your company are shown. HR manages leave approvals and payroll amounts.</p>
+            <div className="attendance-actions">
+              {(["team", "attendance", "leave", "payroll", "reports", "notifications"] as const).map((item) => (
+                <button key={item} type="button" className="secondary-button" aria-pressed={section === item}
+                  onClick={() => setSelection({ key: location.key, section: item })}>{item[0].toUpperCase() + item.slice(1)}</button>
+              ))}
+            </div>
+            {section !== "notifications" && (
+              <label>Report month <input type="month" value={month} min="2000-01" max="2100-12"
+                onChange={(event) => { if (event.target.value) setMonth(event.target.value); }} /></label>
+            )}
+            {section === "notifications" ? (
+              <>
+                <h4>My notifications</h4>
+                {notificationError && <p role="alert">{notificationError}</p>}
+                {!notificationError && notifications.length === 0 && <p>No notifications.</p>}
+                <ul>{notifications.map((notice) => <li key={notice.id}>{notice.message}</li>)}</ul>
+              </>
+            ) : reportLoading ? <p>Loading team report...</p> : reportError ? <p role="alert">{reportError}</p> : !report?.members.length ? (
+              <p>No direct reports are assigned to you. Ask HR to set the Reporting Manager for your team.</p>
+            ) : (
+              <>
+                {section === "reports" && <p>Team members: {report.members.length} · Recorded work: {duration(report.members.reduce((sum, member) => sum + member.workedMinutes, 0))} · Extra: {duration(report.members.reduce((sum, member) => sum + member.overtimeMinutes, 0))}</p>}
+                {report.members.map((member) => {
+                  const live = teamAttendance.find((record) => record.employeeId === member.id);
+                  const status = !live ? "Not checked in" : live.checkOutTime ? "Checked out" : live.onLunch ? "On lunch" : "Checked in";
+                  return (
+                    <article key={member.id} className="panel">
+                      <h4>{member.name} · {member.code}</h4>
+                      {section === "team" && <p>{member.department} · {member.designation} · Today: {status} · Month work: {duration(member.workedMinutes)} · Extra: {duration(member.overtimeMinutes)}</p>}
+                      {section === "attendance" && (member.attendance.length === 0 ? <p>No attendance for this month.</p> : <ul>{member.attendance.map((day) => <li key={day.date}>{day.date} · {day.checkIn ? `In ${new Date(day.checkIn).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : "No check-in"} · {day.checkOut ? `Out ${new Date(day.checkOut).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : day.onLunch ? "On lunch" : "Open"} · Work {duration(day.workedMinutes)} · Extra {duration(day.overtimeMinutes)}</li>)}</ul>)}
+                      {section === "leave" && (member.leave.length === 0 ? <p>No leave in this month.</p> : <ul>{member.leave.map((leave, index) => <li key={`${leave.startDate}-${leave.endDate}-${index}`}>{leave.startDate} – {leave.endDate} · {leave.type || "Leave"}{leave.halfDay ? " · Half day" : ""} · {leave.status} (HR approval)</li>)}</ul>)}
+                      {section === "payroll" && <p>Payroll status: {member.payrollStatus.replaceAll("_", " ")} · Work: {duration(member.workedMinutes)} · Extra: {duration(member.overtimeMinutes)}. Salary amounts are private.</p>}
+                      {section === "reports" && <p>Recorded work: {duration(member.workedMinutes)} · Extra: {duration(member.overtimeMinutes)} · Attendance days: {member.attendance.filter((day) => day.checkIn).length} · Leave requests: {member.leave.length}</p>}
+                    </article>
+                  );
+                })}
+              </>
             )}
           </section>
         </>

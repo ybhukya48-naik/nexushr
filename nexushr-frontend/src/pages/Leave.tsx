@@ -40,7 +40,7 @@ export default function Leave() {
 
   const role = localStorage.getItem("nexushr_role") || "HR";
 
-  const isEmployee = role === "EMPLOYEE";
+  const isEmployee = role === "EMPLOYEE" || role === "MANAGER";
   const companyEmployees = useMemo(
     () =>
       employees.filter(
@@ -75,7 +75,7 @@ export default function Leave() {
     setError("");
 
     try {
-      const leaveData = await getLeaves();
+      const leaveData = await getLeaves(role === "MANAGER");
       setLeaves(leaveData);
       setHolidays(await getHolidays().catch(() => []));
 
@@ -252,8 +252,8 @@ export default function Leave() {
 
       <div className="ux-tabs">
         <button type="button" className={tab === "mine" ? "active" : ""} onClick={() => setTab("mine")}>{isEmployee ? "My leave" : "Leave"}</button>
-        <button type="button" className={tab === "calendar" ? "active" : ""} onClick={() => setTab("calendar")}>Team calendar</button>
-        <button type="button" className={tab === "approvals" ? "active" : ""} onClick={() => setTab("approvals")}>Approvals ({pending.length})</button>
+        {role !== "MANAGER" && <button type="button" className={tab === "calendar" ? "active" : ""} onClick={() => setTab("calendar")}>Team calendar</button>}
+        {role !== "MANAGER" && <button type="button" className={tab === "approvals" ? "active" : ""} onClick={() => setTab("approvals")}>Approvals ({pending.length})</button>}
         <button type="button" className={tab === "holidays" ? "active" : ""} onClick={() => setTab("holidays")}>Holidays</button>
         <button type="button" className={tab === "policy" ? "active" : ""} onClick={() => setTab("policy")}>Policy</button>
         {isEmployee && (
@@ -608,4 +608,3 @@ export default function Leave() {
     </section>
   );
 }
-

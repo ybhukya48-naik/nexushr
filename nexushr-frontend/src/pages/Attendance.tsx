@@ -701,8 +701,8 @@ export interface LeaveBalance {
   remainingDays: number;
 }
 
-export async function getLeaves() {
-  return attendanceRequest<LeaveRequest[]>("/leaves");
+export async function getLeaves(mine = false) {
+  return attendanceRequest<LeaveRequest[]>(mine ? "/leaves/me" : "/leaves");
 }
 
 export async function createLeave(
@@ -808,7 +808,7 @@ export default function Attendance() {
 
   // Management users must explicitly select an employee before using
   // Check In / Check Out. "All employees" remains a view-only filter.
-  const isManagementRole = ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"].includes(currentRole);
+  const isManagementRole = ["ADMIN", "HR", "SUPER_ADMIN"].includes(currentRole);
   const canPunch = currentRole === "EMPLOYEE";
   const siteVisitor = Boolean(currentEmployee?.siteVisitor);
   const officePunchAllowed = isWindowsComputer() || siteVisitor;
@@ -941,7 +941,7 @@ export default function Attendance() {
     setAttendanceLoaded(false);
 
     try {
-      const isManagementRole = ["ADMIN", "SUPER_ADMIN", "HR", "MANAGER"].includes(
+      const isManagementRole = ["ADMIN", "SUPER_ADMIN", "HR"].includes(
         currentRole,
       );
 

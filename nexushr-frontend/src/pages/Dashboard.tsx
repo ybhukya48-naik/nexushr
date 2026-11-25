@@ -236,7 +236,7 @@ export default function Dashboard() {
         setPeople(listedPeople);
         setTodayRows(rows);
         setSelfRecord(current?.id
-          ? rows.find((row) => row.employee?.id === current.id) ?? null
+          ? asList<AttendanceRecord>(attendance).find((row) => row.employee?.id === current.id) ?? null
           : null);
       })
       .catch((err) => {
