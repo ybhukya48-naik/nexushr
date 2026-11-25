@@ -1131,9 +1131,7 @@ public class AttendanceService {
 
             BigDecimal yearlyCtc = payroll.getCtc() != null && payroll.getCtc().signum() > 0
                     ? payroll.getCtc()
-                    : employee.getBaseSalary() != null && employee.getBaseSalary().signum() > 0
-                    ? employee.getBaseSalary().multiply(BigDecimal.valueOf(12))
-                    : BigDecimal.ZERO;
+                    : EmployeeCtc.yearly(employee);
             BigDecimal monthlyCtc = yearlyCtc.divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
             CtcSalarySplit.Parts parts = CtcSalarySplit.split(monthlyCtc, workedMinutes, expectedWorkMinutes);
 

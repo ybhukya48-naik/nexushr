@@ -46,6 +46,17 @@ public class EmployeeService {
         return employeeRepository.findByReportingManagerIdAndActiveTrue(managerId);
     }
 
+    private void applyAnnualCtc(Employee employee, BigDecimal annualCtc) {
+        if (annualCtc != null) {
+            if (annualCtc.signum() <= 0 || annualCtc.scale() > 2 || annualCtc.precision() - annualCtc.scale() > 17) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST,
+                        "Annual CTC must be positive, with at most 17 integer digits and two decimal places");
+            }
+            employee.setAnnualCtc(annualCtc);
+        }
+    }
+
     public Employee findById(Long id) {
         return employeeRepository.findById(id)
                 .orElseThrow(() ->
@@ -131,6 +142,7 @@ public class EmployeeService {
         if (request.getBaseSalary() != null) {
             employee.setBaseSalary(request.getBaseSalary());
         }
+        applyAnnualCtc(employee, request.getAnnualCtc());
 
         employee.setActive(true);
         employee.setLifecycleStatus(
@@ -232,6 +244,7 @@ public class EmployeeService {
                     request.getBaseSalary()
             );
         }
+        applyAnnualCtc(employee, request.getAnnualCtc());
 
         if (request.getActive() != null) {
             employee.setActive(

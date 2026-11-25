@@ -64,6 +64,28 @@ class PayrollServiceTest {
     }
 
     @Test
+    void create_usesStoredAnnualCtcInsteadOfLegacyMonthlySalary() {
+        employee.setAnnualCtc(new BigDecimal("1200000"));
+        PayrollRequest request = new PayrollRequest();
+        request.setEmployeeId(4L);
+        request.setPayMonth("2026-09");
+        AttendanceRecord attendance = new AttendanceRecord();
+        attendance.setAttendanceDate(LocalDate.of(2026, 9, 1));
+        attendance.setCheckInTime(LocalDateTime.of(2026, 9, 1, 9, 0));
+        attendance.setCheckOutTime(LocalDateTime.of(2026, 9, 1, 17, 0));
+        attendance.setWorkMinutes(480);
+        when(employeeRepository.findById(4L)).thenReturn(Optional.of(employee));
+        when(attendanceRepository.findByEmployee_IdAndAttendanceDateBetween(
+                eq(4L), any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of(attendance));
+        when(payrollRepository.save(any(PayrollRecord.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PayrollRecord result = payrollService.create(request);
+        assertThat(result.getCtc()).isEqualByComparingTo("1200000");
+        assertThat(result.getEarnedGross()).isEqualByComparingTo("3846.15");
+        assertThat(payrollService.autoComponents(4L, "2026-09").workedMinutes()).isEqualTo(480);
+    }
+
+    @Test
     void create_annualCtcUsesMonthlyAmountAndRecordedHours() {
         PayrollRequest request = new PayrollRequest();
         request.setEmployeeId(4L);

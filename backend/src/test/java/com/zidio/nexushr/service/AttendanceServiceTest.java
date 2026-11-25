@@ -120,6 +120,26 @@ class AttendanceServiceTest {
     }
 
     @Test
+    void generatePayroll_usesStoredAnnualCtcForNewRecords() {
+        employee.setBaseSalary(new BigDecimal("50000"));
+        employee.setAnnualCtc(new BigDecimal("1200000"));
+        when(employeeRepository.findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus.ACTIVE))
+                .thenReturn(List.of(employee));
+        when(payrollRepository.findByPayMonth("2026-07")).thenReturn(List.of());
+        when(attendanceRepository.findByAttendanceDateBetween(any(), any())).thenReturn(List.of(record));
+        List<PayrollRecord> saved = new java.util.ArrayList<>();
+        when(payrollRepository.saveAll(anyList())).thenAnswer(invocation -> {
+            List<PayrollRecord> batch = invocation.getArgument(0);
+            saved.addAll(batch);
+            return batch;
+        });
+        attendanceService.generatePayrollFromAttendance("2026-07", "");
+        assertThat(saved).hasSize(1);
+        assertThat(saved.get(0).getCtc()).isEqualByComparingTo("1200000");
+        assertThat(saved.get(0).getEarnedGross()).isEqualByComparingTo("3703.70");
+    }
+
+    @Test
     void generatePayroll_preservesAnnualCtcAndDoesNotChangePaidRecords() {
         employee.setBaseSalary(new BigDecimal("1200000"));
         PayrollRecord payroll = new PayrollRecord();

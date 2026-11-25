@@ -516,8 +516,8 @@ export default function Payroll() {
                   <strong>{selectedEmployeeData.designation}</strong>
                 </div>
                 <div>
-                  <span>Stored monthly salary</span>
-                  <strong>{money(selectedEmployeeData.baseSalary)}</strong>
+                  <span>{selectedEmployeeData.annualCtc != null ? "Stored annual CTC" : "Legacy monthly salary"}</span>
+                  <strong>{money(selectedEmployeeData.annualCtc ?? selectedEmployeeData.baseSalary)}</strong>
                 </div>
                 <div>
                   <span>Status</span>
@@ -579,7 +579,7 @@ export default function Payroll() {
                     </strong>
                     <span>
                       {payMonth} runs from the 1st through day {new Date(Number(payMonth.slice(0, 4)), Number(payMonth.slice(5, 7)), 0).getDate()}. Worked {(autoComponents.workedMinutes / 60).toFixed(1)}h of {(autoComponents.expectedWorkMinutes / 60).toFixed(1)}h.
-                      {ctc.trim() ? ` Yearly CTC ${money(Number(ctc))}. One month is ${money(Number(ctc) / 12)}.` : selectedEmployeeData?.baseSalary ? ` Monthly amount ${money(selectedEmployeeData.baseSalary)}.` : " Enter a yearly CTC, or save a base salary, before pay can be calculated."}
+                      {ctc.trim() ? ` Yearly CTC ${money(Number(ctc))}. One month is ${money(Number(ctc) / 12)}.` : selectedEmployeeData?.annualCtc != null ? ` Stored yearly CTC ${money(selectedEmployeeData.annualCtc)}. One month is ${money(selectedEmployeeData.annualCtc / 12)}.` : selectedEmployeeData?.baseSalary ? ` Legacy monthly salary ${money(selectedEmployeeData.baseSalary)}.` : " Enter or save a yearly CTC before pay can be calculated."}
                     </span>
                     <span>
                       Overtime {(autoComponents.overtimeMinutes / 60).toFixed(1)}h is shown separately and is not added to CTC earnings.
@@ -594,7 +594,9 @@ export default function Payroll() {
             const yearly = Number(ctc);
             const monthAmount = ctc.trim() && Number.isFinite(yearly) && yearly > 0
               ? yearly / 12
-              : selectedEmployeeData?.baseSalary || 0;
+              : selectedEmployeeData?.annualCtc != null
+                ? selectedEmployeeData.annualCtc / 12
+                : selectedEmployeeData?.baseSalary || 0;
             const ratio = autoComponents && autoComponents.expectedWorkMinutes > 0
               ? Math.min(1, Math.max(0, autoComponents.workedMinutes / autoComponents.expectedWorkMinutes))
               : 0;
@@ -609,6 +611,7 @@ export default function Payroll() {
                   <label>
                     Annual CTC
                     <input min="0" type="number" step="0.01" value={ctc} onChange={(event) => setCtc(event.target.value)} placeholder="Yearly amount" />
+                    <small>Optional override for this payroll record; edit the employee to change their stored CTC.</small>
                   </label>
                   <label>
                     One month
@@ -958,7 +961,6 @@ export default function Payroll() {
     </section>
   );
 }
-
 
 
 

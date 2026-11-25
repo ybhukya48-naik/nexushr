@@ -96,6 +96,7 @@ export interface EmployeeResponse {
   designation: string;
   joiningDate: string;
   baseSalary: number;
+  annualCtc?: number | null;
   active: boolean;
  gender?: "MALE" | "FEMALE" | "OTHER" | "PREFER_NOT_TO_SAY";
   lifecycleStatus: EmployeeLifecycleStatus;
@@ -118,6 +119,7 @@ export interface EmployeeRequest {
   designation: string;
   joiningDate: string;
   baseSalary: number;
+  annualCtc?: number;
   active: boolean;
   companyCode?: string;
   starterAccount?: boolean;

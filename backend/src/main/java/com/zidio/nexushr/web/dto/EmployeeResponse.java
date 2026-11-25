@@ -19,6 +19,7 @@ public record EmployeeResponse(
         String designation,
         LocalDate joiningDate,
         BigDecimal baseSalary,
+        BigDecimal annualCtc,
         boolean active,
         EmployeeLifecycleStatus lifecycleStatus,
         String companyCode,
@@ -29,6 +30,14 @@ public record EmployeeResponse(
 ) {
 
     public static EmployeeResponse from(Employee employee) {
+        return from(employee, false);
+    }
+
+    public static EmployeeResponse withCompensation(Employee employee) {
+        return from(employee, true);
+    }
+
+    private static EmployeeResponse from(Employee employee, boolean includeCompensation) {
         return new EmployeeResponse(
                 employee.getId(),
                 employee.getEmployeeCode(),
@@ -41,6 +50,7 @@ public record EmployeeResponse(
                 employee.getDesignation(),
                 employee.getJoiningDate(),
                 employee.getBaseSalary(),
+                includeCompensation ? employee.getAnnualCtc() : null,
                 employee.isActive(),
                 employee.getLifecycleStatus(),
                 employee.getCompany() == null ? null : employee.getCompany().getCode(),

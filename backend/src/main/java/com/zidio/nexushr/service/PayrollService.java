@@ -123,7 +123,8 @@ public class PayrollService {
         validateNonNegative("CTC", requestedCtc);
         boolean hasBase = employee.getBaseSalary() != null
                 && employee.getBaseSalary().compareTo(ZERO) > 0;
-        if (!hasBase && requestedCtc.compareTo(ZERO) <= 0 && request.getBasicSalary() == null) {
+        boolean hasAnnualCtc = employee.getAnnualCtc() != null && employee.getAnnualCtc().signum() > 0;
+        if (!hasBase && !hasAnnualCtc && requestedCtc.compareTo(ZERO) <= 0 && request.getBasicSalary() == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Enter a yearly CTC, or save a base salary greater than zero"
@@ -146,11 +147,14 @@ public class PayrollService {
 
         BigDecimal monthlyCtc = requestedCtc.compareTo(ZERO) > 0
                 ? requestedCtc.divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP)
+                : hasAnnualCtc
+                ? EmployeeCtc.monthly(employee)
                 : hasBase
                 ? employee.getBaseSalary()
                 : amount(request.getBasicSalary());
         BigDecimal yearlyCtc = requestedCtc.compareTo(ZERO) > 0
                 ? requestedCtc
+                : hasAnnualCtc ? employee.getAnnualCtc()
                 : monthlyCtc.multiply(BigDecimal.valueOf(12)).setScale(2, RoundingMode.HALF_UP);
 
         PayrollAutoComponentsResponse hours = calculateAutoComponents(
@@ -261,9 +265,7 @@ public class PayrollService {
                         "Employee not found: " + employeeId
                 ));
 
-        BigDecimal monthly = employee.getBaseSalary() == null
-                ? ZERO
-                : employee.getBaseSalary().max(ZERO);
+        BigDecimal monthly = EmployeeCtc.monthly(employee);
 
         return calculateAutoComponents(
                 employee,

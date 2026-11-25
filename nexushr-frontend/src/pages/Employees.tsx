@@ -525,6 +525,7 @@ export default function Employees() {
       designation: employee.designation,
       joiningDate: employee.joiningDate,
       baseSalary: employee.baseSalary,
+      annualCtc: employee.annualCtc ?? undefined,
       active: employee.active,
       companyCode: employee.companyCode || "CYOND",
     });
@@ -623,6 +624,7 @@ export default function Employees() {
           designation: form.designation.trim(),
           joiningDate: new Date().toISOString().slice(0, 10),
           baseSalary: 0,
+          annualCtc: form.annualCtc,
           active: true,
           companyCode,
           starterAccount: true,
@@ -950,21 +952,23 @@ export default function Employees() {
               />
             </label>}
 
-            {editingEmployeeId !== null && <label>
-              Base Salary
+            <label>
+              Annual CTC
               <input
-                required
-                min="0"
+                min="0.01"
+                step="0.01"
                 type="number"
-                value={form.baseSalary}
+                value={form.annualCtc ?? ""}
+                placeholder="Total yearly CTC"
                 onChange={(event) =>
                   updateForm(
-                    "baseSalary",
-                    Number(event.target.value),
+                    "annualCtc",
+                    event.target.value ? Number(event.target.value) : undefined,
                   )
                 }
               />
-            </label>}
+              <small>Yearly amount; monthly CTC is this value divided by 12. Leave blank to retain the existing salary.</small>
+            </label>
 
             {editingEmployeeId !== null && <label>
               Active

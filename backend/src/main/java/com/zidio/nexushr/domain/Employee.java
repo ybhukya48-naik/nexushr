@@ -59,6 +59,18 @@ public class Employee {
     @Column(nullable = false)
     private BigDecimal baseSalary;
 
+    @JsonIgnore
+    @Column(name = "annual_ctc", precision = 19, scale = 2)
+    private BigDecimal annualCtc;
+
+    public BigDecimal getAnnualCtc() {
+        return annualCtc;
+    }
+
+    public void setAnnualCtc(BigDecimal annualCtc) {
+        this.annualCtc = annualCtc;
+    }
+
     @Column(nullable = false)
     private boolean active = true;
 

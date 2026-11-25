@@ -83,6 +83,25 @@ class EmployeeServiceTest {
     }
 
     @Test
+    void create_storesAnnualCtcWithoutChangingLegacyMonthlySalary() {
+        request.setAnnualCtc(new BigDecimal("1200000"));
+        when(passwordEncoder.encode("Password@123")).thenReturn("encoded");
+        when(employeeRepository.save(any(Employee.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        Employee saved = employeeService.create(request);
+        assertThat(saved.getAnnualCtc()).isEqualByComparingTo("1200000");
+        assertThat(saved.getBaseSalary()).isEqualByComparingTo("50000");
+    }
+
+    @Test
+    void create_rejectsInvalidAnnualCtc() {
+        request.setAnnualCtc(new BigDecimal("-1"));
+        assertThatThrownBy(() -> employeeService.create(request))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("Annual CTC must be positive");
+        verify(employeeRepository, never()).save(any(Employee.class));
+    }
+
+    @Test
     void findAll_returnsList() {
 
         when(employeeRepository.findAll())
@@ -296,6 +315,19 @@ class EmployeeServiceTest {
     }
 
     @Test
+    void update_preservesAnnualCtcWhenOmittedAndUpdatesWhenProvided() {
+        employee.setAnnualCtc(new BigDecimal("1200000"));
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(employee));
+        when(employeeRepository.save(employee)).thenReturn(employee);
+        EmployeeRequest update = new EmployeeRequest();
+        employeeService.update(1L, update);
+        assertThat(employee.getAnnualCtc()).isEqualByComparingTo("1200000");
+        update.setAnnualCtc(new BigDecimal("1500000"));
+        employeeService.update(1L, update);
+        assertThat(employee.getAnnualCtc()).isEqualByComparingTo("1500000");
+    }
+
+    @Test
     void update_updatesEmployee() {
 
         when(employeeRepository.findById(1L))
@@ -393,4 +425,3 @@ class EmployeeServiceTest {
         verify(entityManager).clear();
     }
 }
-

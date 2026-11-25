@@ -36,7 +36,7 @@ public class EmployeeController {
         return employeeService.findAll()
                 .stream()
                 .filter(employee -> authorizationService.canSeeEmployee(employee, authentication))
-                .map(EmployeeResponse::from)
+                .map(employee -> employeeResponse(employee, authentication))
                 .toList();
     }
 
@@ -56,9 +56,7 @@ public class EmployeeController {
             );
         }
 
-        return EmployeeResponse.from(
-                employeeService.findById(employeeId)
-        );
+        return employeeResponse(employeeService.findById(employeeId), authentication);
     }
 
     public record TeamMember(Long id, String employeeCode, String fullName, String department, String designation) {}
@@ -80,7 +78,7 @@ public class EmployeeController {
         Long employeeId = requireSelf(authentication);
         String password = body == null ? null : body.get("password");
         try {
-            return EmployeeResponse.from(employeeService.changeOwnPassword(employeeId, password));
+            return employeeResponse(employeeService.changeOwnPassword(employeeId, password), authentication);
         } catch (IllegalArgumentException ex) {
             throw new org.springframework.web.server.ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -98,7 +96,7 @@ public class EmployeeController {
         String phone = body == null ? null : body.get("phone");
         String email = body == null ? null : body.get("email");
         try {
-            return EmployeeResponse.from(employeeService.completeOwnProfile(employeeId, fullName, phone, email));
+            return employeeResponse(employeeService.completeOwnProfile(employeeId, fullName, phone, email), authentication);
         } catch (IllegalArgumentException ex) {
             throw new org.springframework.web.server.ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -141,13 +139,13 @@ public class EmployeeController {
             Authentication authentication) throws IOException {
 
         Long employeeId = requireSelf(authentication);
-        return EmployeeResponse.from(savePhoto(employeeId, file));
+        return employeeResponse(savePhoto(employeeId, file), authentication);
     }
 
     @DeleteMapping("/me/photo")
     public EmployeeResponse deleteMyPhoto(Authentication authentication) {
         Long employeeId = requireSelf(authentication);
-        return EmployeeResponse.from(employeeService.clearProfilePhoto(employeeId));
+        return employeeResponse(employeeService.clearProfilePhoto(employeeId), authentication);
     }
 
     @GetMapping("/{id}/photo")
@@ -183,7 +181,7 @@ public class EmployeeController {
                     HttpStatus.NOT_FOUND,
                     "Employee not found");
         }
-        return EmployeeResponse.from(savePhoto(id, file));
+        return EmployeeResponse.withCompensation(savePhoto(id, file));
     }
 
     @DeleteMapping("/{id}/photo")
@@ -197,7 +195,7 @@ public class EmployeeController {
                     HttpStatus.NOT_FOUND,
                     "Employee not found");
         }
-        return EmployeeResponse.from(employeeService.clearProfilePhoto(id));
+        return EmployeeResponse.withCompensation(employeeService.clearProfilePhoto(id));
     }
 
     @GetMapping("/{id}")
@@ -210,7 +208,7 @@ public class EmployeeController {
                     HttpStatus.NOT_FOUND,
                     "Employee not found");
         }
-        return EmployeeResponse.from(employee);
+        return employeeResponse(employee, authentication);
     }
 
     @PostMapping
@@ -231,7 +229,7 @@ public class EmployeeController {
 
         Employee created = employeeService.create(request);
 
-        return EmployeeResponse.from(created);
+        return EmployeeResponse.withCompensation(created);
     }
 
     @PutMapping("/{id}")
@@ -253,7 +251,14 @@ public class EmployeeController {
 
         Employee updated = employeeService.update(id, request);
 
-        return EmployeeResponse.from(updated);
+        return EmployeeResponse.withCompensation(updated);
+    }
+
+    private EmployeeResponse employeeResponse(Employee employee, Authentication authentication) {
+        boolean maySeeCtc = authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_HR".equals(a.getAuthority()) || "ROLE_ADMIN".equals(a.getAuthority())
+                        || "ROLE_SUPER_ADMIN".equals(a.getAuthority()));
+        return maySeeCtc ? EmployeeResponse.withCompensation(employee) : EmployeeResponse.from(employee);
     }
 
     @DeleteMapping("/{id}")

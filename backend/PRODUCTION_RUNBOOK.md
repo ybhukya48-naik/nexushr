@@ -1,5 +1,7 @@
 # NexusHR Production Runbook
 
+> Hosting details below are historical and must be reverified before deployment. As of November 2026, `hr.cyond.com` resolves to an nginx server and the repository's CD workflow does not deploy to it. Do not apply attendance or payroll migrations without a verified backup and rollback plan.
+
 ## 1) Architecture (Current)
 - Frontend host: Vercel
 - Frontend domain: https://hr.cyond.com
@@ -36,7 +38,7 @@ Optional pool tuning:
 - Office sessions with no app heartbeat for 30 minutes are checked out at the last heartbeat. Browser closure, sleep, and loss of connectivity cannot be distinguished; keep the app open and connected. Site/selfie attendance is exempt and retains its separate checkout policy.
 - Lunch pauses heartbeat-based checkout. Resume lunch explicitly; checking out while on lunch ends the break.
 - Historical attendance keeps its previous calculation policy. Migration V43 adds the new fields without converting existing records.
-- Annual payroll CTC is divided by 12. Existing employee base-salary values are treated as monthly because their historical meaning is not known.
+- Annual employee CTC is stored separately by migration V44 and divided by 12. Existing employee base-salary values are not migrated and remain a monthly fallback until HR sets an annual CTC. A payroll CTC entry overrides the employee value for that payroll record only; previously saved payroll snapshots are retained during bulk recalculation.
 
 ## 4) Vercel Settings
 - Production domain mapped: `hr.cyond.com`
