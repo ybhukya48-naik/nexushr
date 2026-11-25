@@ -1,6 +1,7 @@
 package com.zidio.nexushr.service;
 
 import com.zidio.nexushr.domain.Employee;
+import com.zidio.nexushr.domain.AttendanceRecord;
 import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
 import com.zidio.nexushr.domain.PayrollRecord;
 import com.zidio.nexushr.domain.PayrollStatus;
@@ -18,6 +19,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -58,6 +61,33 @@ class PayrollServiceTest {
         employee.setBaseSalary(new BigDecimal("110000"));
         employee.setActive(true);
         employee.setLifecycleStatus(EmployeeLifecycleStatus.ACTIVE);
+    }
+
+    @Test
+    void create_annualCtcUsesMonthlyAmountAndRecordedHours() {
+        PayrollRequest request = new PayrollRequest();
+        request.setEmployeeId(4L);
+        request.setPayMonth("2026-09");
+        request.setCtc(new BigDecimal("1200000"));
+
+        AttendanceRecord attendance = new AttendanceRecord();
+        attendance.setAttendanceDate(LocalDate.of(2026, 9, 1));
+        attendance.setCheckInTime(LocalDateTime.of(2026, 9, 1, 9, 0));
+        attendance.setCheckOutTime(LocalDateTime.of(2026, 9, 1, 18, 0));
+        attendance.setWorkMinutes(480);
+        attendance.setOvertimeMinutes(60);
+        when(employeeRepository.findById(4L)).thenReturn(Optional.of(employee));
+        when(attendanceRepository.findByEmployee_IdAndAttendanceDateBetween(
+                eq(4L), any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of(attendance));
+        when(payrollRepository.save(any(PayrollRecord.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PayrollRecord result = payrollService.create(request);
+        assertThat(result.getCtc()).isEqualByComparingTo("1200000");
+        assertThat(result.getExpectedWorkMinutes()).isEqualTo(26 * 480);
+        assertThat(result.getWorkedMinutes()).isEqualTo(480);
+        assertThat(result.getEarnedGross()).isEqualByComparingTo("3846.15");
+        assertThat(result.getOvertimeMinutes()).isEqualTo(60);
+        assertThat(result.getOvertime()).isEqualByComparingTo("0");
     }
 
     @Test

@@ -1,6 +1,6 @@
 import { isCompanyMatch } from "../utils/company";
 import { getWorkspaceCompany } from "../utils/workspace";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   createPayroll,
@@ -77,6 +77,7 @@ export default function Payroll() {
   const [autoComponents, setAutoComponents] =
     useState<PayrollAutoComponentsResponse | null>(null);
   const [autoComponentsLoading, setAutoComponentsLoading] = useState(false);
+  const autoRequest = useRef(0);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -169,8 +170,10 @@ export default function Payroll() {
     employeeId: string,
     targetMonth: string,
   ) {
+    const requestId = ++autoRequest.current;
     if (!isManagementRole || !employeeId) {
       setAutoComponents(null);
+      setAutoComponentsLoading(false);
       return;
     }
 
@@ -182,16 +185,19 @@ export default function Payroll() {
         targetMonth,
       );
 
+      if (requestId !== autoRequest.current) return;
       setAutoComponents(components);
 
       if (autoFromAttendance) {
         setOvertime("");
       }
     } catch (err) {
+      if (requestId !== autoRequest.current) return;
       console.error("Auto payroll component load failed:", err);
       setAutoComponents(null);
+      setError(err instanceof Error ? err.message : "Unable to calculate attendance.");
     } finally {
-      setAutoComponentsLoading(false);
+      if (requestId === autoRequest.current) setAutoComponentsLoading(false);
     }
   }
 
@@ -216,10 +222,6 @@ export default function Payroll() {
   }, []);
 
   useEffect(() => {
-    if (!isManagementRole || !selectedEmployee) {
-      return;
-    }
-
     void loadAutoComponents(selectedEmployee, payMonth);
   }, [selectedEmployee, payMonth, isManagementRole, autoFromAttendance]);
 
@@ -456,7 +458,7 @@ export default function Payroll() {
             <div>
               <strong>Generate from working hours</strong>
               <span>
-                Adds check-in to check-out for every day in {payMonth}, including a day that is still open. The monthly CTC amount is paid in proportion to those hours. PF, insurance, and professional tax stay on the record.
+                Uses completed attendance days in {payMonth}. The monthly CTC amount is paid in proportion to those hours. Paid records are not changed.
               </span>
             </div>
             <button
@@ -487,7 +489,7 @@ export default function Payroll() {
                 required
                 value={selectedEmployee}
                 onChange={(event) =>
-                  setSelectedEmployee(event.target.value)
+                  { autoRequest.current++; setAutoComponents(null); setCtc(""); setSelectedEmployee(event.target.value); }
                 }
               >
                 <option value="">Choose an employee</option>
@@ -514,7 +516,7 @@ export default function Payroll() {
                   <strong>{selectedEmployeeData.designation}</strong>
                 </div>
                 <div>
-                  <span>Base Salary</span>
+                  <span>Stored monthly salary</span>
                   <strong>{money(selectedEmployeeData.baseSalary)}</strong>
                 </div>
                 <div>
@@ -535,7 +537,7 @@ export default function Payroll() {
                 required
                 type="month"
                 value={payMonth}
-                onChange={(event) => setPayMonth(event.target.value)}
+                onChange={(event) => { autoRequest.current++; setAutoComponents(null); setPayMonth(event.target.value); }}
               />
             </label>
 
@@ -550,7 +552,7 @@ export default function Payroll() {
                   }
                 />
                 <span>
-                  Check-in and check-out fill Overtime and Leave Deduction below.
+                  Completed attendance determines earnings. Overtime hours are shown separately.
                 </span>
               </div>
             </label>
@@ -580,7 +582,7 @@ export default function Payroll() {
                       {ctc.trim() ? ` Yearly CTC ${money(Number(ctc))}. One month is ${money(Number(ctc) / 12)}.` : selectedEmployeeData?.baseSalary ? ` Monthly amount ${money(selectedEmployeeData.baseSalary)}.` : " Enter a yearly CTC, or save a base salary, before pay can be calculated."}
                     </span>
                     <span>
-                      Earnings use these hours. Extra time after the day is not added to the CTC.
+                      Overtime {(autoComponents.overtimeMinutes / 60).toFixed(1)}h is shown separately and is not added to CTC earnings.
                     </span>
                   </div>
                 )}
@@ -590,7 +592,13 @@ export default function Payroll() {
           </div>
           {(() => {
             const yearly = Number(ctc);
-            const monthAmount = ctc.trim() && Number.isFinite(yearly) && yearly > 0 ? yearly / 12 : 0;
+            const monthAmount = ctc.trim() && Number.isFinite(yearly) && yearly > 0
+              ? yearly / 12
+              : selectedEmployeeData?.baseSalary || 0;
+            const ratio = autoComponents && autoComponents.expectedWorkMinutes > 0
+              ? Math.min(1, Math.max(0, autoComponents.workedMinutes / autoComponents.expectedWorkMinutes))
+              : 0;
+            const earned = monthAmount * ratio;
             const incentiveAmount = Number(bonus) || 0;
             const deductionAmount = (Number(pf) || 0) + (Number(insurance) || 0) + (Number(professionalTax) || 0) + (Number(tds) || 0) + (Number(otherDeductions) || 0);
             const shown = (amount: number) => (monthAmount > 0 || amount > 0 ? money(amount) : "₹0.00");
@@ -599,7 +607,7 @@ export default function Payroll() {
                 <section>
                   <h3>Gross</h3>
                   <label>
-                    CTC
+                    Annual CTC
                     <input min="0" type="number" step="0.01" value={ctc} onChange={(event) => setCtc(event.target.value)} placeholder="Yearly amount" />
                   </label>
                   <label>
@@ -609,16 +617,16 @@ export default function Payroll() {
                 </section>
                 <section>
                   <h3>Earnings</h3>
-                  <label>Basic<input readOnly value={shown(monthAmount * 0.61)} /></label>
-                  <label>HRA<input readOnly value={shown(monthAmount * 0.3)} /></label>
-                  <label>Conveyance<input readOnly value={shown(monthAmount * 0.036)} /></label>
-                  <label>Medical<input readOnly value={shown(monthAmount * 0.028)} /></label>
-                  <label>Other allowance<input readOnly value={shown(monthAmount * 0.026)} /></label>
+                  <label>Basic<input readOnly value={shown(earned * 0.61)} /></label>
+                  <label>HRA<input readOnly value={shown(earned * 0.3)} /></label>
+                  <label>Conveyance<input readOnly value={shown(earned * 0.036)} /></label>
+                  <label>Medical<input readOnly value={shown(earned * 0.028)} /></label>
+                  <label>Other allowance<input readOnly value={shown(earned * 0.026)} /></label>
                   <label>
                     Incentives
                     <input min="0" type="number" step="0.01" value={bonus} onChange={(event) => setBonus(event.target.value)} placeholder="Extra, not part of the CTC" />
                   </label>
-                  <label>Total earnings<input readOnly value={shown(monthAmount + incentiveAmount)} /></label>
+                  <label>Total earnings<input readOnly value={shown(earned + incentiveAmount)} /></label>
                 </section>
                 <section>
                   <h3>Deductions</h3>
@@ -950,9 +958,6 @@ export default function Payroll() {
     </section>
   );
 }
-
-
-
 
 
 

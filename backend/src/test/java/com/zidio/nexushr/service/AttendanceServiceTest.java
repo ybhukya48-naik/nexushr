@@ -2,8 +2,12 @@ package com.zidio.nexushr.service;
 
 import com.zidio.nexushr.domain.AttendanceRecord;
 import com.zidio.nexushr.domain.Employee;
+import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
+import com.zidio.nexushr.domain.PayrollRecord;
+import com.zidio.nexushr.domain.PayrollStatus;
 import com.zidio.nexushr.repository.AttendanceRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
+import com.zidio.nexushr.repository.PayrollRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,6 +32,9 @@ class AttendanceServiceTest {
 
     @Mock
     private EmployeeRepository employeeRepository;
+
+    @Mock
+    private PayrollRepository payrollRepository;
 
     @InjectMocks
     private AttendanceService attendanceService;
@@ -59,6 +67,32 @@ class AttendanceServiceTest {
         );
 
         record.setWorkMinutes(480);
+    }
+
+    @Test
+    void generatePayroll_preservesAnnualCtcAndDoesNotChangePaidRecords() {
+        employee.setBaseSalary(new BigDecimal("1200000"));
+        PayrollRecord payroll = new PayrollRecord();
+        payroll.setEmployee(employee);
+        payroll.setPayMonth("2026-07");
+        payroll.setCtc(new BigDecimal("1200000"));
+        payroll.setStatus(PayrollStatus.GENERATED);
+        when(employeeRepository.findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus.ACTIVE))
+                .thenReturn(List.of(employee));
+        when(payrollRepository.findByPayMonth("2026-07")).thenReturn(List.of(payroll));
+        when(attendanceRepository.findByAttendanceDateBetween(any(), any())).thenReturn(List.of(record));
+
+        attendanceService.generatePayrollFromAttendance("2026-07", "");
+
+        assertThat(payroll.getCtc()).isEqualByComparingTo("1200000");
+        assertThat(payroll.getEarnedGross()).isEqualByComparingTo("3703.70");
+        verify(payrollRepository).saveAll(anyList());
+
+        reset(payrollRepository);
+        payroll.setStatus(PayrollStatus.PAID);
+        when(payrollRepository.findByPayMonth("2026-07")).thenReturn(List.of(payroll));
+        attendanceService.generatePayrollFromAttendance("2026-07", "");
+        verify(payrollRepository, never()).saveAll(anyList());
     }
 
     @Test

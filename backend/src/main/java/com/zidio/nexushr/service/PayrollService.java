@@ -234,7 +234,7 @@ public class PayrollService {
         payrollRecord.setExpectedWorkMinutes(hours.expectedWorkMinutes());
         payrollRecord.setWorkedMinutes(hours.workedMinutes());
         payrollRecord.setShortfallMinutes(hours.shortfallMinutes());
-        payrollRecord.setOvertimeMinutes(0);
+        payrollRecord.setOvertimeMinutes(hours.overtimeMinutes());
 
         payrollRecord.setStatus(PayrollStatus.GENERATED);
 
@@ -573,4 +573,3 @@ public class PayrollService {
         return code == null || code.isBlank() || code.equalsIgnoreCase(companyCode);
     }
 }
-

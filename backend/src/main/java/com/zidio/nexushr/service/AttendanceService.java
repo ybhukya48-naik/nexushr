@@ -1046,13 +1046,10 @@ public class AttendanceService {
 
             int shortfallMinutes = HoursPayPolicy.deductibleShortfall(expectedWorkMinutes, workedMinutes);
 
-            BigDecimal baseSalary = employee.getBaseSalary() != null && employee.getBaseSalary().compareTo(BigDecimal.ZERO) > 0
-                    ? employee.getBaseSalary()
-                    : BigDecimal.ZERO;
-
-            CtcSalarySplit.Parts parts = CtcSalarySplit.split(baseSalary, workedMinutes, expectedWorkMinutes);
-
             PayrollRecord payroll = existingPayrollMap.get(employee.getId());
+            if (payroll != null && payroll.getStatus() == PayrollStatus.PAID) {
+                continue;
+            }
             if (payroll == null) {
                 payroll = new PayrollRecord();
                 payroll.setEmployee(employee);
@@ -1061,9 +1058,17 @@ public class AttendanceService {
                 existingPayrollMap.put(employee.getId(), payroll);
             }
 
+            BigDecimal yearlyCtc = payroll.getCtc() != null && payroll.getCtc().signum() > 0
+                    ? payroll.getCtc()
+                    : employee.getBaseSalary() != null && employee.getBaseSalary().signum() > 0
+                    ? employee.getBaseSalary().multiply(BigDecimal.valueOf(12))
+                    : BigDecimal.ZERO;
+            BigDecimal monthlyCtc = yearlyCtc.divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
+            CtcSalarySplit.Parts parts = CtcSalarySplit.split(monthlyCtc, workedMinutes, expectedWorkMinutes);
+
             BigDecimal incentives = payroll.getBonus() == null ? BigDecimal.ZERO : payroll.getBonus();
             BigDecimal grossSalary = parts.earnings().add(incentives).setScale(2, RoundingMode.HALF_UP);
-            payroll.setCtc(baseSalary.multiply(BigDecimal.valueOf(12)));
+            payroll.setCtc(yearlyCtc);
             payroll.setGrossSalary(grossSalary);
             payroll.setBasicSalary(parts.basic());
             payroll.setHra(parts.hra());
