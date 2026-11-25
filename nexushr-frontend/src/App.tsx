@@ -11,6 +11,7 @@ import {
 } from "react-router-dom";
 import {
   getCurrentEmployee,
+  getMyTeam,
   getEmployeeNotifications,
   downloadPayslipPdf,
   getEmployeePayroll,
@@ -32,6 +33,7 @@ import {
   websiteSessionActive,
   type AiWorkforceDashboardResponse,
   type EmployeeResponse,
+  type TeamMember,
   type NotificationResponse,
 } from "./api";
 import {
@@ -734,6 +736,8 @@ function AppRoutes() {
                 element={
                   signedRole === "EMPLOYEE" ? (
                     <EmployeeDashboard />
+                  ) : signedRole === "MANAGER" ? (
+                    <ManagerDashboard />
                   ) : signedRole === "ADMIN" || signedRole === "SUPER_ADMIN" ? (
                     <AdminDashboard />
                   ) : (
@@ -1379,6 +1383,89 @@ function formatTimer(totalSeconds: number) {
   const minutes = Math.floor((safe % 3600) / 60);
   const seconds = safe % 60;
   return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function ManagerDashboard() {
+  const [employee, setEmployee] = useState<EmployeeResponse | null>(null);
+  const [team, setTeam] = useState<TeamMember[]>([]);
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const [me, members] = await Promise.all([getCurrentEmployee(), getMyTeam()]);
+        const history = await getEmployeeAttendance(me.id);
+        if (active) {
+          setEmployee(me);
+          setTeam(members);
+          setRecords(history);
+        }
+      } catch (err) {
+        if (active) setError(err instanceof Error ? err.message : "Unable to load your dashboard.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    void load();
+    return () => { active = false; };
+  }, []);
+
+  const today = records.find((record) => record.attendanceDate?.slice(0, 10) === todayKey());
+  const checkedIn = Boolean(today?.checkInTime && !today.checkOutTime);
+
+  async function punch(kind: "in" | "out") {
+    if (!employee) return;
+    setBusy(true);
+    setError("");
+    try {
+      await (kind === "in" ? officeCheckIn() : checkOut());
+      setRecords(await getEmployeeAttendance(employee.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save attendance.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="dashboard-page">
+      <div className="dashboard-hero">
+        <div className="dashboard-hero-copy">
+          <p className="eyebrow">MANAGER DASHBOARD</p>
+          <h2>Welcome{employee ? `, ${employee.fullName}` : ""}</h2>
+        </div>
+      </div>
+      {error && <p role="alert" className="page-alert">{error}</p>}
+      {loading ? <p>Loading dashboard...</p> : (
+        <>
+          <section className="panel">
+            <h3>My attendance</h3>
+            <p>{!today?.checkInTime ? "Not checked in" : checkedIn ? "Checked in" : "Checked out"}</p>
+            <div className="attendance-actions">
+              <button type="button" className="primary-button" disabled={busy || checkedIn || !employee} onClick={() => void punch("in")}>Check in</button>
+              <button type="button" className="secondary-button" disabled={busy || !checkedIn || !employee} onClick={() => void punch("out")}>Check out</button>
+            </div>
+          </section>
+          <section className="panel">
+            <h3>My team</h3>
+            {team.length === 0 ? <p>No direct reports are assigned to you.</p> : (
+              <ul>
+                {team.map((member) => (
+                  <li key={member.id}>
+                    {member.fullName} · {member.employeeCode} · {member.designation} · {member.department}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </>
+      )}
+    </div>
+  );
 }
 
 function EmployeeDashboard() {
@@ -2132,8 +2219,6 @@ export default function App() {
     </PageGuard>
   );
 }
-
-
 
 
 

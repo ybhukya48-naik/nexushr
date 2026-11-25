@@ -523,6 +523,18 @@ export function getEmployee(id: number) {
   return request<EmployeeResponse>(`/employees/${id}`);
 }
 
+export interface TeamMember {
+  id: number;
+  employeeCode: string;
+  fullName: string;
+  department: string;
+  designation: string;
+}
+
+export function getMyTeam() {
+  return request<TeamMember[]>("/employees/me/team");
+}
+
 export function defaultEmployeePassword(company?: string) {
   return company === "GORLE" ? "Gorle@1234" : "Cyond@1234";
 }

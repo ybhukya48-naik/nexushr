@@ -51,6 +51,31 @@ class EmployeeControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "MANAGER")
+    void myTeam_returnsOnlyDirectReportsWithoutSalary() throws Exception {
+        Employee member = new Employee();
+        member.setId(2L);
+        member.setEmployeeCode("EMP002");
+        member.setFullName("Bob");
+        member.setDepartment("TEAM-A");
+        member.setDesignation("Engineer");
+        when(authorizationService.authenticatedEmployeeId(any())).thenReturn(1L);
+        when(employeeService.findDirectReports(1L)).thenReturn(List.of(member));
+
+        mockMvc.perform(get("/api/v1/employees/me/team"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].fullName").value("Bob"))
+                .andExpect(jsonPath("$[0].baseSalary").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(roles = "EMPLOYEE")
+    void myTeam_rejectsNonManagers() throws Exception {
+        mockMvc.perform(get("/api/v1/employees/me/team"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @WithMockUser(roles = "HR")
     void list_returnsEmployeeList() throws Exception {
 

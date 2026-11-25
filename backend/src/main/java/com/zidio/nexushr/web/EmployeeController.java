@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import com.zidio.nexushr.web.dto.EmployeeRequest;
@@ -58,6 +59,18 @@ public class EmployeeController {
         return EmployeeResponse.from(
                 employeeService.findById(employeeId)
         );
+    }
+
+    public record TeamMember(Long id, String employeeCode, String fullName, String department, String designation) {}
+
+    @GetMapping("/me/team")
+    @PreAuthorize("hasRole('MANAGER')")
+    public List<TeamMember> myTeam(Authentication authentication) {
+        Long managerId = requireSelf(authentication);
+        return employeeService.findDirectReports(managerId).stream()
+                .map(employee -> new TeamMember(employee.getId(), employee.getEmployeeCode(),
+                        employee.getFullName(), employee.getDepartment(), employee.getDesignation()))
+                .toList();
     }
 
     @PostMapping("/me/password")

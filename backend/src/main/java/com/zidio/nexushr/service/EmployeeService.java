@@ -42,6 +42,10 @@ public class EmployeeService {
         return employeeRepository.findAll();
     }
 
+    public List<Employee> findDirectReports(Long managerId) {
+        return employeeRepository.findByReportingManagerIdAndActiveTrue(managerId);
+    }
+
     public Employee findById(Long id) {
         return employeeRepository.findById(id)
                 .orElseThrow(() ->
