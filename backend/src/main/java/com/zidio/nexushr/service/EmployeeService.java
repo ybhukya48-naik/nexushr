@@ -140,6 +140,16 @@ public class EmployeeService {
             employee.setSiteVisitor(request.getSiteVisitor());
         }
 
+        if (request.getReportingManagerId() != null) {
+            Employee manager = findById(request.getReportingManagerId());
+            if (!manager.isActive() || manager.getRoleType() != RoleType.MANAGER
+                    || manager.getCompany() == null
+                    || !companyCode.equalsIgnoreCase(manager.getCompany().getCode())) {
+                throw new IllegalArgumentException("Reporting manager must be an active manager in the same company");
+            }
+            employee.setReportingManagerId(manager.getId());
+        }
+
         return employeeRepository.save(employee);
     }
 

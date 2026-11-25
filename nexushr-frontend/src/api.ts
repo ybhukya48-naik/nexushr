@@ -121,6 +121,7 @@ export interface EmployeeRequest {
   active: boolean;
   companyCode?: string;
   starterAccount?: boolean;
+  reportingManagerId?: number;
 }
 
 export interface EmployeeLifecycleRequest {

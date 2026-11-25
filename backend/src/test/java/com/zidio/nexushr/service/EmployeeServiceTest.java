@@ -152,6 +152,40 @@ class EmployeeServiceTest {
     }
 
     @Test
+    void create_assignsActiveManagerInSameCompany() {
+        Employee manager = new Employee();
+        manager.setId(5L);
+        manager.setRoleType(RoleType.MANAGER);
+        Company company = new Company();
+        company.setCode("CYOND");
+        manager.setCompany(company);
+        manager.setActive(true);
+        request.setReportingManagerId(5L);
+        when(employeeRepository.findById(5L)).thenReturn(Optional.of(manager));
+        when(passwordEncoder.encode("Password@123")).thenReturn("hash");
+        when(employeeRepository.save(any(Employee.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        assertThat(employeeService.create(request).getReportingManagerId()).isEqualTo(5L);
+    }
+
+    @Test
+    void create_rejectsManagerFromAnotherCompany() {
+        Employee manager = new Employee();
+        manager.setId(5L);
+        manager.setRoleType(RoleType.MANAGER);
+        Company company = new Company();
+        company.setCode("GORLE");
+        manager.setCompany(company);
+        manager.setActive(true);
+        request.setReportingManagerId(5L);
+        when(employeeRepository.findById(5L)).thenReturn(Optional.of(manager));
+        when(passwordEncoder.encode("Password@123")).thenReturn("hash");
+        assertThatThrownBy(() -> employeeService.create(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("same company");
+        verify(employeeRepository, never()).save(any());
+    }
+
+    @Test
     void create_withoutPassword_letsTheEmployeeChooseOneLater() {
 
         request.setPassword(null);
@@ -359,5 +393,4 @@ class EmployeeServiceTest {
         verify(entityManager).clear();
     }
 }
-
 

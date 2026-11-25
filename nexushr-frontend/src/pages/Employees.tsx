@@ -495,9 +495,9 @@ export default function Employees() {
   const pageRows = directoryRows.slice((safePage - 1) * pageSize, safePage * pageSize);
   const shownRows = listOpen ? pageRows : pageRows.slice(0, 6);
 
-  function updateForm(
-    field: keyof EmployeeRequest,
-    value: string | number | boolean,
+  function updateForm<K extends keyof EmployeeRequest>(
+    field: K,
+    value: EmployeeRequest[K],
   ) {
     setForm((current) => ({
       ...current,
@@ -619,13 +619,14 @@ export default function Employees() {
           accountNumber: "",
           password: defaultEmployeePassword(companyCode),
           roleType: "EMPLOYEE",
-          department: form.designation.trim(),
+          department: form.department.trim() || form.designation.trim(),
           designation: form.designation.trim(),
           joiningDate: new Date().toISOString().slice(0, 10),
           baseSalary: 0,
           active: true,
           companyCode,
           starterAccount: true,
+          reportingManagerId: form.reportingManagerId,
         };
 
     try {
@@ -890,18 +891,34 @@ export default function Employees() {
               </select>
             </label>}
 
-            {editingEmployeeId !== null && <label>
-              Department
+            <label>
+              Team or department
               <input
-                required
+                list="employee-team-options"
+                required={editingEmployeeId !== null}
                 value={form.department}
-                onChange={(event) =>
-                  updateForm(
-                    "department",
-                    event.target.value,
-                  )
-                }
+                onChange={(event) => updateForm("department", event.target.value)}
+                placeholder="Select or enter a team"
               />
+              <datalist id="employee-team-options">
+                {TEAM_ORDER.map((team) => <option key={team} value={team} />)}
+              </datalist>
+            </label>
+
+            {editingEmployeeId === null && <label>
+              Reporting manager
+              <select
+                value={form.reportingManagerId ?? ""}
+                onChange={(event) => updateForm("reportingManagerId", event.target.value ? Number(event.target.value) : undefined)}
+              >
+                <option value="">Not assigned</option>
+                {employees.filter((person) =>
+                  person.active && person.roleType === "MANAGER" &&
+                  isCompanyMatch(person.companyCode, company),
+                ).map((person) => (
+                  <option key={person.id} value={person.id}>{person.fullName} - {person.employeeCode}</option>
+                ))}
+              </select>
             </label>}
 
             <label>
@@ -1225,5 +1242,3 @@ export default function Employees() {
     </section>
   );
 }
-
-
