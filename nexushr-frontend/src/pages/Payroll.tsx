@@ -458,7 +458,7 @@ export default function Payroll() {
             <div>
               <strong>Generate from working hours</strong>
               <span>
-                Uses completed attendance days in {payMonth}. The monthly CTC amount is paid in proportion to those hours. Paid records are not changed.
+                Uses recorded working hours in {payMonth}, including current manual-attendance sessions. The monthly CTC amount is paid in proportion to those hours. Paid records are not changed.
               </span>
             </div>
             <button
@@ -958,7 +958,6 @@ export default function Payroll() {
     </section>
   );
 }
-
 
 
 

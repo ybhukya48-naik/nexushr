@@ -923,20 +923,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
       await openSession(response);
     } catch (err) {
       console.error(err);
-      const message = err instanceof Error ? err.message : "Invalid username or password.";
-      const needsProfile = message.toLowerCase().includes("not saved yet")
-        || message.toLowerCase().includes("create your profile");
-      if (needsProfile) {
-        setCreating(true);
-        setError("");
-        setNotice(
-          employee
-            ? "This account needs a password. Create your profile with your own password."
-            : "This account needs a password. Create your profile, then sign in on the correct login page for your role.",
-        );
-        return;
-      }
-      setError(message);
+      setError(err instanceof Error ? err.message : "Unable to sign in.");
     } finally {
       setLoading(false);
     }
@@ -1125,7 +1112,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
                   ? "A cyond manager signs in with their own email and password. A Gorle manager signs in with the employee code and password."
                   : kind === "admin"
                   ? "Example: employee code 310310 opens the admin panel. Use Entity for the Gorle admin panel or the CYOND admin panel."
-                  : "hr@gorlegroup.com opens HR. Use Entity to switch between Gorle Group and CYOND without signing in again."}
+                  : "Sign in with the email or employee code assigned to your account."}
               </p>
 
             </div>
@@ -1259,7 +1246,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
 
               {creating ? (
                 <p className="login-notice">
-                  HR login uses hr@gorlegroup.com, then Entity switches Gorle Group and CYOND. Admin panel example: employee code 310310. Other Gorle people use their employee code. Other cyond people use their @cyond.com email.
+                  Use the email address assigned to your account, or your employee code.
                 </p>
               ) : employee ? (
                 <p className="login-notice">

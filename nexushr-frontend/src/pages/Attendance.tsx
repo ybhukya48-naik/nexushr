@@ -1314,7 +1314,7 @@ export default function Attendance() {
                 : siteVisitor && !selfie
                   ? "Site visitors add a selfie, then check in."
                   : canResume
-                    ? "Check in again. Work time resumes and the lunch gap is break time."
+                    ? "Check in again to resume working time."
                     : undefined
             }
           >
@@ -1826,5 +1826,4 @@ export default function Attendance() {
     </>
   );
 }
-
 

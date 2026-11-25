@@ -295,6 +295,9 @@ export async function login(
   const response = await postLogin(username, password, site);
 
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Username or password might be incorrect.");
+    }
     let message = "Invalid username or password";
     try {
       const errorBody = await response.json() as { message?: string; error?: string };

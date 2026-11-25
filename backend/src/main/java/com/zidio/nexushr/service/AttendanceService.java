@@ -255,7 +255,7 @@ public class AttendanceService {
         restoreClockedWork(record);
         AttendanceDay day = dayFrom(record);
         try {
-            day.checkIn(now);
+            day.checkIn(now, !record.isManualLunch());
         } catch (IllegalStateException ex) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,

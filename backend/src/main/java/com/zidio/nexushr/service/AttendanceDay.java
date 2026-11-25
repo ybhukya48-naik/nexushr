@@ -40,11 +40,17 @@ public final class AttendanceDay {
     }
 
     public void checkIn(LocalDateTime now) {
+        checkIn(now, true);
+    }
+
+    public void checkIn(LocalDateTime now, boolean countGapAsBreak) {
         if (sessionOpen()) {
             throw new IllegalStateException("Already checked in");
         }
         if (lastCheckOut != null) {
-            breakMinutes += minutesBetween(lastCheckOut, now);
+            if (countGapAsBreak) {
+                breakMinutes += minutesBetween(lastCheckOut, now);
+            }
             lastCheckOut = null;
         }
         if (firstCheckIn == null) {
