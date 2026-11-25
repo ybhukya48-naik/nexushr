@@ -578,7 +578,7 @@ export default function Payroll() {
                       Attendance calculation for {autoComponents.employeeCode}
                     </strong>
                     <span>
-                      {payMonth} runs from the 1st through day {new Date(Number(payMonth.slice(0, 4)), Number(payMonth.slice(5, 7)), 0).getDate()}. Worked {(autoComponents.workedMinutes / 60).toFixed(1)}h of {(autoComponents.expectedWorkMinutes / 60).toFixed(1)}h.
+                      {payMonth}: {autoComponents.businessDays} scheduled working days, {autoComponents.presentDays} present days. Worked {(autoComponents.workedMinutes / 60).toFixed(1)}h of {(autoComponents.expectedWorkMinutes / 60).toFixed(1)}h; approved paid casual leave {(autoComponents.paidLeaveMinutes / 60).toFixed(1)}h.
                       {ctc.trim() ? ` Yearly CTC ${money(Number(ctc))}. One month is ${money(Number(ctc) / 12)}.` : selectedEmployeeData?.annualCtc != null ? ` Stored yearly CTC ${money(selectedEmployeeData.annualCtc)}. One month is ${money(selectedEmployeeData.annualCtc / 12)}.` : selectedEmployeeData?.baseSalary ? ` Legacy monthly salary ${money(selectedEmployeeData.baseSalary)}.` : " Enter or save a yearly CTC before pay can be calculated."}
                     </span>
                     <span>
@@ -598,7 +598,7 @@ export default function Payroll() {
                 ? selectedEmployeeData.annualCtc / 12
                 : selectedEmployeeData?.baseSalary || 0;
             const ratio = autoComponents && autoComponents.expectedWorkMinutes > 0
-              ? Math.min(1, Math.max(0, autoComponents.workedMinutes / autoComponents.expectedWorkMinutes))
+              ? Math.min(1, Math.max(0, (autoComponents.workedMinutes + autoComponents.paidLeaveMinutes) / autoComponents.expectedWorkMinutes))
               : 0;
             const earned = monthAmount * ratio;
             const incentiveAmount = Number(bonus) || 0;
@@ -717,9 +717,10 @@ export default function Payroll() {
                 <tr>
                   <th>Employee</th>
                   <th>Month</th>
-                  {isManagementRole && <th>Hours</th>}
+                  {isManagementRole && <th>Worked / scheduled</th>}
+                  {isManagementRole && <th>Extra hours</th>}
                   <th>Gross Salary</th>
-                  {isManagementRole && <th>CTC</th>}
+                  {isManagementRole && <th>Annual / monthly CTC</th>}
                   {isManagementRole && <th>PF</th>}
                   {isManagementRole && <th>Insurance</th>}
                   {isManagementRole && <th>Professional tax</th>}
@@ -746,12 +747,13 @@ export default function Payroll() {
                       <td>
                         {record.workedMinutes == null
                           ? "—"
-                          : `${(record.workedMinutes / 60).toFixed(1)}h`}
+                          : `${(record.workedMinutes / 60).toFixed(1)}h / ${record.expectedWorkMinutes == null ? "—" : `${(record.expectedWorkMinutes / 60).toFixed(1)}h`}`}
                       </td>
                     )}
+                    {isManagementRole && <td>{record.overtimeMinutes == null ? "—" : `${(record.overtimeMinutes / 60).toFixed(1)}h (unpaid)`}</td>}
 
                     <td>{money(record.grossSalary)}</td>
-                    {isManagementRole && <td>{record.ctc ? money(record.ctc) : "—"}</td>}
+                    {isManagementRole && <td>{record.ctc ? `${money(record.ctc)} / ${money(record.ctc / 12)}` : "—"}</td>}
 
                     {isManagementRole && <td>{money(record.pf)}</td>}
                     {isManagementRole && <td>{money(record.esi || 0)}</td>}
@@ -896,7 +898,7 @@ export default function Payroll() {
           </div>
 
           <p>
-            Worked {((payslip.workedMinutes || 0) / 60).toFixed(1)}h of {((payslip.expectedWorkMinutes || 0) / 60).toFixed(1)}h. Earnings follow those hours.
+            Worked {((payslip.workedMinutes || 0) / 60).toFixed(1)}h of {((payslip.expectedWorkMinutes || 0) / 60).toFixed(1)}h. Earnings may also include approved paid casual leave.
           </p>
           <div className="employee-summary-grid">
             <div className="employee-summary-card">
@@ -961,8 +963,6 @@ export default function Payroll() {
     </section>
   );
 }
-
-
 
 
 

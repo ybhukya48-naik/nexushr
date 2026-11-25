@@ -7,7 +7,7 @@ import {
   type EmployeeResponse,
 } from "../api";
 import { asWorkspaceCompany, getWorkspaceCompany } from "../utils/workspace";
-import { checkOut, officeCheckIn, startLunch, endLunch, getEmployeeAttendance, isWindowsComputer, type AttendanceRecord } from "./Attendance";
+import { checkOut, officeCheckIn, startLunch, endLunch, getEmployeeAttendance, isWindowsComputer, clockedWorkMinutes, type AttendanceRecord } from "./Attendance";
 import "./Dashboard.css";
 
 function formatClock(value?: string | null) {
@@ -140,6 +140,11 @@ export default function AdminDashboard() {
   const missingCheckOut = active.filter((row) => row.checkInTime && !row.checkOutTime);
   const companyName = company === "GORLE" ? "Gorle Group" : "CYOND";
   const displayName = me?.fullName?.trim() || "Admin";
+  const worked = clockedWorkMinutes(selfRecord ?? undefined, now);
+  const lunch = (selfRecord?.breakMinutes ?? 0) + (selfRecord?.lunchStartedAt
+    ? Math.max(0, Math.floor((now.getTime() - new Date(selfRecord.lunchStartedAt).getTime()) / 60000))
+    : 0);
+  const hours = (minutes: number) => `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 
   function reportsOf(person: AdminEmployeeRow, chairman: boolean) {
     const direct = people.filter((row) => row.reportingManagerId === person.id);
@@ -167,12 +172,14 @@ export default function AdminDashboard() {
       <section className="hr-card">
         <h3>My attendance</h3>
         <p>{selfRecord?.lunchStartedAt ? "Lunch in progress" : selfRecord?.checkInTime && !selfRecord.checkOutTime ? "Checked in" : selfRecord?.checkOutTime ? "Checked out" : "Not checked in"}</p>
+        <p>Worked: {hours(worked)} · Lunch: {hours(lunch)} · Extra: {hours(Math.max(0, worked - 480))}</p>
         <div className="attendance-actions">
           <button type="button" disabled={punching || !me || !isWindowsComputer() || Boolean(selfRecord?.checkInTime && !selfRecord.checkOutTime)} onClick={() => void punchSelf("in")}>Check in</button>
-          <button type="button" disabled={punching || !me || !isWindowsComputer() || !selfRecord?.checkInTime || Boolean(selfRecord.checkOutTime)} onClick={() => void punchSelf("out")}>Check out</button>
+          <button type="button" disabled={punching || !me || !isWindowsComputer() || !selfRecord?.checkInTime || Boolean(selfRecord.checkOutTime || selfRecord.lunchStartedAt)} onClick={() => void punchSelf("out")}>Check out</button>
           <button type="button" disabled={punching || !me || !isWindowsComputer() || !selfRecord?.checkInTime || Boolean(selfRecord.checkOutTime || selfRecord.lunchStartedAt)} onClick={() => void punchSelf("start")}>Start lunch</button>
           <button type="button" disabled={punching || !me || !isWindowsComputer() || !selfRecord?.lunchStartedAt} onClick={() => void punchSelf("end")}>End lunch</button>
         </div>
+        {selfRecord?.lunchStartedAt && <p>End lunch before checking out.</p>}
       </section>
 
       <section className="hr-kpis">

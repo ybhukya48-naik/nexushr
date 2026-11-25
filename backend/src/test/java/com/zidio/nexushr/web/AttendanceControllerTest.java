@@ -47,6 +47,42 @@ class AttendanceControllerTest {
     private AuthorizationService authorizationService;
 
     @Test
+    @WithMockUser(username = "manager@example.com", roles = "MANAGER")
+    void teamTodayReturnsOnlyAuthorizedAttendanceWithoutEmployeeDetails() throws Exception {
+        com.zidio.nexushr.domain.Employee report = new com.zidio.nexushr.domain.Employee();
+        report.setId(2L);
+        report.setEmail("report@example.com");
+        report.setBaseSalary(java.math.BigDecimal.TEN);
+        com.zidio.nexushr.domain.Employee unrelated = new com.zidio.nexushr.domain.Employee();
+        unrelated.setId(3L);
+        AttendanceRecord visible = new AttendanceRecord();
+        visible.setEmployee(report);
+        visible.setCheckInTime(java.time.LocalDateTime.of(2026, 9, 1, 9, 0));
+        AttendanceRecord hidden = new AttendanceRecord();
+        hidden.setEmployee(unrelated);
+        when(authorizationService.authenticatedEmployeeId(any())).thenReturn(1L);
+        when(authorizationService.canSeeEmployee(eq(report), any())).thenReturn(true);
+        when(attendanceService.listByDate(any())).thenReturn(List.of(visible, hidden));
+        mockMvc.perform(get("/api/v1/attendance/team-today"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].employeeId").value(2))
+                .andExpect(jsonPath("$[0].employee").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = "manager@example.com", roles = "MANAGER")
+    void managerCannotAccessCompanyWideAttendanceOrImport() throws Exception {
+        mockMvc.perform(get("/api/v1/attendance/metrics").param("date", "2026-09-01"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/attendance/daily-counts"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/attendance/import-paste")
+                .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @WithMockUser(username = "employee@example.com", roles = "EMPLOYEE")
     void lunchEndpointsAlwaysUseTheAuthenticatedEmployee() throws Exception {
         when(attendanceService.findEmployeeIdByUsername("employee@example.com")).thenReturn(100L);

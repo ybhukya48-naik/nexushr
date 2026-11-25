@@ -926,17 +926,19 @@ export default function Dashboard() {
           <strong>{formatTimer(selfOut ? lunchSeconds : workSeconds)}</strong>
           <em>{selfOut ? "Lunch is excluded from work time." : "1 flexible lunch hour"}</em>
         </div>
+        <p className="hr-empty">Worked: {formatTimer(workSeconds)} · Lunch: {formatTimer((myRecord?.breakMinutes ?? 0) * 60 + lunchSeconds)} · Extra: {formatTimer(Math.max(0, workSeconds - 8 * 3600))}</p>
         <div className="attendance-actions">
           <button className="primary-button" type="button" disabled={punching || !windowsPunch || !me || selfOpen} onClick={() => void punchSelf("in")}>
             Check in
           </button>
-          <button className="secondary-button" type="button" disabled={punching || !windowsPunch || !me || !selfOpen} onClick={() => void punchSelf("out")}>
+          <button className="secondary-button" type="button" disabled={punching || !windowsPunch || !me || !selfOpen || selfOut} onClick={() => void punchSelf("out")}>
             Check out
           </button>
           <button className="secondary-button" type="button" disabled={punching || !windowsPunch || !me || !selfOpen || selfOut} onClick={() => void punchSelf("lunch-start")}>Start lunch</button>
           <button className="secondary-button" type="button" disabled={punching || !windowsPunch || !me || !selfOut} onClick={() => void punchSelf("lunch-end")}>End lunch</button>
         </div>
         {!windowsPunch && <p className="hr-empty">Check in and check out work on a Windows or Mac computer. A phone cannot punch.</p>}
+        {selfOut && <p className="hr-empty">End lunch before checking out.</p>}
         {punchNote && <p className="hr-empty">{punchNote}</p>}
       </section>
 

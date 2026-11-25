@@ -89,6 +89,9 @@ class PayrollControllerTest {
         record.setId(1L);
         record.setEmployee(testEmployee());
         record.setPayMonth("2026-07");
+        record.setExpectedWorkMinutes(11520);
+        record.setWorkedMinutes(480);
+        record.setOvertimeMinutes(60);
 
         when(payrollService.findAll())
                 .thenReturn(List.of(record));
@@ -99,6 +102,9 @@ class PayrollControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].payMonth")
                 .value("2026-07"))
+        .andExpect(jsonPath("$[0].expectedWorkMinutes").value(11520))
+        .andExpect(jsonPath("$[0].workedMinutes").value(480))
+        .andExpect(jsonPath("$[0].overtimeMinutes").value(60))
         .andExpect(jsonPath("$[0].employee.employeeCode")
                 .value("E1002"))
         .andExpect(jsonPath("$[0].employee.fullName")
@@ -173,16 +179,13 @@ class PayrollControllerTest {
 
     @Test
     @WithMockUser(roles = "MANAGER")
-    void payroll_isAllowedForManager()
+    void payroll_administrationIsForbiddenForManager()
             throws Exception {
-
-        when(payrollService.findAll())
-                .thenReturn(List.of());
 
         mockMvc.perform(
                 get("/api/v1/payroll")
         )
-        .andExpect(status().isOk());
+        .andExpect(status().isForbidden());
     }
 
     @Test

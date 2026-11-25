@@ -5,9 +5,12 @@ import com.zidio.nexushr.domain.AttendanceRecord;
 import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
 import com.zidio.nexushr.domain.PayrollRecord;
 import com.zidio.nexushr.domain.PayrollStatus;
+import com.zidio.nexushr.domain.LeaveRequest;
+import com.zidio.nexushr.domain.LeaveStatus;
 import com.zidio.nexushr.repository.AttendanceRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.repository.PayrollRepository;
+import com.zidio.nexushr.repository.LeaveRequestRepository;
 import com.zidio.nexushr.web.dto.PayrollRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +40,9 @@ class PayrollServiceTest {
     @Mock
     private EmployeeRepository employeeRepository;
 
+    @Mock
+    private LeaveRequestRepository leaveRequestRepository;
+
         @Mock
         private AttendanceRepository attendanceRepository;
 
@@ -61,6 +67,38 @@ class PayrollServiceTest {
         employee.setBaseSalary(new BigDecimal("110000"));
         employee.setActive(true);
         employee.setLifecycleStatus(EmployeeLifecycleStatus.ACTIVE);
+    }
+
+    @Test
+    void monthlySalaryIsProportionalToScheduledWorkingHours() {
+        BigDecimal monthly = new BigDecimal("24000");
+        int scheduled = 24 * 8 * 60;
+        assertThat(CtcSalarySplit.split(monthly, 8 * 60, scheduled).earnings()).isEqualByComparingTo("1000.00");
+        assertThat(CtcSalarySplit.split(monthly, 6 * 60, scheduled).earnings()).isEqualByComparingTo("750.00");
+        assertThat(CtcSalarySplit.split(monthly, scheduled, scheduled).earnings()).isEqualByComparingTo("24000.00");
+    }
+
+    @Test
+    void create_creditsApprovedHalfDayCasualLeave() {
+        employee.setAnnualCtc(new BigDecimal("288000"));
+        PayrollRequest request = new PayrollRequest();
+        request.setEmployeeId(4L);
+        request.setPayMonth("2026-09");
+        LeaveRequest leave = new LeaveRequest();
+        leave.setStartDate(LocalDate.of(2026, 9, 1));
+        leave.setEndDate(leave.getStartDate());
+        leave.setLeaveType("CASUAL");
+        leave.setHalfDay(true);
+        leave.setStatus(LeaveStatus.APPROVED);
+        when(employeeRepository.findById(4L)).thenReturn(Optional.of(employee));
+        when(leaveRequestRepository.findByEmployee_IdAndStatus(4L, LeaveStatus.APPROVED))
+                .thenReturn(List.of(leave));
+        when(payrollRepository.save(any(PayrollRecord.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        PayrollRecord result = payrollService.create(request);
+        assertThat(result.getWorkedMinutes()).isZero();
+        assertThat(result.getEarnedGross()).isEqualByComparingTo("461.54");
+        assertThat(result.getCasualLeave()).isEqualByComparingTo("0.5");
+        assertThat(payrollService.autoComponents(4L, "2026-09").paidLeaveMinutes()).isEqualTo(240);
     }
 
     @Test
@@ -110,6 +148,7 @@ class PayrollServiceTest {
         assertThat(result.getEarnedGross()).isEqualByComparingTo("3846.15");
         assertThat(result.getOvertimeMinutes()).isEqualTo(60);
         assertThat(result.getOvertime()).isEqualByComparingTo("0");
+        assertThat(payrollService.autoComponents(4L, "2026-09").overtimeAmount()).isEqualByComparingTo("0");
     }
 
     @Test

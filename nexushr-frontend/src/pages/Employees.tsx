@@ -528,6 +528,7 @@ export default function Employees() {
       annualCtc: employee.annualCtc ?? undefined,
       active: employee.active,
       companyCode: employee.companyCode || "CYOND",
+      reportingManagerId: employee.reportingManagerId ?? 0,
     });
 
     setShowCreateForm(true);
@@ -907,21 +908,21 @@ export default function Employees() {
               </datalist>
             </label>
 
-            {editingEmployeeId === null && <label>
+            <label>
               Reporting manager
               <select
                 value={form.reportingManagerId ?? ""}
-                onChange={(event) => updateForm("reportingManagerId", event.target.value ? Number(event.target.value) : undefined)}
+                onChange={(event) => updateForm("reportingManagerId", event.target.value ? Number(event.target.value) : editingEmployeeId === null ? undefined : 0)}
               >
-                <option value="">Not assigned</option>
+                <option value={editingEmployeeId === null ? "" : 0}>Not assigned</option>
                 {employees.filter((person) =>
                   person.active && person.roleType === "MANAGER" &&
-                  isCompanyMatch(person.companyCode, company),
+                  person.id !== editingEmployeeId && isCompanyMatch(person.companyCode, company),
                 ).map((person) => (
                   <option key={person.id} value={person.id}>{person.fullName} - {person.employeeCode}</option>
                 ))}
               </select>
-            </label>}
+            </label>
 
             <label>
               Designation

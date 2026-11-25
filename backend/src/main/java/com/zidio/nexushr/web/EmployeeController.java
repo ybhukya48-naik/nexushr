@@ -66,6 +66,7 @@ public class EmployeeController {
     public List<TeamMember> myTeam(Authentication authentication) {
         Long managerId = requireSelf(authentication);
         return employeeService.findDirectReports(managerId).stream()
+                .filter(employee -> authorizationService.canSeeEmployee(employee, authentication))
                 .map(employee -> new TeamMember(employee.getId(), employee.getEmployeeCode(),
                         employee.getFullName(), employee.getDepartment(), employee.getDesignation()))
                 .toList();

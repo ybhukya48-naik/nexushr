@@ -1345,6 +1345,7 @@ export default function Attendance() {
               !isToday ||
               !actionEmployee ||
               !sessionOpen ||
+              Boolean(actionEmployeeRecord?.lunchStartedAt) ||
               (siteVisitor && !selfie)
             }
             title={
@@ -1354,6 +1355,8 @@ export default function Attendance() {
                 ? "Check-out is available only for today."
                 : !sessionOpen
                   ? "Check in before checking out."
+                  : actionEmployeeRecord?.lunchStartedAt
+                    ? "End lunch before checking out."
                   : siteVisitor && !selfie
                     ? "Site visitors take a selfie, then check out."
                     : undefined
@@ -1826,4 +1829,3 @@ export default function Attendance() {
     </>
   );
 }
-

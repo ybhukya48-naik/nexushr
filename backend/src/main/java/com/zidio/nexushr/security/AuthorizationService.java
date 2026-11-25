@@ -91,7 +91,24 @@ public class AuthorizationService {
         if (self == null || self.getCompany() == null || self.getCompany().getCode() == null) {
             return false;
         }
+        if (hasAuthority(authentication, "ROLE_MANAGER")) {
+            return self.getCompany().getCode().equalsIgnoreCase(employee.getCompany().getCode())
+                    && (self.getId().equals(employee.getId())
+                        || self.getId().equals(employee.getReportingManagerId()));
+        }
         return self.getCompany().getCode().equalsIgnoreCase(employee.getCompany().getCode());
+    }
+
+    public boolean canViewPayrollEmployee(Long employeeId, Authentication authentication) {
+        if (employeeId == null || authentication == null) {
+            return false;
+        }
+        if (seesAllCompanies(authentication) || hasAuthority(authentication, "ROLE_HR")
+                || hasAuthority(authentication, "ROLE_ADMIN")) {
+            return canSeeEmployeeId(employeeId, authentication);
+        }
+        Employee self = findAuthenticatedEmployee(authentication);
+        return self != null && employeeId.equals(self.getId());
     }
 
     public String ownCompanyCode(Authentication authentication) {
@@ -174,7 +191,7 @@ public class AuthorizationService {
 
         return payrollRepository.findById(payrollId)
                 .map(payroll ->
-                        isSelf(
+                        canViewPayrollEmployee(
                                 payroll.getEmployee().getId(),
                                 authentication))
                 .orElse(false);

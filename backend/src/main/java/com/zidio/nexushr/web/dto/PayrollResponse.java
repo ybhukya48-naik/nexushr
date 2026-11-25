@@ -43,7 +43,10 @@ public record PayrollResponse(
         BigDecimal deductions,
         BigDecimal netSalary,
 
-        PayrollStatus status
+        PayrollStatus status,
+        Integer expectedWorkMinutes,
+        Integer workedMinutes,
+        Integer overtimeMinutes
 ) {
 
     public static PayrollResponse from(PayrollRecord payroll) {
@@ -86,7 +89,10 @@ public record PayrollResponse(
                 payroll.getDeductions(),
                 payroll.getNetSalary(),
 
-                payroll.getStatus()
+                payroll.getStatus(),
+                payroll.getExpectedWorkMinutes(),
+                payroll.getWorkedMinutes(),
+                payroll.getOvertimeMinutes()
         );
     }
 }

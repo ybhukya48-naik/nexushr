@@ -541,6 +541,17 @@ export function getMyTeam() {
   return request<TeamMember[]>("/employees/me/team");
 }
 
+export interface TeamAttendance {
+  employeeId: number;
+  checkInTime: string | null;
+  checkOutTime: string | null;
+  onLunch: boolean;
+}
+
+export function getTeamAttendanceToday() {
+  return request<TeamAttendance[]>("/attendance/team-today");
+}
+
 export function defaultEmployeePassword(company?: string) {
   return company === "GORLE" ? "Gorle@1234" : "Cyond@1234";
 }
@@ -939,8 +950,10 @@ export interface PayrollAutoComponentsResponse {
   employeeCode: string;
   payMonth: string;
   businessDays: number;
+  presentDays: number;
   expectedWorkMinutes: number;
   workedMinutes: number;
+  paidLeaveMinutes: number;
   shortfallMinutes: number;
   overtimeMinutes: number;
   leaveDeduction: number;
@@ -963,6 +976,7 @@ export interface PayrollRecord {
   ctc?: number;
   workedMinutes?: number;
   expectedWorkMinutes?: number;
+  overtimeMinutes?: number;
   leaveDeduction: number;
   otherDeductions: number;
   deductions: number;

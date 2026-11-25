@@ -85,7 +85,7 @@ public class PayrollController {
 
     @GetMapping("/employee/{employeeId}")
     @PreAuthorize(
-            "@authorizationService.isEmployeeSelfOrManagement(#employeeId, authentication)"
+            "@authorizationService.canViewPayrollEmployee(#employeeId, authentication)"
     )
     public List<PayrollResponse> listByEmployee(
             @PathVariable Long employeeId) {
@@ -436,5 +436,4 @@ public class PayrollController {
                 .replace(">", "&gt;");
     }
 }
-
 

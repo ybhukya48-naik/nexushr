@@ -17,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -63,6 +64,9 @@ public class LeaveService {
                     "Start date cannot be after end date"
             );
         }
+        if (request.isHalfDay() && !request.getStartDate().equals(request.getEndDate())) {
+            throw badRequest("A half-day leave must be on a single date");
+        }
 
         if (request.getReason() == null
                 || request.getReason().isBlank()) {
@@ -107,7 +111,7 @@ public class LeaveService {
 
         LeaveRequest saved = leaveRequestRepository.save(request);
 
-        notifyManagers(saved);
+        notifyApprovers(saved);
 
         return saved;
     }
@@ -191,12 +195,8 @@ public class LeaveService {
                         "Employee not found: " + employeeId
                 ));
 
-        long usedDays = getApprovedLeaveDays(employeeId);
-
-        long remainingDays = Math.max(
-                0,
-                (long) annualEntitlementDays - usedDays
-        );
+        BigDecimal usedDays = getApprovedLeaveDays(employeeId);
+        BigDecimal remainingDays = BigDecimal.valueOf(annualEntitlementDays).subtract(usedDays).max(BigDecimal.ZERO);
 
         return new LeaveBalanceResponse(
                 employeeId,
@@ -225,9 +225,9 @@ public class LeaveService {
         if (isDutyRequest(type)) {
             return;
         }
-        long requestedDays = ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
-        long usedDays = getApprovedLeaveDays(employeeId);
-        if (usedDays + requestedDays > annualEntitlementDays) {
+        BigDecimal requestedDays = leaveDays(request);
+        BigDecimal usedDays = getApprovedLeaveDays(employeeId);
+        if (usedDays.add(requestedDays).compareTo(BigDecimal.valueOf(annualEntitlementDays)) > 0) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "Leave request exceeds the remaining annual leave balance"
@@ -238,24 +238,27 @@ public class LeaveService {
         }
         LocalDate monthStart = request.getStartDate().withDayOfMonth(1);
         LocalDate monthEnd = monthStart.plusMonths(1).minusDays(1);
-        boolean alreadyUsed = leaveRequestRepository
+        List<LeaveRequest> existing = leaveRequestRepository
                 .findByEmployee_IdOrderByStartDateDesc(employeeId)
                 .stream()
                 .filter(leave -> leave.getId() == null || request.getId() == null || !leave.getId().equals(request.getId()))
                 .filter(leave -> leave.getStatus() == LeaveStatus.APPROVED || leave.getStatus() == LeaveStatus.PENDING)
                 .filter(leave -> type.equals(normalizeLeaveType(leave.getLeaveType())))
-                .anyMatch(leave -> !leave.getEndDate().isBefore(monthStart) && !leave.getStartDate().isAfter(monthEnd));
-        if (alreadyUsed) {
+                .filter(leave -> !leave.getEndDate().isBefore(monthStart) && !leave.getStartDate().isAfter(monthEnd))
+                .toList();
+        boolean anotherHalfCasual = "CASUAL".equals(type) && request.isHalfDay()
+                && existing.size() == 1 && existing.get(0).isHalfDay();
+        if (!existing.isEmpty() && !anotherHalfCasual) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "CASUAL".equals(type)
                             ? "One casual leave is allowed each month"
-                            : "One paid leave is allowed each month"
+                            : "One earned leave request is allowed each month"
             );
         }
     }
 
-    private long getApprovedLeaveDays(Long employeeId) {
+    private BigDecimal getApprovedLeaveDays(Long employeeId) {
 
         return leaveRequestRepository
                 .findByEmployee_IdAndStatus(
@@ -267,13 +270,13 @@ public class LeaveService {
                     String type = normalizeLeaveType(leave.getLeaveType());
                     return !isDutyRequest(type);
                 })
-                .mapToLong(leave ->
-                        ChronoUnit.DAYS.between(
-                                leave.getStartDate(),
-                                leave.getEndDate()
-                        ) + 1
-                )
-                .sum();
+                .map(this::leaveDays)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal leaveDays(LeaveRequest leave) {
+        return leave.isHalfDay() ? new BigDecimal("0.5")
+                : BigDecimal.valueOf(ChronoUnit.DAYS.between(leave.getStartDate(), leave.getEndDate()) + 1);
     }
 
     private void validateActiveEmployee(Employee employee) {
@@ -289,7 +292,7 @@ public class LeaveService {
         }
     }
 
-    private void notifyManagers(LeaveRequest request) {
+    private void notifyApprovers(LeaveRequest request) {
 
         if (notificationService == null) {
             return;
@@ -307,26 +310,26 @@ public class LeaveService {
                         + request.getEndDate()
                         + " is pending approval.";
 
-        List<Employee> managers = new java.util.ArrayList<>();
-        Long managerId = request.getEmployee().getReportingManagerId();
-        if (managerId != null) {
-            employeeRepository.findById(managerId)
-                    .filter(Employee::isActive)
-                    .ifPresent(managers::add);
-        }
-        if (managers.isEmpty()) {
-            managers.addAll(employeeRepository.findByRoleTypeAndActiveTrue(RoleType.MANAGER));
-        }
-
-        for (Employee manager : managers) {
+        List<Employee> approvers = new java.util.ArrayList<>();
+        approvers.addAll(employeeRepository.findByRoleTypeAndActiveTrue(RoleType.HR));
+        approvers.addAll(employeeRepository.findByRoleTypeAndActiveTrue(RoleType.ADMIN));
+        approvers.addAll(employeeRepository.findByRoleTypeAndActiveTrue(RoleType.SUPER_ADMIN));
+        String company = request.getEmployee().getCompany() == null
+                ? null : request.getEmployee().getCompany().getCode();
+        for (Employee approver : approvers) {
+            if (approver.getRoleType() != RoleType.SUPER_ADMIN
+                    && (company == null || approver.getCompany() == null
+                    || !company.equalsIgnoreCase(approver.getCompany().getCode()))) {
+                continue;
+            }
             notificationService.sendNotification(
-                    manager.getId(),
+                    approver.getId(),
                     "Leave approval required",
                     message,
                     NotificationType.APPROVAL,
                     NotificationChannel.IN_APP,
-                    manager.getEmail(),
-                    manager.getPhone()
+                    approver.getEmail(),
+                    approver.getPhone()
             );
         }
     }

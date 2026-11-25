@@ -56,6 +56,7 @@ public class Employee {
     @Column(nullable = false)
     private GenderType gender = GenderType.PREFER_NOT_TO_SAY;
 
+    @JsonIgnore
     @Column(nullable = false)
     private BigDecimal baseSalary;
 

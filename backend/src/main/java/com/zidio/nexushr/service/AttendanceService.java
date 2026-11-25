@@ -94,19 +94,20 @@ public class AttendanceService {
     @Autowired(required = false)
     private CompanyHolidayCalendar companyHolidayCalendar;
 
-    @Autowired(required = false)
-    private LeaveRequestRepository leaveRequestRepository;
+    private final LeaveRequestRepository leaveRequestRepository;
 
     public AttendanceService(
             AttendanceRepository attendanceRepository,
             EmployeeRepository employeeRepository,
             PayrollRepository payrollRepository,
-            @Lazy ExcelPayrollService excelPayrollService) {
+            @Lazy ExcelPayrollService excelPayrollService,
+            LeaveRequestRepository leaveRequestRepository) {
 
         this.attendanceRepository = attendanceRepository;
         this.employeeRepository = employeeRepository;
         this.payrollRepository = payrollRepository;
         this.excelPayrollService = excelPayrollService;
+        this.leaveRequestRepository = leaveRequestRepository;
     }
 
     public AttendanceRecord create(AttendanceRecord attendanceRecord) {
@@ -314,17 +315,7 @@ public class AttendanceService {
             return attendanceRepository.save(record);
         }
         if (record.getLunchStartedAt() != null) {
-            record.setBreakMinutes((record.getBreakMinutes() == null ? 0 : record.getBreakMinutes())
-                    + AttendanceRules.sessionMinutes(record.getLunchStartedAt(), now));
-            record.setLunchStartedAt(null);
-            record.setCheckOutTime(now);
-            record.setAttendanceStatus("CLOSED");
-            record.setWorkMinutes(record.getClosedWorkMinutes());
-            record.setOvertimeMinutes(calculateOvertimeMinutes(record.getClosedWorkMinutes()));
-            if (attendancePolicyService != null) {
-                attendancePolicyService.onCheckOut(record, actor(actorId, employee));
-            }
-            return attendanceRepository.save(record);
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "End lunch before checking out");
         }
         restoreClockedWork(record);
         AttendanceDay day = dayFrom(record);
@@ -1115,7 +1106,11 @@ public class AttendanceService {
                     .mapToInt(Integer::intValue)
                     .sum();
 
-            int shortfallMinutes = HoursPayPolicy.deductibleShortfall(expectedWorkMinutes, workedMinutes);
+            PaidCasualLeave.Credit casualLeave = PaidCasualLeave.calculate(
+                    leaveRequestRepository.findByEmployee_IdAndStatus(employee.getId(), LeaveStatus.APPROVED),
+                    records, effectiveStart, endDate, gorle, holidays, now);
+            int paidLeaveMinutes = casualLeave.creditedMinutes();
+            int shortfallMinutes = Math.max(0, expectedWorkMinutes - workedMinutes - paidLeaveMinutes);
 
             PayrollRecord payroll = existingPayrollMap.get(employee.getId());
             if (payroll != null && payroll.getStatus() == PayrollStatus.PAID) {
@@ -1133,7 +1128,7 @@ public class AttendanceService {
                     ? payroll.getCtc()
                     : EmployeeCtc.yearly(employee);
             BigDecimal monthlyCtc = yearlyCtc.divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP);
-            CtcSalarySplit.Parts parts = CtcSalarySplit.split(monthlyCtc, workedMinutes, expectedWorkMinutes);
+            CtcSalarySplit.Parts parts = CtcSalarySplit.split(monthlyCtc, workedMinutes + paidLeaveMinutes, expectedWorkMinutes);
 
             BigDecimal incentives = payroll.getBonus() == null ? BigDecimal.ZERO : payroll.getBonus();
             BigDecimal grossSalary = parts.earnings().add(incentives).setScale(2, RoundingMode.HALF_UP);
@@ -1165,7 +1160,8 @@ public class AttendanceService {
 
             payroll.setWorkingDays((int) records.stream().filter(r -> r.getCheckInTime() != null).count());
             payroll.setActualHours(BigDecimal.valueOf(workedMinutes).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP));
-            payroll.setCasualLeave(BigDecimal.ONE);
+            payroll.setCasualLeave(BigDecimal.valueOf(casualLeave.approvedMinutes())
+                    .divide(BigDecimal.valueOf(AttendanceRules.WORK_MINUTES), 2, RoundingMode.HALF_UP));
             payroll.setRequiredHours(BigDecimal.valueOf(8));
             payroll.setExpectedWorkMinutes(expectedWorkMinutes);
             payroll.setWorkedMinutes(workedMinutes);
@@ -1229,19 +1225,19 @@ public class AttendanceService {
 
             int rowIndex = 1;
             if (people.isEmpty()) {
-                rowIndex = writeSampleRow(sheet, rowIndex, "CY-EMP-001", day, "09:00", "18:00", "720000");
-                rowIndex = writeSampleRow(sheet, rowIndex, "CY-EMP-002", day.plusDays(1), "09:30", "18:30", "600000");
-                writeSampleRow(sheet, rowIndex, "CY-EMP-003", day.plusDays(2), "10:00", "18:00", "540000");
+                rowIndex = writeSampleRow(sheet, rowIndex, "CY-EMP-001", day, "09:00", "18:00", "60000");
+                rowIndex = writeSampleRow(sheet, rowIndex, "CY-EMP-002", day.plusDays(1), "09:30", "18:30", "50000");
+                writeSampleRow(sheet, rowIndex, "CY-EMP-003", day.plusDays(2), "10:00", "18:00", "45000");
             } else {
                 for (Employee employee : people) {
-                    BigDecimal annual = employee.getBaseSalary() == null
-                            ? BigDecimal.valueOf(360000)
-                            : employee.getBaseSalary().multiply(BigDecimal.valueOf(12));
+                    BigDecimal monthly = employee.getAnnualCtc() == null && employee.getBaseSalary() == null
+                            ? BigDecimal.valueOf(30000)
+                            : EmployeeCtc.monthly(employee);
                     String code = employee.getEmployeeCode() == null ? "CY-EMP-001" : employee.getEmployeeCode();
-                    String annualText = annual.setScale(0, RoundingMode.HALF_UP).toPlainString();
-                    rowIndex = writeSampleRow(sheet, rowIndex, code, day, "09:00", "18:00", annualText);
-                    rowIndex = writeSampleRow(sheet, rowIndex, code, day.plusDays(1), "09:00", "17:00", annualText);
-                    rowIndex = writeSampleRow(sheet, rowIndex, code, day.plusDays(2), "09:00", "19:00", annualText);
+                    String monthlyText = monthly.setScale(2, RoundingMode.HALF_UP).toPlainString();
+                    rowIndex = writeSampleRow(sheet, rowIndex, code, day, "09:00", "18:00", monthlyText);
+                    rowIndex = writeSampleRow(sheet, rowIndex, code, day.plusDays(1), "09:00", "17:00", monthlyText);
+                    rowIndex = writeSampleRow(sheet, rowIndex, code, day.plusDays(2), "09:00", "19:00", monthlyText);
                 }
             }
 

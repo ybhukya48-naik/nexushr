@@ -12,6 +12,7 @@ import {
 import {
   getCurrentEmployee,
   getMyTeam,
+  getTeamAttendanceToday,
   getEmployeeNotifications,
   downloadPayslipPdf,
   getEmployeePayroll,
@@ -34,6 +35,7 @@ import {
   type AiWorkforceDashboardResponse,
   type EmployeeResponse,
   type TeamMember,
+  type TeamAttendance,
   type NotificationResponse,
 } from "./api";
 import {
@@ -49,6 +51,7 @@ import {
   type AttendanceAuditEntry,
   type LeaveRequest,
   dayCountedSeconds,
+  clockedWorkMinutes,
   dayExtraSeconds,
   dayIsComplete,
   formatHoursSeconds,
@@ -87,13 +90,13 @@ const navItems: ReadonlyArray<
   readonly [string, string, readonly string[]]
 > = [
   ["Dashboard", "/", ["HR", "MANAGER", "EMPLOYEE", "ADMIN", "SUPER_ADMIN"]],
-  ["Employees", "/employees", ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"]],
-  ["Attendance", "/attendance", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
-  ["Leave", "/leave", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
-  ["Payroll", "/payroll", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
-  ["Performance", "/performance", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
-  ["AI Insights", "/ai", ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"]],
-  ["Notifications", "/notifications", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
+  ["Employees", "/employees", ["ADMIN", "HR", "SUPER_ADMIN"]],
+  ["Attendance", "/attendance", ["ADMIN", "HR", "EMPLOYEE", "SUPER_ADMIN"]],
+  ["Leave", "/leave", ["ADMIN", "HR", "EMPLOYEE", "SUPER_ADMIN"]],
+  ["Payroll", "/payroll", ["ADMIN", "HR", "EMPLOYEE", "SUPER_ADMIN"]],
+  ["Performance", "/performance", ["ADMIN", "HR", "EMPLOYEE", "SUPER_ADMIN"]],
+  ["AI Insights", "/ai", ["ADMIN", "HR", "SUPER_ADMIN"]],
+  ["Notifications", "/notifications", ["ADMIN", "HR", "EMPLOYEE", "SUPER_ADMIN"]],
   ["Profile", "/profile", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
 ] as const;
 
@@ -749,14 +752,14 @@ function AppRoutes() {
                 }
               />
               <Route path="/profile" element={<EmployeeProfile />} />
-              <Route path="/employees" element={<Employees />} />
-              <Route path="/employees/:id" element={<EmployeeProfile />} />
-              <Route path="/attendance" element={<Attendance />} />
-              <Route path="/leave" element={<Leave />} />
-              <Route path="/payroll" element={<Payroll />} />
-              <Route path="/performance" element={<Performance />} />
-              <Route path="/ai" element={<AIInsights />} />
-              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/employees" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <Employees />} />
+              <Route path="/employees/:id" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <EmployeeProfile />} />
+              <Route path="/attendance" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <Attendance />} />
+              <Route path="/leave" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <Leave />} />
+              <Route path="/payroll" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <Payroll />} />
+              <Route path="/performance" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <Performance />} />
+              <Route path="/ai" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <AIInsights />} />
+              <Route path="/notifications" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <Notifications />} />
               <Route
                 path="/admin"
                 element={isAdmin ? <Admin view="settings" /> : <Navigate to="/" replace />}
@@ -1379,6 +1382,8 @@ function ManagerDashboard() {
   const [employee, setEmployee] = useState<EmployeeResponse | null>(null);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [teamAttendance, setTeamAttendance] = useState<TeamAttendance[]>([]);
+  const [clockNow, setClockNow] = useState(() => new Date());
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -1387,11 +1392,12 @@ function ManagerDashboard() {
     let active = true;
     async function load() {
       try {
-        const [me, members] = await Promise.all([getCurrentEmployee(), getMyTeam()]);
+        const [me, members, teamRecords] = await Promise.all([getCurrentEmployee(), getMyTeam(), getTeamAttendanceToday()]);
         const history = await getEmployeeAttendance(me.id);
         if (active) {
           setEmployee(me);
           setTeam(members);
+          setTeamAttendance(teamRecords);
           setRecords(history);
         }
       } catch (err) {
@@ -1406,12 +1412,22 @@ function ManagerDashboard() {
 
   const today = records.find((record) => record.attendanceDate?.slice(0, 10) === todayKey());
   const checkedIn = Boolean(today?.checkInTime && !today.checkOutTime);
+  const worked = clockedWorkMinutes(today, clockNow);
+  const activeLunch = today?.lunchStartedAt ? Math.max(0, Math.floor((clockNow.getTime() - new Date(today.lunchStartedAt).getTime()) / 60000)) : 0;
+  const duration = (minutes: number) => `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!employee) return;
     const refresh = () => {
       void getEmployeeAttendance(employee.id).then(setRecords)
         .catch((err) => setError(err instanceof Error ? err.message : "Unable to refresh attendance."));
+      void getTeamAttendanceToday().then(setTeamAttendance)
+        .catch((err) => setError(err instanceof Error ? err.message : "Unable to refresh team attendance."));
     };
     window.addEventListener("nexushr-attendance-refresh", refresh);
     return () => window.removeEventListener("nexushr-attendance-refresh", refresh);
@@ -1444,13 +1460,15 @@ function ManagerDashboard() {
         <>
           <section className="panel">
             <h3>My attendance</h3>
-            <p>{!today?.checkInTime ? "Not checked in" : checkedIn ? "Checked in" : "Checked out"}</p>
+            <p>{!today?.checkInTime ? "Not checked in" : today.lunchStartedAt ? "On lunch" : checkedIn ? "Checked in" : "Checked out"}</p>
+            <p>Worked: {duration(worked)} · Lunch: {duration((today?.breakMinutes ?? 0) + activeLunch)} · Remaining: {duration(Math.max(0, 480 - worked))} · Extra: {duration(Math.max(0, worked - 480))}</p>
             <div className="attendance-actions">
               <button type="button" className="primary-button" disabled={busy || checkedIn || !employee} onClick={() => void punch("in")}>Check in</button>
-              <button type="button" className="secondary-button" disabled={busy || !checkedIn || !employee} onClick={() => void punch("out")}>Check out</button>
+              <button type="button" className="secondary-button" disabled={busy || !checkedIn || !employee || Boolean(today?.lunchStartedAt)} onClick={() => void punch("out")}>Check out</button>
               <button type="button" className="secondary-button" disabled={busy || !checkedIn || Boolean(today?.lunchStartedAt)} onClick={() => void punch("lunch-start")}>Start lunch</button>
               <button type="button" className="secondary-button" disabled={busy || !today?.lunchStartedAt} onClick={() => void punch("lunch-end")}>End lunch</button>
             </div>
+            {today?.lunchStartedAt && <p>End lunch before checking out.</p>}
           </section>
           <section className="panel">
             <h3>My team</h3>
@@ -1458,7 +1476,10 @@ function ManagerDashboard() {
               <ul>
                 {team.map((member) => (
                   <li key={member.id}>
-                    {member.fullName} · {member.employeeCode} · {member.designation} · {member.department}
+                    {member.fullName} · {member.employeeCode} · {member.designation} · {member.department} · {(() => {
+                      const status = teamAttendance.find((record) => record.employeeId === member.id);
+                      return !status ? "Not checked in" : status.checkOutTime ? `Checked out ${new Date(status.checkOutTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : status.onLunch ? "On lunch" : `Checked in ${status.checkInTime ? new Date(status.checkInTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : ""}`;
+                    })()}
                   </li>
                 ))}
               </ul>
@@ -1721,7 +1742,6 @@ function EmployeeDashboard() {
         const historySeconds = records.reduce((sum, row) => sum + dayCountedSeconds(row, clockNow), 0);
         const historyExtra = records.reduce((sum, row) => sum + dayExtraSeconds(row, clockNow), 0);
         const warnings = monthRows.filter((row) => row.yellowFlag).length;
-        const halfDay = warnings >= 3 ? Math.round(Number(employee.baseSalary || 0) / 26 / 2) : 0;
         const workday = new Date().getDay() !== 0;
         const onLunchNow = Boolean(todayRecord?.lunchStartedAt);
         const notices = [
@@ -1739,7 +1759,7 @@ function EmployeeDashboard() {
             ? "Desktop was inactive for more than 30 minutes. This is a warning."
             : "",
           warnings >= 3
-            ? `3 inactivity warnings this month. A half day, ₹${halfDay.toLocaleString("en-IN")}, is cut from salary.`
+            ? "3 inactivity warnings this month. A half-day deduction applies."
             : "",
         ].filter(Boolean);
         const monthStamp = today.slice(0, 7);
@@ -1748,7 +1768,7 @@ function EmployeeDashboard() {
           (leave.status === "APPROVED" || leave.status === "PENDING")
           && leave.leaveType === "CASUAL"
           && leave.startDate.startsWith(monthStamp),
-        ).length;
+        ).reduce((sum, leave) => sum + (leave.halfDay ? 0.5 : 1), 0);
         const sickTaken = savedLeaves.filter((leave) => leave.status === "APPROVED" && leave.leaveType === "SICK").length;
         const compOff = savedLeaves.filter((leave) => leave.status === "APPROVED" && leave.leaveType === "COMP_OFF").length;
         const week = monthDateKeys(7).map((date) => ({
@@ -1805,7 +1825,7 @@ function EmployeeDashboard() {
                       <button className="primary-button" type="button" disabled={punching || !isWindowsComputer() || checkedIn} onClick={() => void punch("in")}>
                         Check in
                       </button>
-                      <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !checkedIn} onClick={() => void punch("out")}>
+                      <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !checkedIn || onLunch} onClick={() => void punch("out")}>
                         Check out
                       </button>
                     </div>

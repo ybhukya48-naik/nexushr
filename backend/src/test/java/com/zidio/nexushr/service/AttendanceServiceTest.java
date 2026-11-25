@@ -5,16 +5,22 @@ import com.zidio.nexushr.domain.Employee;
 import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
 import com.zidio.nexushr.domain.PayrollRecord;
 import com.zidio.nexushr.domain.PayrollStatus;
+import com.zidio.nexushr.domain.LeaveRequest;
+import com.zidio.nexushr.domain.LeaveStatus;
 import com.zidio.nexushr.repository.AttendanceRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.repository.PayrollRepository;
+import com.zidio.nexushr.repository.LeaveRequestRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
@@ -36,6 +42,9 @@ class AttendanceServiceTest {
 
     @Mock
     private PayrollRepository payrollRepository;
+
+    @Mock
+    private LeaveRequestRepository leaveRequestRepository;
 
     @InjectMocks
     private AttendanceService attendanceService;
@@ -68,6 +77,23 @@ class AttendanceServiceTest {
         );
 
         record.setWorkMinutes(480);
+    }
+
+    @Test
+    void checkoutRequiresManuallyEndingLunch() {
+        LocalDateTime now = LocalDateTime.now(AttendanceService.COMPANY_ZONE);
+        AttendanceRecord today = new AttendanceRecord();
+        today.setEmployee(employee);
+        today.setAttendanceDate(now.toLocalDate());
+        today.setCheckInTime(now.minusHours(1));
+        today.setManualLunch(true);
+        today.setLunchStartedAt(now.minusMinutes(15));
+        when(employeeRepository.findById(100L)).thenReturn(Optional.of(employee));
+        when(attendanceRepository.lockByEmployeeAndDate(100L, now.toLocalDate())).thenReturn(Optional.of(today));
+        assertThatThrownBy(() -> attendanceService.checkOut(100L)).hasMessageContaining("End lunch before checking out");
+        assertThat(today.getLunchStartedAt()).isNotNull();
+        assertThat(today.getCheckOutTime()).isNull();
+        verify(attendanceRepository, never()).save(any());
     }
 
     @Test
@@ -137,6 +163,61 @@ class AttendanceServiceTest {
         assertThat(saved).hasSize(1);
         assertThat(saved.get(0).getCtc()).isEqualByComparingTo("1200000");
         assertThat(saved.get(0).getEarnedGross()).isEqualByComparingTo("3703.70");
+        assertThat(saved.get(0).getCasualLeave()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void sampleWorkbookShowsMonthlyCtcFromAnnualCtc() throws IOException {
+        employee.setBaseSalary(new BigDecimal("50000"));
+        employee.setAnnualCtc(new BigDecimal("288000"));
+        when(employeeRepository.findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus.ACTIVE))
+                .thenReturn(List.of(employee));
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(
+                new ByteArrayInputStream(attendanceService.sampleAttendanceWorkbook()))) {
+            assertThat(workbook.getSheetAt(0).getRow(0).getCell(4).getStringCellValue())
+                    .isEqualTo("Monthly CTC");
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(4).getStringCellValue())
+                    .isEqualTo("24000.00");
+        }
+    }
+
+    @Test
+    void sampleWorkbookFallbackValuesAreMonthly() throws IOException {
+        when(employeeRepository.findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus.ACTIVE))
+                .thenReturn(List.of());
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(
+                new ByteArrayInputStream(attendanceService.sampleAttendanceWorkbook()))) {
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(4).getStringCellValue())
+                    .isEqualTo("60000");
+        }
+    }
+
+    @Test
+    void generatePayroll_creditsApprovedHalfDayCasualLeave() {
+        employee.setAnnualCtc(new BigDecimal("288000"));
+        LeaveRequest leave = new LeaveRequest();
+        leave.setStartDate(LocalDate.of(2026, 7, 2));
+        leave.setEndDate(leave.getStartDate());
+        leave.setLeaveType("CASUAL");
+        leave.setHalfDay(true);
+        leave.setStatus(LeaveStatus.APPROVED);
+        when(employeeRepository.findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus.ACTIVE))
+                .thenReturn(List.of(employee));
+        when(leaveRequestRepository.findByEmployee_IdAndStatus(100L, LeaveStatus.APPROVED))
+                .thenReturn(List.of(leave));
+        List<PayrollRecord> saved = new java.util.ArrayList<>();
+        when(payrollRepository.saveAll(anyList())).thenAnswer(invocation -> {
+            List<PayrollRecord> batch = invocation.getArgument(0);
+            saved.addAll(batch);
+            return batch;
+        });
+        attendanceService.generatePayrollFromAttendance("2026-07", "");
+        assertThat(saved).hasSize(1);
+        assertThat(saved.get(0).getWorkedMinutes()).isZero();
+        assertThat(saved.get(0).getEarnedGross()).isEqualByComparingTo("444.44");
+        assertThat(saved.get(0).getCasualLeave()).isEqualByComparingTo("0.5");
     }
 
     @Test

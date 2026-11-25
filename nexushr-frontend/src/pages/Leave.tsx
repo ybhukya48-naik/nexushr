@@ -194,10 +194,10 @@ export default function Leave() {
     (leave.status === "APPROVED" || leave.status === "PENDING")
     && (leave.leaveType || "EARNED") === "CASUAL"
     && leave.startDate.startsWith(monthKey),
-  ).length;
+  ).reduce((sum, leave) => sum + (leave.halfDay ? 0.5 : 1), 0);
   const paidThisMonth = balanceLeaves.filter((leave) =>
     (leave.status === "APPROVED" || leave.status === "PENDING")
-    && (leave.leaveType || "EARNED") !== "CASUAL"
+    && (leave.leaveType || "EARNED") === "EARNED"
     && leave.startDate.startsWith(monthKey),
   ).length;
   const shown = new Date(`${startDate || "2000-01-01"}T00:00:00`);
@@ -347,7 +347,7 @@ export default function Leave() {
       {tab === "policy" && (
         <section className="panel">
           <h3>Leave policy</h3>
-          <p>One casual leave and one paid leave each month. Sundays and listed holidays are not counted.</p>
+          <p>Up to one approved casual leave day per month is paid. Two half-days count as one day. Earned leave is not paid in payroll; Sundays and listed holidays are excluded from scheduled hours.</p>
           <p>A request can be a full day or a half day. It stays pending until someone approves or rejects it.</p>
         </section>
       )}
@@ -406,7 +406,7 @@ export default function Leave() {
               Type
               <select value={leaveType} onChange={(event) => setLeaveType(event.target.value)}>
                 <option value="CASUAL">Casual</option>
-                <option value="EARNED">Paid</option>
+                <option value="EARNED">Earned (unpaid in payroll)</option>
                 <option value="WFH">Work from home</option>
                 <option value="SITE_MORNING">Morning site visit</option>
                 <option value="SITE_AFTERNOON">Afternoon site visit</option>
@@ -608,5 +608,4 @@ export default function Leave() {
     </section>
   );
 }
-
 

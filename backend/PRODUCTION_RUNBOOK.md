@@ -26,6 +26,7 @@ are not the live site.
   not actual desktop activity. Sleeping devices, network loss and browser
   throttling can cause checkout; a connected open tab can continue heartbeats.
   Lunch pauses inactivity checkout and can remain open overnight.
+  Employees must end lunch manually before checking out.
 - Agree a maintenance window, release and rollback owners, monitoring, and
   acceptance criteria with payroll/HR. Confirm that no other process applies
   Flyway migrations at the same time.
@@ -81,9 +82,15 @@ V43 adds manual lunch state; old rows retain the legacy policy. V44 adds a
 nullable employee annual CTC without backfilling or reinterpreting existing
 salary. Legacy `baseSalary` remains a monthly fallback until HR sets an annual
 CTC. Monthly payroll uses annual CTC divided by 12, proportional to eligible
-recorded work; overtime is displayed separately and is not included in CTC
+recorded work and up to one approved CASUAL day per month; two half-days count
+as one day. Only scheduled dates through today are credited. On a leave date,
+credited leave and worked time together cannot exceed eight hours; the approved
+leave consumes its full allowance even if attendance reduces the credit. EARNED
+leave is not paid under this policy. Overtime is displayed separately and is not included in CTC
 earnings. A payroll entry's override affects that record only; existing payroll
 snapshots and paid records are preserved during bulk recalculation.
+Managers see their own attendance and same-company direct reports, not HR
+administration or leave approvals. HR/admin receive leave approval notifications.
 
 1. Arrange a consistent backup immediately before deployment with the database
    owner. Use the provider's point-in-time recovery where available and a

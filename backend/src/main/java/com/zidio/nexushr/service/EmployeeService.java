@@ -153,12 +153,7 @@ public class EmployeeService {
         }
 
         if (request.getReportingManagerId() != null) {
-            Employee manager = findById(request.getReportingManagerId());
-            if (!manager.isActive() || manager.getRoleType() != RoleType.MANAGER
-                    || manager.getCompany() == null
-                    || !companyCode.equalsIgnoreCase(manager.getCompany().getCode())) {
-                throw new IllegalArgumentException("Reporting manager must be an active manager in the same company");
-            }
+            Employee manager = validateReportingManager(employee, request.getReportingManagerId());
             employee.setReportingManagerId(manager.getId());
         }
 
@@ -172,6 +167,9 @@ public class EmployeeService {
         Employee employee = findById(id);
 
 
+        boolean companyChanged = request.getCompanyCode() != null && !request.getCompanyCode().isBlank()
+                && (employee.getCompany() == null
+                || !request.getCompanyCode().equalsIgnoreCase(employee.getCompany().getCode()));
         if (request.getCompanyCode() != null && !request.getCompanyCode().isBlank()) {
             Company company = companyRepository.findByCodeIgnoreCase(request.getCompanyCode())
                     .orElseThrow(() -> new IllegalArgumentException(
@@ -257,7 +255,26 @@ public class EmployeeService {
         }
 
         if (request.getReportingManagerId() != null) {
-            employee.setReportingManagerId(request.getReportingManagerId());
+            Long managerId = request.getReportingManagerId();
+            if (managerId == 0) {
+                employee.setReportingManagerId(null);
+            } else {
+                try {
+                    validateReportingManager(employee, managerId);
+                } catch (IllegalArgumentException ex) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
+                }
+                employee.setReportingManagerId(managerId);
+            }
+        } else if (companyChanged && employee.getReportingManagerId() != null) {
+            try {
+                validateReportingManager(employee, employee.getReportingManagerId());
+            } catch (IllegalArgumentException ex) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST,
+                        "Select a reporting manager in the new company or clear the assignment", ex);
+            }
         }
 
         if (request.getPassword() != null
@@ -295,13 +312,21 @@ public class EmployeeService {
     public Employee setReportingManager(Long id, Long managerId) {
         Employee employee = findById(id);
         if (managerId != null) {
-            if (managerId.equals(id)) {
-                throw new IllegalArgumentException("An employee cannot report to themselves");
-            }
-            findById(managerId);
+            validateReportingManager(employee, managerId);
         }
         employee.setReportingManagerId(managerId);
         return employeeRepository.save(employee);
+    }
+
+    private Employee validateReportingManager(Employee employee, Long managerId) {
+        Employee manager = findById(managerId);
+        if (managerId.equals(employee.getId()) || !manager.isActive()
+                || manager.getRoleType() != RoleType.MANAGER || manager.getCompany() == null
+                || employee.getCompany() == null
+                || !manager.getCompany().getCode().equalsIgnoreCase(employee.getCompany().getCode())) {
+            throw new IllegalArgumentException("Reporting manager must be another active manager in the same company");
+        }
+        return manager;
     }
 
     public Employee setActive(Long id, boolean active) {

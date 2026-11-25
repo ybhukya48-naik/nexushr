@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Layer 1 — Integration tests: Dashboard summary API with real PostgreSQL.
- * Verifies role-based access control (HR/ADMIN/MANAGER allowed, EMPLOYEE denied).
+ * Verifies role-based access control (HR/ADMIN allowed, MANAGER/EMPLOYEE denied).
  */
 class DashboardApiIT extends AbstractIntegrationTest {
 
@@ -59,14 +59,14 @@ class DashboardApiIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void summary_withManagerRole_returnsOk() {
+    void summary_withManagerRole_returnsForbidden() {
         ResponseEntity<Map> response = restTemplate.exchange(
                 baseUrl() + "/api/v1/dashboard/summary",
                 HttpMethod.GET,
                 new HttpEntity<>(bearerHeaders("MANAGER")),
                 Map.class
         );
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test
