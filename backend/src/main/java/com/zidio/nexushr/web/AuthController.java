@@ -257,21 +257,17 @@ public class AuthController {
 
         try {
             List<Object[]> rows = employeeRepository.findLoginMatches(normalizedUsername);
-            boolean sawInactive = false;
-            boolean sawUnsetPassword = false;
             for (Object[] row : rows) {
                 String life = text(row, 5);
                 if (!isActiveFlag(row.length > 4 ? row[4] : null)
                         || "OFFBOARDED".equalsIgnoreCase(life)
                         || "OFFBOARDING".equalsIgnoreCase(life)) {
-                    sawInactive = true;
                     continue;
                 }
                 String storedHash = text(row, 1);
                 if (storedHash == null
                         || storedHash.isBlank()
                         || ExcelPayrollService.UNSET_PASSWORD_HASH.equals(storedHash)) {
-                    sawUnsetPassword = true;
                     continue;
                 }
                 if (!passwordMatches(request.password(), storedHash)) {
@@ -302,14 +298,7 @@ public class AuthController {
                 return ResponseEntity.ok(new AuthDtos.LoginResponse(token, role, name, mustChange, profileDone));
             }
 
-            String message = rows.isEmpty()
-                    ? "That account is not saved yet. cyond signs in with the email. Gorle Group signs in with the employee code."
-                    : sawInactive
-                    ? "This employee account is not active."
-                    : sawUnsetPassword
-                    ? "That account is not saved yet. Use Create your profile to set your password."
-                    : "Password does not match. cyond uses the email. Gorle Group uses the employee code.";
-            return ResponseEntity.status(401).body(Map.of("message", message));
+            return ResponseEntity.status(401).body(Map.of("message", "Username or password might be incorrect."));
         } catch (Exception ex) {
             log.error("LOGIN_FAILED", ex);
             return ResponseEntity.status(401).body(Map.of(

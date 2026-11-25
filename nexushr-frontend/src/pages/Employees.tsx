@@ -7,7 +7,6 @@ import type { FormEvent } from "react";
 import {
   createEmployee,
   defaultEmployeePassword,
-  employeeEmailDomain,
   getEmployees,
   resetEmployeePassword,
   updateEmployee,
@@ -600,11 +599,6 @@ export default function Employees() {
       ? form.companyCode
       : (getWorkspaceCompany() ?? "CYOND");
     const email = form.email.trim().toLowerCase();
-    if (editingEmployeeId === null && !email.endsWith(employeeEmailDomain(companyCode))) {
-      setSaving(false);
-      setSaveError(`Use an email that ends with ${employeeEmailDomain(companyCode)}.`);
-      return;
-    }
     const employeeData: EmployeeRequest = editingEmployeeId !== null
       ? {
           ...form,
@@ -874,7 +868,7 @@ export default function Employees() {
 
             {editingEmployeeId === null && (
               <p className="employee-password-note">
-                First password is {defaultEmployeePassword(getWorkspaceCompany() ?? "CYOND")}. The email must end with {employeeEmailDomain(getWorkspaceCompany() ?? "CYOND")}. The employee sets a new password, then creates the rest of the profile.
+                First password is {defaultEmployeePassword(getWorkspaceCompany() ?? "CYOND")}. Enter the employee's own email. The employee sets a new password, then creates the rest of the profile.
               </p>
             )}
 
@@ -1231,6 +1225,5 @@ export default function Employees() {
     </section>
   );
 }
-
 
 

@@ -143,6 +143,15 @@ class EmployeeServiceTest {
     }
 
     @Test
+    void create_starterAcceptsEmployeeOwnEmail() {
+        request.setStarterAccount(true);
+        when(employeeRepository.save(any(Employee.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThat(employeeService.create(request).getEmail()).isEqualTo("alice@example.com");
+    }
+
+    @Test
     void create_withoutPassword_letsTheEmployeeChooseOneLater() {
 
         request.setPassword(null);
@@ -350,6 +359,5 @@ class EmployeeServiceTest {
         verify(entityManager).clear();
     }
 }
-
 
 

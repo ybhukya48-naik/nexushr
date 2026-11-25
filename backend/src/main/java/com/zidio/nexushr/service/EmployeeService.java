@@ -76,13 +76,8 @@ public class EmployeeService {
 
         boolean starter = Boolean.TRUE.equals(request.getStarterAccount());
         String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
-        if (starter) {
-            String domain = CompanyPasswords.emailDomain(companyCode);
-            if (!email.endsWith(domain)) {
-                throw new IllegalArgumentException(
-                        "Use an employee email that ends with " + domain
-                );
-            }
+        if (starter && !email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+            throw new IllegalArgumentException("Enter a valid employee email address");
         }
 
         Employee employee = new Employee();

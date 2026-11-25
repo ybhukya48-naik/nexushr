@@ -57,6 +57,7 @@ export default function Payroll() {
   }, []);
   const [records, setRecords] = useState<PayrollRecord[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");
+  const [employeeSearch, setEmployeeSearch] = useState("");
   const [payMonth, setPayMonth] = useState(currentMonth());
 
   const [ctc, setCtc] = useState("");
@@ -472,6 +473,15 @@ export default function Payroll() {
         <form className="payroll-salary-form" onSubmit={handleGenerate}>
           <div className="employee-filters">
             <label>
+              Search employees
+              <input
+                type="search"
+                placeholder="Search name or employee code"
+                value={employeeSearch}
+                onChange={(event) => setEmployeeSearch(event.target.value)}
+              />
+            </label>
+            <label>
               Employee
               <select
                 required
@@ -482,7 +492,10 @@ export default function Payroll() {
               >
                 <option value="">Choose an employee</option>
 
-                {companyEmployees.map((employee) => (
+                {companyEmployees.filter((employee) =>
+                  String(employee.id) === selectedEmployee ||
+                  `${employee.employeeCode} ${employee.fullName}`.toLowerCase().includes(employeeSearch.trim().toLowerCase()),
+                ).map((employee) => (
                   <option key={employee.id} value={employee.id}>
                     {employee.employeeCode} - {employee.fullName}
                   </option>
@@ -937,7 +950,6 @@ export default function Payroll() {
     </section>
   );
 }
-
 
 
 
