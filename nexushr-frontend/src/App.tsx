@@ -1565,6 +1565,7 @@ function EmployeeDashboard() {
     useState<EmployeeResponse | null>(cachedDashboard?.employee ?? null);
   const [records, setRecords] = useState<AttendanceRecord[]>(cachedDashboard?.records ?? []);
   const [audit, setAudit] = useState<AttendanceAuditEntry[]>([]);
+  const [auditError, setAuditError] = useState("");
   const [leaveCount, setLeaveCount] = useState(0);
   const [myLeaves, setMyLeaves] = useState<LeaveRequest[]>([]);
   const [nextHoliday, setNextHoliday] = useState("None listed");
@@ -1590,6 +1591,13 @@ function EmployeeDashboard() {
     const refresh = () => {
       void getEmployeeAttendance(employee.id).then(setRecords)
         .catch((err) => setPunchNote(err instanceof Error ? err.message : "Unable to refresh attendance."));
+      void getAttendanceAudit(employee.id).then((entries) => {
+        setAudit(entries);
+        setAuditError("");
+      }).catch((err) => {
+        setAudit([]);
+        setAuditError(err instanceof Error ? err.message : "Unable to refresh punch history.");
+      });
     };
     window.addEventListener("nexushr-attendance-refresh", refresh);
     return () => window.removeEventListener("nexushr-attendance-refresh", refresh);
@@ -1606,7 +1614,10 @@ function EmployeeDashboard() {
         setLoading(false);
         return Promise.all([
           getEmployeeAttendance(me.id).catch(() => []),
-          getAttendanceAudit(me.id).catch(() => []),
+          getAttendanceAudit(me.id).catch((err) => {
+            if (!cancelled) setAuditError(err instanceof Error ? err.message : "Unable to load punch history.");
+            return [];
+          }),
           getLeaves().catch(() => []),
           getEmployeePayroll(me.id).catch(() => []),
           getHolidays().catch(() => []),
@@ -1715,6 +1726,13 @@ function EmployeeDashboard() {
       setRecords(savedHistory);
       writeDashboardSnapshot(signedInEmployee, savedHistory);
       setPunchNote(kind === "out" ? "Checked out." : "Checked in.");
+      try {
+        setAudit(await getAttendanceAudit(signedInEmployee.id));
+        setAuditError("");
+      } catch (err) {
+        setAudit([]);
+        setAuditError(err instanceof Error ? err.message : "Unable to refresh punch history.");
+      }
     } catch (err) {
       setPunchNote(
         err instanceof Error
@@ -2065,6 +2083,7 @@ function EmployeeDashboard() {
                   <p>Your check-in, check-out, and the working hours used for salary.</p>
                 </div>
               </div>
+              {auditError && <p role="alert">Punch history unavailable: {auditError}</p>}
               <div className="employees-table-wrap month-history">
                 <table className="employees-table">
                   <thead>

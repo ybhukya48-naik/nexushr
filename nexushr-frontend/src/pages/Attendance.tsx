@@ -648,22 +648,22 @@ export function HoursTotals({ records, now }: { records: AttendanceRecord[]; now
       <article>
         <span>Today working hours</span>
         <strong>{formatHoursSeconds(dayCountedSeconds(todayRow, now))}</strong>
-        <em>Up to 9 hours, including 1 flexible lunch hour</em>
+        <em>Up to 8 working hours; flexible lunch is separate. Legacy records may use a 9-hour rule.</em>
       </article>
       <article>
         <span>Month working hours</span>
         <strong>{formatHoursSeconds(monthSeconds)}</strong>
-        <em>1st through today, 9 hours each day</em>
+        <em>1st through today; up to 8 working hours per manual-lunch day</em>
       </article>
       <article>
         <span>History total working hours</span>
         <strong>{formatHoursSeconds(historySeconds)}</strong>
-        <em>Every recorded day, up to 9 hours</em>
+        <em>Every recorded day; legacy records may use a 9-hour rule</em>
       </article>
       <article className="hours-extra">
         <span>Extra working hours</span>
         <strong>{formatHoursSeconds(todayExtra)}</strong>
-        <em>Today. Not counted in the 9 hours.</em>
+        <em>Today. Separate from regular working hours.</em>
         <em>Month {formatHoursSeconds(monthExtra)}</em>
         <em>History {formatHoursSeconds(historyExtra)}</em>
       </article>
@@ -1508,16 +1508,16 @@ export default function Attendance() {
         </div>
       )}
 
-      {canPunch && (
+      {canPunch && isToday && (
         <div className="ux-clock">
           <div>
-            <span>{formatDate(date)} · General shift 9:30–6:30 · {sessionOpen ? "Checked in" : "Not checked in"}</span>
+            <span>{formatDate(date)} · General shift 9:30–6:30 · {onLunch ? "On lunch" : sessionOpen ? "Checked in" : canResume ? "Checked out" : "Not checked in"}</span>
             <strong>
               {String(Math.floor((actionEmployeeRecord ? clockedWorkMinutes(actionEmployeeRecord, currentTime) : 0) / 60)).padStart(2, "0")}
               :
               {String((actionEmployeeRecord ? clockedWorkMinutes(actionEmployeeRecord, currentTime) : 0) % 60).padStart(2, "0")}
             </strong>
-            <em>{(actionEmployeeRecord ? dayExtraMinutes(actionEmployeeRecord, currentTime) : 0) > 0 ? `Extra ${formatAsHours(dayExtraMinutes(actionEmployeeRecord, currentTime))} is shown separately.` : sessionOpen ? "8 working hours and 1 flexible lunch hour." : "Check in to start the day."}</em>
+            <em>{(actionEmployeeRecord ? dayExtraMinutes(actionEmployeeRecord, currentTime) : 0) > 0 ? `Extra ${formatAsHours(dayExtraMinutes(actionEmployeeRecord, currentTime))} is shown separately.` : canResume ? "Your work session has ended." : sessionOpen ? "8 working hours and 1 flexible lunch hour." : "Check in to start the day."}</em>
           </div>
         </div>
       )}
