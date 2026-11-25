@@ -10,6 +10,7 @@ public record PayrollAutoComponentsResponse(
         int presentDays,
         int expectedWorkMinutes,
         int workedMinutes,
+        Integer todayWorkedMinutes,
         int approvedCasualLeaveMinutes,
         int paidLeaveMinutes,
         int shortfallMinutes,

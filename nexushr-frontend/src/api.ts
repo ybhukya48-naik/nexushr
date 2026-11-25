@@ -986,6 +986,7 @@ export interface PayrollAutoComponentsResponse {
   presentDays: number;
   expectedWorkMinutes: number;
   workedMinutes: number;
+  todayWorkedMinutes: number | null;
   paidLeaveMinutes: number;
   shortfallMinutes: number;
   overtimeMinutes: number;

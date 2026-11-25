@@ -580,6 +580,24 @@ export default function Payroll() {
                       {payMonth}: {autoComponents.businessDays} scheduled working days, {autoComponents.presentDays} present days. Worked {(autoComponents.workedMinutes / 60).toFixed(1)}h of {(autoComponents.expectedWorkMinutes / 60).toFixed(1)}h; approved paid casual leave {(autoComponents.paidLeaveMinutes / 60).toFixed(1)}h.
                       {ctc.trim() ? ` Yearly CTC ${money(Number(ctc))}. One month is ${money(Number(ctc) / 12)}.` : selectedEmployeeData?.annualCtc != null ? ` Stored yearly CTC ${money(selectedEmployeeData.annualCtc)}. One month is ${money(selectedEmployeeData.annualCtc / 12)}.` : selectedEmployeeData?.baseSalary ? ` Legacy monthly salary ${money(selectedEmployeeData.baseSalary)}.` : " Enter or save a yearly CTC before pay can be calculated."}
                     </span>
+                    {autoComponents.todayWorkedMinutes != null && (() => {
+                      const override = Number(ctc);
+                      const annual = ctc.trim() && Number.isFinite(override) && override > 0
+                        ? override : selectedEmployeeData?.annualCtc;
+                      const monthly = annual != null
+                        ? Math.round((annual / 12) * 100) / 100
+                        : selectedEmployeeData?.baseSalary;
+                      const minutes = autoComponents.todayWorkedMinutes;
+                      return (
+                        <span>
+                          Today: {Math.floor(minutes / 60)}h {minutes % 60}m payroll-eligible work
+                          {monthly != null && monthly > 0 && autoComponents.expectedWorkMinutes > 0
+                            ? ` · Estimated gross for today's work: ${money(monthly * minutes / autoComponents.expectedWorkMinutes)} (${money(monthly)} monthly CTC ÷ ${(autoComponents.expectedWorkMinutes / 60).toFixed(1)} scheduled hours).`
+                            : " · Set a CTC and scheduled hours to estimate today's earnings."}
+                          {" "}Before deductions and incentives; monthly cap, paid leave and rounding may affect final pay.
+                        </span>
+                      );
+                    })()}
                     <span>
                       Overtime {(autoComponents.overtimeMinutes / 60).toFixed(1)}h is shown separately and is not added to CTC earnings.
                     </span>
@@ -962,8 +980,6 @@ export default function Payroll() {
     </section>
   );
 }
-
-
 
 
 

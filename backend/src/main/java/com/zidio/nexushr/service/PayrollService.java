@@ -494,6 +494,14 @@ public class PayrollService {
                 .sum();
         workedMinutes = Math.max(0, workedMinutes - deductedMinutes);
 
+        Integer todayWorkedMinutes = month.equals(YearMonth.from(now))
+                ? records.stream()
+                    .filter(record -> now.toLocalDate().equals(record.getAttendanceDate()))
+                    .mapToInt(record -> Math.max(0, AttendanceRules.payrollMinutes(record, now)
+                            - (record.getDeductedMinutes() == null ? 0 : record.getDeductedMinutes())))
+                    .sum()
+                : null;
+
         int overtimeMinutes = records.stream()
                 .map(AttendanceRecord::getOvertimeMinutes)
                 .filter(java.util.Objects::nonNull)
@@ -515,6 +523,7 @@ public class PayrollService {
                     presentDays,
                     0,
                     workedMinutes,
+                    todayWorkedMinutes,
                     casualLeave.approvedMinutes(),
                     paidLeaveMinutes,
                     0,
@@ -542,6 +551,7 @@ public class PayrollService {
                 presentDays,
                 expectedWorkMinutes,
                 workedMinutes,
+                todayWorkedMinutes,
                 casualLeave.approvedMinutes(),
                 paidLeaveMinutes,
                 shortfallMinutes,

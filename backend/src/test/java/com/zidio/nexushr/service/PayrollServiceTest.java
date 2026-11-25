@@ -24,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
 
@@ -76,6 +77,29 @@ class PayrollServiceTest {
         assertThat(CtcSalarySplit.split(monthly, 8 * 60, scheduled).earnings()).isEqualByComparingTo("1000.00");
         assertThat(CtcSalarySplit.split(monthly, 6 * 60, scheduled).earnings()).isEqualByComparingTo("750.00");
         assertThat(CtcSalarySplit.split(monthly, scheduled, scheduled).earnings()).isEqualByComparingTo("24000.00");
+    }
+
+    @Test
+    void todayPreviewUsesEligibleWorkNotOvertimeAndOnlyForCurrentMonth() {
+        LocalDate today = LocalDate.now(AttendanceService.COMPANY_ZONE);
+        AttendanceRecord attendance = new AttendanceRecord();
+        attendance.setAttendanceDate(today);
+        attendance.setCheckInTime(today.atTime(8, 0));
+        attendance.setCheckOutTime(today.atTime(18, 0));
+        attendance.setManualLunch(true);
+        attendance.setWorkMinutes(540);
+        attendance.setOvertimeMinutes(60);
+        attendance.setDeductedMinutes(30);
+        when(employeeRepository.findById(4L)).thenReturn(Optional.of(employee));
+        when(attendanceRepository.findByEmployee_IdAndAttendanceDateBetween(
+                eq(4L), any(LocalDate.class), any(LocalDate.class))).thenReturn(List.of(attendance));
+
+        var current = payrollService.autoComponents(4L, YearMonth.from(today).toString());
+        assertThat(current.todayWorkedMinutes()).isEqualTo(450);
+        assertThat(current.workedMinutes()).isEqualTo(450);
+        assertThat(current.overtimeMinutes()).isEqualTo(60);
+        assertThat(payrollService.autoComponents(4L, YearMonth.from(today).minusMonths(1).toString())
+                .todayWorkedMinutes()).isNull();
     }
 
     @Test

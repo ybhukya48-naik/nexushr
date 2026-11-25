@@ -99,6 +99,9 @@ leave consumes its full allowance even if attendance reduces the credit. EARNED
 leave is not paid under this policy. Overtime is displayed separately and is not included in CTC
 earnings. A payroll entry's override affects that record only; existing payroll
 snapshots and paid records are preserved during bulk recalculation.
+The payroll employee preview shows today's eligible work and its estimated
+gross share of monthly CTC before deductions and incentives. Monthly caps,
+paid leave, and rounding can change the final payroll total.
 Managers can view their own attendance history and payslips and submit their
 own leave requests to HR. Managers see same-company direct reports, not HR
 administration or leave approvals. The manager team report exposes recorded
@@ -106,6 +109,9 @@ work, overtime, leave status and payroll status, but not salary amounts or
 leave reasons. A manager's direct reports must be assigned through Reporting
 Manager; sharing a department alone does not grant access. HR/admin receive
 leave approval notifications.
+The employee form supports teams A-G or a custom department; HR must also
+select the reporting manager for the manager's team view. HR, admin and super
+admin have their own attendance controls on the dashboard.
 
 1. Arrange a consistent backup immediately before deployment with the database
    owner. Use the provider's point-in-time recovery where available and a

@@ -217,9 +217,9 @@ export default function Dashboard() {
     const from = dates[0];
     const to = dates[dates.length - 1];
     Promise.all([
-      getCurrentEmployee().catch(() => null),
+      getCurrentEmployee(),
       getEmployees().catch(() => [] as EmployeeResponse[]),
-      getAttendanceByDate(today).catch(() => [] as AttendanceRecord[]),
+      getAttendanceByDate(today),
     ])
       .then(([current, employees, attendance]) => {
         if (cancelled) {

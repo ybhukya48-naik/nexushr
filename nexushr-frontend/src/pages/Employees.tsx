@@ -909,6 +909,19 @@ export default function Employees() {
             </label>
 
             <label>
+              Choose a team
+              <select
+                value={["TEAM-A", "TEAM-B", "TEAM-C", "TEAM-D", "TEAM-E", "TEAM-F", "TEAM-G"].includes(form.department) ? form.department : ""}
+                onChange={(event) => updateForm("department", event.target.value)}
+              >
+                <option value="">Select a team or enter a department above</option>
+                {["A", "B", "C", "D", "E", "F", "G"].map((letter) => (
+                  <option key={letter} value={`TEAM-${letter}`}>Team {letter}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
               Reporting manager
               <select
                 value={form.reportingManagerId ?? ""}
@@ -923,6 +936,7 @@ export default function Employees() {
                 ))}
               </select>
             </label>
+            <p>Assign a reporting manager to make this employee visible in that manager's team.</p>
 
             <label>
               Designation
