@@ -327,12 +327,15 @@ public class SecurityConfig {
                     HttpMethod.POST,
                     "/api/v1/attendance/check-in",
                     "/api/v1/attendance/check-out",
+                    "/api/v1/attendance/lunch/start",
+                    "/api/v1/attendance/lunch/end",
                     "/api/v1/attendance/biometric/check-in",
                     "/api/v1/attendance/biometric/check-out"
                 )
                 .hasAnyRole(
                     "HR",
                     "ADMIN",
+                    "SUPER_ADMIN",
                     "MANAGER",
                     "EMPLOYEE"
                 )
@@ -585,4 +588,3 @@ public class SecurityConfig {
         return source;
     }
 }
-

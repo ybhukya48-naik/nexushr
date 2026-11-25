@@ -63,10 +63,6 @@ public class AttendancePolicyService {
 
     public void onCheckOut(AttendanceRecord record, Employee actor) {
         LocalDateTime now = record.getCheckOutTime();
-        // Flexible lunch is the employee's own hour. They check out, the
-        // system is inactive while they are away, and they check in again
-        // after lunch. That gap is break time, not a warning. A warning is
-        // only raised while they are still checked in.
         int gap = AttendanceRules.countableInactiveMinutes(record.getLastActivityAt(), now);
         int idle = zero(record.getSessionIdleMinutes());
         if (Boolean.TRUE.equals(record.getYellowFlag())
@@ -77,8 +73,7 @@ public class AttendancePolicyService {
         record.setSessionIdleMinutes(0);
         record.setLastActivityAt(now);
         applyMonthPenalties(record);
-        audit(record, actor, "CHECK_OUT",
-                "Check-out at " + now + ". Time until the next check-in is lunch, not working time.");
+        audit(record, actor, "CHECK_OUT", "Check-out at " + now);
     }
 
     @Transactional
@@ -86,14 +81,20 @@ public class AttendancePolicyService {
         LocalDate today = LocalDate.now(AttendanceService.COMPANY_ZONE);
         LocalDateTime now = LocalDateTime.now(AttendanceService.COMPANY_ZONE);
         AttendanceRecord record = attendanceRepository
-                .findByEmployee_IdAndAttendanceDate(employeeId, today)
+                .lockByEmployeeAndDate(employeeId, today)
                 .orElse(null);
         if (record == null || record.getCheckInTime() == null || record.getCheckOutTime() != null) {
+            return record;
+        }
+        if (record.getLunchStartedAt() != null) {
             return record;
         }
         Employee employee = record.getEmployee();
         if (employee != null && employee.isSiteVisitor()) {
             record.setLastActivityAt(now);
+            return attendanceRepository.save(record);
+        }
+        if (closeIfHeartbeatExpired(record, now)) {
             return attendanceRepository.save(record);
         }
         int gap = AttendanceRules.countableInactiveMinutes(
@@ -113,6 +114,24 @@ public class AttendancePolicyService {
         return attendanceRepository.save(record);
     }
 
+    public boolean closeIfHeartbeatExpired(AttendanceRecord record, LocalDateTime now) {
+        if (record.getCheckInTime() == null || record.getCheckOutTime() != null
+                || record.getLunchStartedAt() != null
+                || record.getEmployee() == null || record.getEmployee().isSiteVisitor()) {
+            return false;
+        }
+        LocalDateTime lastConfirmed = AttendanceRules.inactivityMeasuredFrom(
+                record.getLastActivityAt(), record.getSessionStartedAt());
+        if (lastConfirmed == null) {
+            lastConfirmed = record.getCheckInTime();
+        }
+        if (now.isBefore(lastConfirmed.plusMinutes(AttendanceRules.INACTIVE_LIMIT_MINUTES))) {
+            return false;
+        }
+        closeAt(record, lastConfirmed, "Automatic check-out at the last heartbeat after 30 minutes without a heartbeat.");
+        return true;
+    }
+
     public void automaticLogout(AttendanceRecord record) {
         if (record.getCheckInTime() == null || record.getCheckOutTime() != null) {
             return;
@@ -121,6 +140,10 @@ public class AttendancePolicyService {
         LocalDateTime checkoutAt = deadline == null || record.getCheckInTime().isAfter(deadline)
                 ? record.getCheckInTime()
                 : deadline;
+        closeAt(record, checkoutAt, "Automatic check-out 9 hours after check-in. The attendance record is kept.");
+    }
+
+    private void closeAt(AttendanceRecord record, LocalDateTime checkoutAt, String detail) {
         AttendanceDay day = new AttendanceDay();
         int closed = record.getClosedWorkMinutes() == null ? 0 : record.getClosedWorkMinutes();
         day.restore(
@@ -136,8 +159,9 @@ public class AttendancePolicyService {
             record.setSessionStartedAt(null);
             record.setClosedWorkMinutes(day.closedWorkMinutes());
             record.setBreakMinutes(day.breakMinutes());
-            record.setWorkMinutes(AttendanceRules.payableWorkMinutes(
-                    day.closedWorkMinutes(), day.breakMinutes()));
+            record.setWorkMinutes(record.isManualLunch() ? day.closedWorkMinutes()
+                    : AttendanceRules.payableWorkMinutes(day.closedWorkMinutes(), day.breakMinutes()));
+            record.setOvertimeMinutes(Math.max(0, record.getWorkMinutes() - AttendanceRules.WORK_MINUTES));
             record.setAttendanceStatus("CLOSED");
         } catch (IllegalStateException ex) {
             if (record.getCheckOutTime() == null) {
@@ -148,8 +172,7 @@ public class AttendancePolicyService {
         record.setBlueFlag(true);
         record.setLastActivityAt(checkoutAt);
         applyMonthPenalties(record);
-        audit(record, record.getEmployee(), "AUTO_LOGOUT",
-                "Automatic check-out 9 hours after check-in. The attendance record is kept.");
+        audit(record, record.getEmployee(), "AUTO_LOGOUT", detail);
     }
 
     public void markMissingLogout(AttendanceRecord record) {

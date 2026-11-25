@@ -7,6 +7,7 @@ import {
   type EmployeeResponse,
 } from "../api";
 import { asWorkspaceCompany, getWorkspaceCompany } from "../utils/workspace";
+import { checkOut, officeCheckIn, startLunch, endLunch, getEmployeeAttendance, isWindowsComputer, type AttendanceRecord } from "./Attendance";
 import "./Dashboard.css";
 
 function formatClock(value?: string | null) {
@@ -63,6 +64,8 @@ export default function AdminDashboard() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => new Date());
+  const [selfRecord, setSelfRecord] = useState<AttendanceRecord | null>(null);
+  const [punching, setPunching] = useState(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30000);
@@ -99,6 +102,32 @@ export default function AdminDashboard() {
     };
   }, [company]);
 
+  useEffect(() => {
+    if (!me) return;
+    const refresh = () => {
+      void getEmployeeAttendance(me.id).then((history) => {
+        const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+        setSelfRecord(history.find((row) => row.attendanceDate?.slice(0, 10) === today) ?? null);
+      }).catch((err) => setError(err instanceof Error ? err.message : "Unable to load your attendance."));
+    };
+    refresh();
+    window.addEventListener("nexushr-attendance-refresh", refresh);
+    return () => window.removeEventListener("nexushr-attendance-refresh", refresh);
+  }, [me]);
+
+  async function punchSelf(action: "in" | "out" | "start" | "end") {
+    setPunching(true);
+    setError("");
+    try {
+      const saved = await (action === "in" ? officeCheckIn() : action === "out" ? checkOut() : action === "start" ? startLunch() : endLunch());
+      setSelfRecord(saved);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save attendance.");
+    } finally {
+      setPunching(false);
+    }
+  }
+
   const people = rows.filter((row) => !company || asWorkspaceCompany(row.company) === company);
   const active = people.filter((row) => row.active);
   const chairmen = active.filter(isChairman);
@@ -134,6 +163,17 @@ export default function AdminDashboard() {
       </header>
 
       {error && <p className="page-alert">{error}</p>}
+
+      <section className="hr-card">
+        <h3>My attendance</h3>
+        <p>{selfRecord?.lunchStartedAt ? "Lunch in progress" : selfRecord?.checkInTime && !selfRecord.checkOutTime ? "Checked in" : selfRecord?.checkOutTime ? "Checked out" : "Not checked in"}</p>
+        <div className="attendance-actions">
+          <button type="button" disabled={punching || !me || !isWindowsComputer() || Boolean(selfRecord?.checkInTime && !selfRecord.checkOutTime)} onClick={() => void punchSelf("in")}>Check in</button>
+          <button type="button" disabled={punching || !me || !isWindowsComputer() || !selfRecord?.checkInTime || Boolean(selfRecord.checkOutTime)} onClick={() => void punchSelf("out")}>Check out</button>
+          <button type="button" disabled={punching || !me || !isWindowsComputer() || !selfRecord?.checkInTime || Boolean(selfRecord.checkOutTime || selfRecord.lunchStartedAt)} onClick={() => void punchSelf("start")}>Start lunch</button>
+          <button type="button" disabled={punching || !me || !isWindowsComputer() || !selfRecord?.lunchStartedAt} onClick={() => void punchSelf("end")}>End lunch</button>
+        </div>
+      </section>
 
       <section className="hr-kpis">
         <button type="button" onClick={() => navigate("/employees")}>

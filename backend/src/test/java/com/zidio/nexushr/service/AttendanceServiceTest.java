@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -67,6 +68,55 @@ class AttendanceServiceTest {
         );
 
         record.setWorkMinutes(480);
+    }
+
+    @Test
+    void manualLunchPausesWorkAndCheckoutDoesNotStartLunch() {
+        LocalDateTime now = LocalDateTime.now(AttendanceService.COMPANY_ZONE);
+        AttendanceRecord today = new AttendanceRecord();
+        today.setEmployee(employee);
+        today.setAttendanceDate(now.toLocalDate());
+        today.setCheckInTime(now.minusHours(2));
+        today.setSessionStartedAt(now.minusHours(2));
+        today.setManualLunch(true);
+        when(employeeRepository.findById(100L)).thenReturn(Optional.of(employee));
+        when(attendanceRepository.lockByEmployeeAndDate(100L, now.toLocalDate())).thenReturn(Optional.of(today));
+        when(attendanceRepository.save(today)).thenReturn(today);
+
+        attendanceService.lunch(100L, true);
+        assertThat(today.getCheckOutTime()).isNull();
+        assertThat(today.getLunchStartedAt()).isNotNull();
+        assertThat(today.getWorkMinutes()).isBetween(120, 121);
+        assertThatThrownBy(() -> attendanceService.lunch(100L, true))
+                .hasMessageContaining("already started");
+
+        attendanceService.lunch(100L, false);
+        assertThat(today.getLunchStartedAt()).isNull();
+        assertThat(today.getSessionStartedAt()).isNotNull();
+        attendanceService.checkOut(100L);
+        assertThat(today.getLunchStartedAt()).isNull();
+        assertThat(today.getCheckOutTime()).isNotNull();
+        assertThat(today.getWorkMinutes()).isBetween(120, 121);
+    }
+
+    @Test
+    void eightHoursWithoutLunchAreNotAutomaticallyReduced() {
+        LocalDateTime now = LocalDateTime.now(AttendanceService.COMPANY_ZONE);
+        AttendanceRecord today = new AttendanceRecord();
+        today.setEmployee(employee);
+        today.setAttendanceDate(now.toLocalDate());
+        today.setCheckInTime(now.minusHours(9));
+        today.setSessionStartedAt(now.minusHours(9));
+        today.setManualLunch(true);
+        when(employeeRepository.findById(100L)).thenReturn(Optional.of(employee));
+        when(attendanceRepository.lockByEmployeeAndDate(100L, now.toLocalDate())).thenReturn(Optional.of(today));
+        when(attendanceRepository.save(today)).thenReturn(today);
+
+        attendanceService.checkOut(100L);
+        assertThat(today.getWorkMinutes()).isBetween(540, 541);
+        assertThat(today.getOvertimeMinutes()).isBetween(60, 61);
+        assertThat(AttendanceRules.payrollMinutes(today, now)).isEqualTo(480);
+        assertThat(today.getLunchStartedAt()).isNull();
     }
 
     @Test
@@ -145,7 +195,7 @@ class AttendanceServiceTest {
                 .thenReturn(Optional.of(employee));
 
         when(attendanceRepository
-                .findByEmployee_IdAndAttendanceDate(
+                .lockByEmployeeAndDate(
                         eq(100L),
                         any(LocalDate.class)))
                 .thenReturn(Optional.empty());
@@ -184,7 +234,7 @@ class AttendanceServiceTest {
                 .findById(100L);
 
         verify(attendanceRepository)
-                .findByEmployee_IdAndAttendanceDate(
+                .lockByEmployeeAndDate(
                         eq(100L),
                         eq(LocalDate.now(AttendanceService.COMPANY_ZONE)));
 
@@ -213,7 +263,7 @@ class AttendanceServiceTest {
                 .thenReturn(Optional.of(employee));
 
         when(attendanceRepository
-                .findByEmployee_IdAndAttendanceDate(
+                .lockByEmployeeAndDate(
                         eq(100L),
                         eq(LocalDate.now(AttendanceService.COMPANY_ZONE))))
                 .thenReturn(Optional.of(todayRecord));
@@ -237,7 +287,7 @@ class AttendanceServiceTest {
                 .findById(100L);
 
         verify(attendanceRepository)
-                .findByEmployee_IdAndAttendanceDate(
+                .lockByEmployeeAndDate(
                         100L,
                         LocalDate.now(AttendanceService.COMPANY_ZONE));
 

@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -44,6 +45,20 @@ class AttendanceControllerTest {
 
     @MockitoBean(name = "authorizationService")
     private AuthorizationService authorizationService;
+
+    @Test
+    @WithMockUser(username = "employee@example.com", roles = "EMPLOYEE")
+    void lunchEndpointsAlwaysUseTheAuthenticatedEmployee() throws Exception {
+        when(attendanceService.findEmployeeIdByUsername("employee@example.com")).thenReturn(100L);
+        when(attendanceService.lunch(100L, true)).thenReturn(new AttendanceRecord());
+        when(attendanceService.lunch(100L, false)).thenReturn(new AttendanceRecord());
+        mockMvc.perform(post("/api/v1/attendance/lunch/start").param("employeeId", "101"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/attendance/lunch/end").param("employeeId", "101"))
+                .andExpect(status().isOk());
+        verify(attendanceService).lunch(100L, true);
+        verify(attendanceService).lunch(100L, false);
+    }
 
     @Test
     @WithMockUser(username = "employee@example.com", roles = "EMPLOYEE")

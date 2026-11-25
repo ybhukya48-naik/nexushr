@@ -71,6 +71,20 @@ public class AttendanceController {
         return attendanceService.checkOut(targetEmployeeId, actorId);
     }
 
+    @PostMapping("/lunch/start")
+    @PreAuthorize("isAuthenticated()")
+    public AttendanceRecord startLunch(Authentication authentication, HttpServletRequest request) {
+        requireWindowsComputer(request);
+        return attendanceService.lunch(attendanceService.findEmployeeIdByUsername(authentication.getName()), true);
+    }
+
+    @PostMapping("/lunch/end")
+    @PreAuthorize("isAuthenticated()")
+    public AttendanceRecord endLunch(Authentication authentication, HttpServletRequest request) {
+        requireWindowsComputer(request);
+        return attendanceService.lunch(attendanceService.findEmployeeIdByUsername(authentication.getName()), false);
+    }
+
     @PostMapping("/biometric/check-in")
     @PreAuthorize("isAuthenticated()")
     public AttendanceRecord biometricCheckIn(

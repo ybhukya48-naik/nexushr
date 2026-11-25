@@ -70,69 +70,37 @@ public class AttendanceInactivityService {
         // Lunch is a flexible hour chosen by the employee, not a 1:00–2:00 deadline.
     }
 
-    /**
-     * Closes a forgotten check-in 9 hours after check-in. Someone still active
-     * after those 9 hours stays checked in, so a manual check-out can keep the extra time.
-     */
-    @Scheduled(fixedDelay = 600_000, initialDelay = 20_000)
+    @Scheduled(fixedDelay = 60_000, initialDelay = 20_000)
     @Transactional
     public void closeExpiredOpenSessions() {
         LocalDateTime now = LocalDateTime.now(AttendanceService.COMPANY_ZONE);
-        for (AttendanceRecord record : attendanceRepository.findByCheckInTimeIsNotNullAndCheckOutTimeIsNull()) {
+        for (Long recordId : attendanceRepository.findOpenRecordIds()) {
             try {
+                AttendanceRecord record = attendanceRepository.lockById(recordId).orElse(null);
+                if (record == null || record.getCheckInTime() == null || record.getCheckOutTime() != null) {
+                    continue;
+                }
                 LocalDate date = record.getAttendanceDate() != null
                         ? record.getAttendanceDate()
                         : record.getCheckInTime().toLocalDate();
-                LocalDateTime deadline = AttendanceRules.automaticLogoutAt(record.getCheckInTime());
-                if (deadline == null || now.isBefore(deadline)) {
-                    continue;
-                }
-                if (AttendanceRules.stillWorkingPastFullDay(record.getCheckInTime(), record.getLastActivityAt(), now)) {
-                    continue;
-                }
-                attendancePolicyService.automaticLogout(record);
-                attendanceRepository.save(record);
                 Employee employee = record.getEmployee();
-                if (employee == null || employee.getId() == null) {
+                if (employee == null || employee.isSiteVisitor()
+                        || !attendancePolicyService.closeIfHeartbeatExpired(record, now)) {
+                    continue;
+                }
+                attendanceRepository.save(record);
+                if (employee.getId() == null) {
                     continue;
                 }
                 String marker = date + " automatic logout";
                 notify(
                         employee,
                         "Automatic logout",
-                        marker + ". Check-out was saved 9 hours after check-in. The attendance record is kept.",
+                        marker + ". Check-out was saved at the last heartbeat after 30 minutes without a heartbeat.",
                         false);
-                notifyReportingManager(employee, marker, "was checked out automatically 9 hours after check-in", false);
+                notifyReportingManager(employee, marker, "was checked out after 30 minutes without a heartbeat", false);
             } catch (RuntimeException ex) {
-                log.warn("Could not close a forgotten check-in for record {}", record.getId(), ex);
-            }
-        }
-    }
-
-    @Scheduled(cron = "0 */5 9-22 * * MON-SAT", zone = "Asia/Kolkata")
-    @Transactional
-    public void alertChromeInactive() {
-        LocalDateTime now = LocalDateTime.now(AttendanceService.COMPANY_ZONE);
-        if (AttendanceRules.duringInactivityGrace(now.toLocalTime())) {
-            return;
-        }
-        LocalDate today = now.toLocalDate();
-        for (AttendanceRecord record : attendanceRepository.findByAttendanceDate(today)) {
-            if (record.getCheckInTime() == null || record.getCheckOutTime() != null) {
-                continue;
-            }
-            if (record.getEmployee() != null && record.getEmployee().isSiteVisitor()) {
-                continue;
-            }
-            if (Boolean.TRUE.equals(record.getYellowFlag()) || record.getLastActivityAt() == null) {
-                continue;
-            }
-            int gap = AttendanceRules.countableInactiveMinutes(
-                    AttendanceRules.inactivityMeasuredFrom(record.getLastActivityAt(), record.getSessionStartedAt()),
-                    now);
-            if (gap > AttendanceRules.INACTIVE_LIMIT_MINUTES) {
-                attendancePolicyService.markInactiveChrome(record, (int) gap);
-                attendanceRepository.save(record);
+                log.warn("Could not close a forgotten check-in for record {}", recordId, ex);
             }
         }
     }
@@ -206,6 +174,9 @@ public class AttendanceInactivityService {
                 .findByEmployee_IdAndAttendanceDate(employee.getId(), today)
                 .orElse(null);
         if (record == null || record.getCheckInTime() == null || record.getCheckOutTime() != null) {
+            return;
+        }
+        if (!employee.isSiteVisitor()) {
             return;
         }
         attendancePolicyService.automaticLogout(record);

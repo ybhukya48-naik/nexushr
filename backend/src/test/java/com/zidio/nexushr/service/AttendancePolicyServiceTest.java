@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,6 +40,95 @@ class AttendancePolicyServiceTest {
 
     @InjectMocks
     private AttendancePolicyService attendancePolicyService;
+
+    @Test
+    void manualOpenDayUsesOnlyConfirmedTimeAfterHeartbeatTimeout() {
+        LocalDateTime now = LocalDateTime.now(AttendanceService.COMPANY_ZONE);
+        Employee employee = new Employee();
+        AttendanceRecord record = new AttendanceRecord();
+        record.setEmployee(employee);
+        record.setAttendanceDate(now.toLocalDate());
+        record.setCheckInTime(now.minusHours(5));
+        record.setSessionStartedAt(now.minusHours(2));
+        record.setLastActivityAt(now.minusHours(1));
+        record.setClosedWorkMinutes(180);
+        record.setManualLunch(true);
+        assertThat(record.getWorkMinutes()).isEqualTo(240);
+        assertThat(AttendanceRules.payrollMinutes(record, now)).isEqualTo(240);
+    }
+
+    @Test
+    void lunchDoesNotExpireForMissingHeartbeats() {
+        Employee employee = new Employee();
+        AttendanceRecord record = new AttendanceRecord();
+        record.setEmployee(employee);
+        record.setCheckInTime(LocalDateTime.of(2026, 11, 25, 9, 0));
+        record.setLunchStartedAt(LocalDateTime.of(2026, 11, 25, 13, 0));
+        record.setClosedWorkMinutes(240);
+        record.setManualLunch(true);
+        assertThat(attendancePolicyService.closeIfHeartbeatExpired(record,
+                LocalDateTime.of(2026, 11, 25, 14, 30))).isFalse();
+        assertThat(record.getWorkMinutes()).isEqualTo(240);
+    }
+
+    @Test
+    void lateHeartbeatClosesInsteadOfExtendingTheSession() {
+        Employee employee = new Employee();
+        employee.setId(8L);
+        LocalDateTime lastHeartbeat = LocalDateTime.now(AttendanceService.COMPANY_ZONE).minusMinutes(35);
+        AttendanceRecord record = new AttendanceRecord();
+        record.setEmployee(employee);
+        record.setAttendanceDate(lastHeartbeat.toLocalDate());
+        record.setCheckInTime(lastHeartbeat.minusHours(1));
+        record.setSessionStartedAt(record.getCheckInTime());
+        record.setLastActivityAt(lastHeartbeat);
+        when(attendanceRepository.lockByEmployeeAndDate(8L, LocalDate.now(AttendanceService.COMPANY_ZONE)))
+                .thenReturn(Optional.of(record));
+        when(attendanceRepository.findByEmployee_IdAndAttendanceDateBetween(any(), any(), any()))
+                .thenReturn(List.of());
+        when(attendanceRepository.save(record)).thenReturn(record);
+
+        attendancePolicyService.heartbeat(8L);
+
+        assertThat(record.getCheckOutTime()).isEqualTo(lastHeartbeat);
+        assertThat(record.getLastActivityAt()).isEqualTo(lastHeartbeat);
+        assertThat(record.getWorkMinutes()).isEqualTo(60);
+    }
+
+    @Test
+    void heartbeatExpiryUsesExactThirtyMinuteThresholdAndLastHeartbeat() {
+        Employee employee = new Employee();
+        employee.setId(8L);
+        AttendanceRecord record = new AttendanceRecord();
+        record.setEmployee(employee);
+        record.setAttendanceDate(LocalDate.of(2026, 11, 25));
+        record.setCheckInTime(LocalDateTime.of(2026, 11, 25, 9, 0));
+        record.setSessionStartedAt(record.getCheckInTime());
+        record.setLastActivityAt(record.getCheckInTime().plusHours(2));
+        when(attendanceRepository.findByEmployee_IdAndAttendanceDateBetween(any(), any(), any()))
+                .thenReturn(List.of());
+
+        assertThat(attendancePolicyService.closeIfHeartbeatExpired(record,
+                record.getLastActivityAt().plusMinutes(30).minusNanos(1))).isFalse();
+        assertThat(attendancePolicyService.closeIfHeartbeatExpired(record,
+                record.getLastActivityAt().plusMinutes(30))).isTrue();
+        assertThat(record.getCheckOutTime()).isEqualTo(LocalDateTime.of(2026, 11, 25, 11, 0));
+        assertThat(record.getWorkMinutes()).isEqualTo(120);
+        assertThat(attendancePolicyService.closeIfHeartbeatExpired(record,
+                LocalDateTime.of(2026, 11, 25, 12, 0))).isFalse();
+    }
+
+    @Test
+    void heartbeatExpiryDoesNotApplyToSiteWorkers() {
+        Employee employee = new Employee();
+        employee.setSiteVisitor(true);
+        AttendanceRecord record = new AttendanceRecord();
+        record.setEmployee(employee);
+        record.setCheckInTime(LocalDateTime.of(2026, 11, 25, 9, 0));
+        assertThat(attendancePolicyService.closeIfHeartbeatExpired(record,
+                LocalDateTime.of(2026, 11, 25, 18, 0))).isFalse();
+        assertThat(record.getCheckOutTime()).isNull();
+    }
 
     @Test
     void automaticLogoutClosesTheOpenDayNineHoursAfterCheckIn() {

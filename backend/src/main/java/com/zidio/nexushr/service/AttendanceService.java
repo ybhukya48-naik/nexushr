@@ -178,10 +178,12 @@ public class AttendanceService {
         return attendanceRepository.save(attendanceRecord);
     }
 
+    @Transactional
     public AttendanceRecord checkIn(Long employeeId) {
         return checkIn(employeeId, employeeId, false);
     }
 
+    @Transactional
     public AttendanceRecord checkIn(
             Long employeeId,
             Long actorId,
@@ -225,6 +227,7 @@ public class AttendanceService {
                         && !leave.getEndDate().isBefore(today));
     }
 
+    @Transactional
     public AttendanceRecord checkIn(Long employeeId, Long actorId, boolean selfieAttached) {
 
         Employee employee = getActiveEmployee(employeeId);
@@ -233,8 +236,11 @@ public class AttendanceService {
         LocalDateTime now = LocalDateTime.now(COMPANY_ZONE);
 
         AttendanceRecord record = attendanceRepository
-                .findByEmployee_IdAndAttendanceDate(employeeId, today)
+                .lockByEmployeeAndDate(employeeId, today)
                 .orElseGet(AttendanceRecord::new);
+        if (record.getCheckInTime() == null) {
+            record.setManualLunch(true);
+        }
 
         if (selfieAttached && !employee.isSiteVisitor()) {
             throw badRequest("Selfie check-in is only for site staff");
@@ -243,6 +249,9 @@ public class AttendanceService {
             throw badRequest("Site visitors must check in with a selfie photo");
         }
 
+        if (attendancePolicyService != null && record.getId() != null) {
+            attendancePolicyService.closeIfHeartbeatExpired(record, now);
+        }
         restoreClockedWork(record);
         AttendanceDay day = dayFrom(record);
         try {
@@ -269,14 +278,17 @@ public class AttendanceService {
         return attendanceRepository.save(record);
     }
 
+    @Transactional
     public AttendanceRecord checkOut(Long employeeId) {
         return checkOut(employeeId, employeeId);
     }
 
+    @Transactional
     public AttendanceRecord checkOut(Long employeeId, Long actorId) {
         return checkOut(employeeId, actorId, false);
     }
 
+    @Transactional
     public AttendanceRecord checkOut(Long employeeId, Long actorId, boolean selfieAttached) {
 
         Employee employee = getActiveEmployee(employeeId);
@@ -288,7 +300,7 @@ public class AttendanceService {
 
         AttendanceRecord record =
                 attendanceRepository
-                        .findByEmployee_IdAndAttendanceDate(
+                        .lockByEmployeeAndDate(
                                 employeeId,
                                 today
                         )
@@ -298,6 +310,22 @@ public class AttendanceService {
                         ));
 
         LocalDateTime now = LocalDateTime.now(COMPANY_ZONE);
+        if (attendancePolicyService != null && attendancePolicyService.closeIfHeartbeatExpired(record, now)) {
+            return attendanceRepository.save(record);
+        }
+        if (record.getLunchStartedAt() != null) {
+            record.setBreakMinutes((record.getBreakMinutes() == null ? 0 : record.getBreakMinutes())
+                    + AttendanceRules.sessionMinutes(record.getLunchStartedAt(), now));
+            record.setLunchStartedAt(null);
+            record.setCheckOutTime(now);
+            record.setAttendanceStatus("CLOSED");
+            record.setWorkMinutes(record.getClosedWorkMinutes());
+            record.setOvertimeMinutes(calculateOvertimeMinutes(record.getClosedWorkMinutes()));
+            if (attendancePolicyService != null) {
+                attendancePolicyService.onCheckOut(record, actor(actorId, employee));
+            }
+            return attendanceRepository.save(record);
+        }
         restoreClockedWork(record);
         AttendanceDay day = dayFrom(record);
         try {
@@ -325,6 +353,49 @@ public class AttendanceService {
         return attendanceRepository.save(record);
     }
 
+    @Transactional(noRollbackFor = ResponseStatusException.class)
+    public AttendanceRecord lunch(Long employeeId, boolean start) {
+        Employee employee = getActiveEmployee(employeeId);
+        LocalDateTime now = LocalDateTime.now(COMPANY_ZONE);
+        AttendanceRecord record = attendanceRepository.lockByEmployeeAndDate(employeeId, now.toLocalDate())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Check in before starting lunch"));
+        if (record.getCheckInTime() == null || record.getCheckOutTime() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Check in before starting lunch");
+        }
+        if (start) {
+            if (record.getLunchStartedAt() != null) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Lunch is already started");
+            }
+            if (attendancePolicyService != null && attendancePolicyService.closeIfHeartbeatExpired(record, now)) {
+                attendanceRepository.save(record);
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Your session was checked out at the last heartbeat. Check in before starting lunch.");
+            }
+            LocalDateTime sessionStart = record.getSessionStartedAt() == null
+                    ? record.getCheckInTime() : record.getSessionStartedAt();
+            int closed = record.getClosedWorkMinutes() == null ? 0 : record.getClosedWorkMinutes();
+            record.setClosedWorkMinutes(closed + AttendanceRules.sessionMinutes(sessionStart, now));
+            record.setSessionStartedAt(null);
+            record.setLunchStartedAt(now);
+            record.setManualLunch(true);
+            record.setAttendanceStatus("LUNCH");
+        } else {
+            if (record.getLunchStartedAt() == null) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Lunch has not been started");
+            }
+            record.setBreakMinutes((record.getBreakMinutes() == null ? 0 : record.getBreakMinutes())
+                    + AttendanceRules.sessionMinutes(record.getLunchStartedAt(), now));
+            record.setLunchStartedAt(null);
+            record.setSessionStartedAt(now);
+            record.setLastActivityAt(now);
+            record.setAttendanceStatus("OPEN");
+        }
+        record.setWorkMinutes(record.getClosedWorkMinutes());
+        record.setOvertimeMinutes(calculateOvertimeMinutes(record.getClosedWorkMinutes()));
+        record.setEmployee(employee);
+        return attendanceRepository.save(record);
+    }
+
     private Employee actor(Long actorId, Employee fallback) {
         if (actorId == null || fallback.getId() != null && actorId.equals(fallback.getId())) {
             return fallback;
@@ -346,12 +417,13 @@ public class AttendanceService {
                 && !"INACTIVE".equals(status);
         String message = switch (status) {
             case "OPEN" -> "Checked in";
+            case "LUNCH" -> "Lunch in progress";
             case "CLOSED" -> "Checked out";
             case "INACTIVE" -> "Marked inactive. Check in or check out is missing.";
             default -> open ? "Checked in" : "Check in is missing";
         };
         java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
-        body.put("status", open ? "OPEN" : status);
+        body.put("status", open && !"LUNCH".equals(status) ? "OPEN" : status);
         body.put("checkedIn", record != null && record.getCheckInTime() != null);
         body.put("checkedOut", record != null && record.getCheckOutTime() != null);
         body.put("message", message);
@@ -415,6 +487,9 @@ public class AttendanceService {
         if (record == null) {
             return 0;
         }
+        if (record.isManualLunch()) {
+            return record.getWorkMinutes() == null ? 0 : record.getWorkMinutes();
+        }
         int breakMinutes = record.getBreakMinutes() == null ? 0 : record.getBreakMinutes();
         int closed = record.getClosedWorkMinutes() == null ? 0 : record.getClosedWorkMinutes();
         if (breakMinutes == 0
@@ -430,7 +505,7 @@ public class AttendanceService {
     }
 
     private void restoreClockedWork(AttendanceRecord record) {
-        if (record == null || record.getCheckInTime() == null || record.getCheckOutTime() == null) {
+        if (record == null || record.isManualLunch() || record.getCheckInTime() == null || record.getCheckOutTime() == null) {
             return;
         }
         int breakMinutes = record.getBreakMinutes() == null ? 0 : record.getBreakMinutes();
@@ -494,15 +569,17 @@ public class AttendanceService {
         record.setSessionStartedAt(day.sessionStartedAt());
         record.setClosedWorkMinutes(day.closedWorkMinutes());
         record.setBreakMinutes(day.breakMinutes());
-        record.setWorkMinutes(AttendanceRules.payableWorkMinutes(
-                day.closedWorkMinutes(), day.breakMinutes()));
+        record.setWorkMinutes(record.isManualLunch() ? day.closedWorkMinutes()
+                : AttendanceRules.payableWorkMinutes(day.closedWorkMinutes(), day.breakMinutes()));
         record.setAttendanceStatus(day.status());
     }
 
+    @Transactional
     public AttendanceRecord biometricCheckIn(Long employeeId) {
         return checkIn(employeeId);
     }
 
+    @Transactional
     public AttendanceRecord biometricCheckOut(Long employeeId) {
         return checkOut(employeeId);
     }
@@ -1023,13 +1100,7 @@ public class AttendanceService {
 
             LocalDateTime now = LocalDateTime.now(COMPANY_ZONE);
             int workedMinutes = records.stream()
-                    .mapToInt(record -> AttendanceRules.finishedDayMinutes(
-                            record.getCheckInTime(),
-                            record.getCheckOutTime(),
-                            record.getAttendanceDate(),
-                            record.getWorkMinutes() == null ? 0 : record.getWorkMinutes(),
-                            record.getBreakMinutes() == null ? 0 : record.getBreakMinutes(),
-                            now))
+                    .mapToInt(record -> AttendanceRules.payrollMinutes(record, now))
                     .sum();
             int deductedMinutes = records.stream()
                     .map(AttendanceRecord::getDeductedMinutes)

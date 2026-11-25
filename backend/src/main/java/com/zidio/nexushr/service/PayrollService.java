@@ -471,13 +471,7 @@ public class PayrollService {
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Kolkata"));
         int workedMinutes = records.stream()
-                .mapToInt(record -> AttendanceRules.finishedDayMinutes(
-                        record.getCheckInTime(),
-                        record.getCheckOutTime(),
-                        record.getAttendanceDate(),
-                        record.getWorkMinutes() == null ? 0 : record.getWorkMinutes(),
-                        record.getBreakMinutes() == null ? 0 : record.getBreakMinutes(),
-                        now))
+                .mapToInt(record -> AttendanceRules.payrollMinutes(record, now))
                 .sum();
         int deductedMinutes = records.stream()
                 .map(AttendanceRecord::getDeductedMinutes)

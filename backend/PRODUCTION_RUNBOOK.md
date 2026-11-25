@@ -31,6 +31,13 @@ Optional pool tuning:
 - Auto deploy: Enabled from main branch.
 - Restart policy: Enabled.
 
+## Attendance policy
+- New check-ins track actual work separately from manually started lunch; lunch pauses the work clock and overtime is shown separately after eight working hours.
+- Office sessions with no app heartbeat for 30 minutes are checked out at the last heartbeat. Browser closure, sleep, and loss of connectivity cannot be distinguished; keep the app open and connected. Site/selfie attendance is exempt and retains its separate checkout policy.
+- Lunch pauses heartbeat-based checkout. Resume lunch explicitly; checking out while on lunch ends the break.
+- Historical attendance keeps its previous calculation policy. Migration V43 adds the new fields without converting existing records.
+- Annual payroll CTC is divided by 12. Existing employee base-salary values are treated as monthly because their historical meaning is not known.
+
 ## 4) Vercel Settings
 - Production domain mapped: `hr.cyond.com`
 - Frontend API base URL points to: `https://hr-api.cyond.com`

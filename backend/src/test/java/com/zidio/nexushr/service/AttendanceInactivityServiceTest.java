@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -42,7 +43,7 @@ class AttendanceInactivityServiceTest {
     private NotificationService notificationService;
 
     @Test
-    void closeExpiredOpenSessions_logsOutAForgottenDayNineHoursAfterCheckIn() {
+    void closeExpiredOpenSessions_logsOutAtLastHeartbeat() {
         Employee employee = new Employee();
         employee.setId(7L);
         employee.setFullName("Bhukya Yakub");
@@ -54,6 +55,7 @@ class AttendanceInactivityServiceTest {
         missed.setAttendanceDate(yesterday);
         missed.setCheckInTime(yesterday.atTime(10, 15, 21));
         missed.setSessionStartedAt(missed.getCheckInTime());
+        missed.setLastActivityAt(missed.getCheckInTime().plusHours(4));
         missed.setAttendanceStatus("OPEN");
         missed.setClosedWorkMinutes(0);
         missed.setBreakMinutes(0);
@@ -70,8 +72,9 @@ class AttendanceInactivityServiceTest {
         stillWorking.setClosedWorkMinutes(0);
         stillWorking.setBreakMinutes(0);
 
-        when(attendanceRepository.findByCheckInTimeIsNotNullAndCheckOutTimeIsNull())
-                .thenReturn(List.of(missed, stillWorking));
+        when(attendanceRepository.findOpenRecordIds()).thenReturn(List.of(1L, 2L));
+        when(attendanceRepository.lockById(1L)).thenReturn(Optional.of(missed));
+        when(attendanceRepository.lockById(2L)).thenReturn(Optional.of(stillWorking));
         when(attendanceRepository.findByEmployee_IdAndAttendanceDateBetween(any(), any(), any()))
                 .thenReturn(List.of());
         when(notificationRepository.existsByEmployeeIdAndNotificationTypeAndMessageContaining(
@@ -88,12 +91,12 @@ class AttendanceInactivityServiceTest {
 
         service.closeExpiredOpenSessions();
 
-        assertThat(missed.getCheckOutTime()).isEqualTo(yesterday.atTime(10, 15, 21).plusHours(9));
+        assertThat(missed.getCheckOutTime()).isEqualTo(yesterday.atTime(10, 15, 21).plusHours(4));
         assertThat(missed.getBlueFlag()).isTrue();
         assertThat(missed.getAttendanceStatus()).isEqualTo("CLOSED");
         assertThat(missed.getWorkMinutes()).isEqualTo(
                 AttendanceRules.payableWorkMinutes(
-                        AttendanceRules.sessionMinutes(yesterday.atTime(10, 15, 21), yesterday.atTime(10, 15, 21).plusHours(9)),
+                        AttendanceRules.sessionMinutes(yesterday.atTime(10, 15, 21), yesterday.atTime(10, 15, 21).plusHours(4)),
                         0));
         assertThat(stillWorking.getCheckOutTime()).isNull();
     }

@@ -39,6 +39,8 @@ import {
 import {
   checkOut,
   officeCheckIn,
+  startLunch,
+  endLunch,
   getAttendanceAudit,
   getEmployeeAttendance,
   createLeave,
@@ -335,7 +337,7 @@ function AppRoutes() {
         })
         .catch(() => {
           if (!cancelled) {
-            setAttendanceAlert("");
+            setAttendanceAlert("Unable to load attendance status. Check your connection.");
           }
         });
     }
@@ -343,10 +345,11 @@ function AppRoutes() {
     loadStatus();
     const timer = window.setInterval(loadStatus, 60000);
     const heartbeat = window.setInterval(() => {
-      if (document.visibilityState !== "visible" || !document.hasFocus()) {
-        return;
-      }
-      void sendAttendanceHeartbeat().catch(() => undefined);
+      void sendAttendanceHeartbeat()
+        .then(() => window.dispatchEvent(new Event("nexushr-attendance-refresh")))
+        .catch(() => {
+          if (!cancelled) setAttendanceAlert("Attendance connection failed. Check your internet connection.");
+        });
     }, 60000);
     return () => {
       cancelled = true;
@@ -1417,12 +1420,22 @@ function ManagerDashboard() {
   const today = records.find((record) => record.attendanceDate?.slice(0, 10) === todayKey());
   const checkedIn = Boolean(today?.checkInTime && !today.checkOutTime);
 
-  async function punch(kind: "in" | "out") {
+  useEffect(() => {
+    if (!employee) return;
+    const refresh = () => {
+      void getEmployeeAttendance(employee.id).then(setRecords)
+        .catch((err) => setError(err instanceof Error ? err.message : "Unable to refresh attendance."));
+    };
+    window.addEventListener("nexushr-attendance-refresh", refresh);
+    return () => window.removeEventListener("nexushr-attendance-refresh", refresh);
+  }, [employee]);
+
+  async function punch(kind: "in" | "out" | "lunch-start" | "lunch-end") {
     if (!employee) return;
     setBusy(true);
     setError("");
     try {
-      await (kind === "in" ? officeCheckIn() : checkOut());
+      await (kind === "in" ? officeCheckIn() : kind === "out" ? checkOut() : kind === "lunch-start" ? startLunch() : endLunch());
       setRecords(await getEmployeeAttendance(employee.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save attendance.");
@@ -1448,6 +1461,8 @@ function ManagerDashboard() {
             <div className="attendance-actions">
               <button type="button" className="primary-button" disabled={busy || checkedIn || !employee} onClick={() => void punch("in")}>Check in</button>
               <button type="button" className="secondary-button" disabled={busy || !checkedIn || !employee} onClick={() => void punch("out")}>Check out</button>
+              <button type="button" className="secondary-button" disabled={busy || !checkedIn || Boolean(today?.lunchStartedAt)} onClick={() => void punch("lunch-start")}>Start lunch</button>
+              <button type="button" className="secondary-button" disabled={busy || !today?.lunchStartedAt} onClick={() => void punch("lunch-end")}>End lunch</button>
             </div>
           </section>
           <section className="panel">
@@ -1494,6 +1509,16 @@ function EmployeeDashboard() {
     const timer = window.setInterval(() => setClockNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!employee) return;
+    const refresh = () => {
+      void getEmployeeAttendance(employee.id).then(setRecords)
+        .catch((err) => setPunchNote(err instanceof Error ? err.message : "Unable to refresh attendance."));
+    };
+    window.addEventListener("nexushr-attendance-refresh", refresh);
+    return () => window.removeEventListener("nexushr-attendance-refresh", refresh);
+  }, [employee]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1653,7 +1678,7 @@ function EmployeeDashboard() {
     setPunching(true);
     setPunchNote("");
     try {
-      await (kind === "out" ? checkOut() : officeCheckIn());
+      await (kind === "out" ? startLunch() : endLunch());
       const history = await getEmployeeAttendance(signedInEmployee.id);
       const savedHistory = [...history].sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
       setRecords(savedHistory);
@@ -1711,17 +1736,17 @@ function EmployeeDashboard() {
         const warnings = monthRows.filter((row) => row.yellowFlag).length;
         const halfDay = warnings >= 3 ? Math.round(Number(employee.baseSalary || 0) / 26 / 2) : 0;
         const workday = new Date().getDay() !== 0;
-        const onLunchNow = Boolean(todayRecord?.checkInTime && todayRecord?.checkOutTime);
+        const onLunchNow = Boolean(todayRecord?.lunchStartedAt);
         const notices = [
           workday && !todayRecord?.checkInTime ? "Check-in is missing today." : "",
-          todayRecord?.checkInTime && !todayRecord.checkOutTime && todaySeconds < 9 * 60 * 60
-            ? "You are still checked in. Signing out of the website does not check you out. If you forget, check-out is saved 9 hours after check-in."
+          todayRecord?.checkInTime && !todayRecord.checkOutTime && todaySeconds < 8 * 60 * 60
+            ? "Keep the app connected. After 30 minutes without a heartbeat, checkout is saved at the last heartbeat."
             : "",
-          todayRecord?.checkInTime && !todayRecord.checkOutTime && todaySeconds >= 9 * 60 * 60
-            ? "9 hours are complete. Extra hours are showing. Check out when you leave."
+          todayRecord?.checkInTime && !todayRecord.checkOutTime && todaySeconds >= 8 * 60 * 60
+            ? "8 working hours are complete. Extra hours are shown separately."
             : "",
           isCheckoutMissing(todayRecord)
-            ? "Check-out was missed. It is saved 9 hours after check-in, and the attendance record stays."
+            ? "An older attendance record is missing check-out. Contact HR if it needs correction."
             : "",
           todayRecord?.yellowFlag && !onLunchNow
             ? "Desktop was inactive for more than 30 minutes. This is a warning."
@@ -1753,8 +1778,8 @@ function EmployeeDashboard() {
         const wfhTime = !todayRecord?.checkInTime
           ? "No check-in yet"
           : `Check in ${formatClock(todayRecord.checkInTime)} · ${todayRecord.checkOutTime ? `Check out ${formatClock(todayRecord.checkOutTime)}` : "Still in"} · ${formatHoursSeconds(todaySeconds)}`;
-        const onLunch = Boolean(todayRecord?.checkInTime && todayRecord?.checkOutTime);
-        const lunchStarted = onLunch ? new Date(String(todayRecord?.checkOutTime)).getTime() : 0;
+        const onLunch = Boolean(todayRecord?.lunchStartedAt);
+        const lunchStarted = onLunch ? new Date(String(todayRecord?.lunchStartedAt)).getTime() : 0;
         const lunchSeconds = lunchStarted
           ? Math.max(0, Math.floor((clockNow.getTime() - lunchStarted) / 1000))
           : Math.max(0, (todayRecord?.breakMinutes ?? 0) * 60);
@@ -1770,12 +1795,12 @@ function EmployeeDashboard() {
                 <article>
                   <span>Month working hours</span>
                   <strong>{formatHoursSeconds(monthSeconds)}</strong>
-                  <em>1st through today. Salary uses finished days, {formatHoursSeconds(doneSeconds)}.</em>
+                  <em>1st through today. Completed days: {formatHoursSeconds(doneSeconds)}.</em>
                 </article>
                 <article>
                   <span>History total working hours</span>
                   <strong>{formatHoursSeconds(historySeconds)}</strong>
-                  <em>Every recorded day, up to 9 hours.</em>
+                  <em>Every recorded day, up to 8 working hours.</em>
                 </article>
                 <article className="hours-extra">
                   <span>Extra working hours</span>
@@ -1804,14 +1829,14 @@ function EmployeeDashboard() {
                     <strong>{formatTimer(lunchSeconds)}</strong>
                     <em>{onLunch ? "lunch timer" : "lunch taken"}</em>
                     <div className="attendance-actions">
-                      <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !todayRecord?.checkInTime || Boolean(todayRecord?.checkOutTime)} onClick={() => void punchLunch("out")}>
+                      <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !checkedIn || onLunch} onClick={() => void punchLunch("out")}>
                         Start lunch
                       </button>
-                      <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !todayRecord?.checkOutTime} onClick={() => void punchLunch("in")}>
+                      <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !onLunch} onClick={() => void punchLunch("in")}>
                         End lunch
                       </button>
                     </div>
-                    <em>{lunchSeconds > 3600 ? "Past 1 paid hour. Extra time stays a break." : "1 hour is paid. It can be any hour."}</em>
+                    <em>{lunchSeconds > 3600 ? "Past 1 hour; lunch time is excluded from work." : "Flexible lunch; lunch time is excluded from work."}</em>
                   </div>
                 </div>
               </article>
@@ -2219,6 +2244,3 @@ export default function App() {
     </PageGuard>
   );
 }
-
-
-
