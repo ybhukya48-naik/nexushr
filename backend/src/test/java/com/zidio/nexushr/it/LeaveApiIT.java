@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.*;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 
 import java.util.Map;
 
@@ -35,9 +36,10 @@ class LeaveApiIT extends AbstractIntegrationTest {
         HttpHeaders bootstrap = new HttpHeaders();
         bootstrap.setBearerAuth(jwtTokenService.generate(
                 "bootstrap",
-                Map.of("role", "ADMIN")
+                Map.of("role", "SUPER_ADMIN")
         ));
         bootstrap.setContentType(MediaType.APPLICATION_JSON);
+        restTemplate.getRestTemplate().setRequestFactory(new JdkClientHttpRequestFactory());
         ensureActor(bootstrap);
 
         authHeaders = new HttpHeaders();

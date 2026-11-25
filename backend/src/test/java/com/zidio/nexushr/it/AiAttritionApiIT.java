@@ -1,6 +1,7 @@
 package com.zidio.nexushr.it;
 
 import com.zidio.nexushr.AbstractIntegrationTest;
+import com.zidio.nexushr.domain.RoleType;
 import com.zidio.nexushr.security.JwtTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,7 +29,8 @@ class AiAttritionApiIT extends AbstractIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        String token = jwtTokenService.generate("admin", Map.of("role", "ADMIN"));
+        testEmployee("ITADMIN", "it.admin@example.com", RoleType.ADMIN, "Integration1");
+        String token = jwtTokenService.generate("it.admin@example.com", Map.of("role", "ADMIN"));
         authHeaders = new HttpHeaders();
         authHeaders.setBearerAuth(token);
         authHeaders.setContentType(MediaType.APPLICATION_JSON);

@@ -1,10 +1,19 @@
 package com.zidio.nexushr;
 
+import com.zidio.nexushr.domain.Employee;
+import com.zidio.nexushr.domain.RoleType;
+import com.zidio.nexushr.repository.EmployeeRepository;
+import com.zidio.nexushr.service.EmployeeService;
+import com.zidio.nexushr.web.dto.EmployeeRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
 
 /**
  * Base class for integration tests.
@@ -31,6 +40,29 @@ import org.testcontainers.containers.PostgreSQLContainer;
         }
 )
 public abstract class AbstractIntegrationTest {
+
+    @Autowired
+    private EmployeeRepository testEmployeeRepository;
+
+    @Autowired
+    private EmployeeService testEmployeeService;
+
+    protected Employee testEmployee(String code, String email, RoleType role, String password) {
+        return testEmployeeRepository.findByEmailIgnoreCase(email).orElseGet(() -> {
+            EmployeeRequest request = new EmployeeRequest();
+            request.setEmployeeCode(code);
+            request.setFullName("Integration " + code);
+            request.setEmail(email);
+            request.setPassword(password);
+            request.setRoleType(role);
+            request.setDepartment("Integration");
+            request.setDesignation("Tester");
+            request.setJoiningDate(LocalDate.of(2026, 1, 1));
+            request.setBaseSalary(BigDecimal.valueOf(50000));
+            request.setCompanyCode("CYOND");
+            return testEmployeeService.create(request);
+        });
+    }
 
     /**
      * One PostgreSQL database for every integration test class.
