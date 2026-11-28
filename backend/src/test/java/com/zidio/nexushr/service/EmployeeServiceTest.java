@@ -83,6 +83,25 @@ class EmployeeServiceTest {
     }
 
     @Test
+    void create_storesAnnualCtcWithoutChangingLegacyMonthlySalary() {
+        request.setAnnualCtc(new BigDecimal("1200000"));
+        when(passwordEncoder.encode("Password@123")).thenReturn("encoded");
+        when(employeeRepository.save(any(Employee.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        Employee saved = employeeService.create(request);
+        assertThat(saved.getAnnualCtc()).isEqualByComparingTo("1200000");
+        assertThat(saved.getBaseSalary()).isEqualByComparingTo("50000");
+    }
+
+    @Test
+    void create_rejectsInvalidAnnualCtc() {
+        request.setAnnualCtc(new BigDecimal("-1"));
+        assertThatThrownBy(() -> employeeService.create(request))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("Annual CTC must be positive");
+        verify(employeeRepository, never()).save(any(Employee.class));
+    }
+
+    @Test
     void findAll_returnsList() {
 
         when(employeeRepository.findAll())
@@ -140,6 +159,94 @@ class EmployeeServiceTest {
 
         verify(employeeRepository)
                 .save(any(Employee.class));
+    }
+
+    @Test
+    void create_starterAcceptsEmployeeOwnEmail() {
+        request.setStarterAccount(true);
+        when(employeeRepository.save(any(Employee.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThat(employeeService.create(request).getEmail()).isEqualTo("alice@example.com");
+    }
+
+    @Test
+    void create_assignsActiveManagerInSameCompany() {
+        Employee manager = new Employee();
+        manager.setId(5L);
+        manager.setRoleType(RoleType.MANAGER);
+        Company company = new Company();
+        company.setCode("CYOND");
+        manager.setCompany(company);
+        manager.setActive(true);
+        request.setReportingManagerId(5L);
+        when(employeeRepository.findById(5L)).thenReturn(Optional.of(manager));
+        when(passwordEncoder.encode("Password@123")).thenReturn("hash");
+        when(employeeRepository.save(any(Employee.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        assertThat(employeeService.create(request).getReportingManagerId()).isEqualTo(5L);
+    }
+
+    @Test
+    void create_rejectsManagerFromAnotherCompany() {
+        Employee manager = new Employee();
+        manager.setId(5L);
+        manager.setRoleType(RoleType.MANAGER);
+        Company company = new Company();
+        company.setCode("GORLE");
+        manager.setCompany(company);
+        manager.setActive(true);
+        request.setReportingManagerId(5L);
+        when(employeeRepository.findById(5L)).thenReturn(Optional.of(manager));
+        when(passwordEncoder.encode("Password@123")).thenReturn("hash");
+        assertThatThrownBy(() -> employeeService.create(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("same company");
+        verify(employeeRepository, never()).save(any());
+    }
+
+    @Test
+    void setReportingManager_rejectsCrossCompanyAssignment() {
+        Company cyond = new Company();
+        cyond.setCode("CYOND");
+        Company gorle = new Company();
+        gorle.setCode("GORLE");
+        employee.setCompany(cyond);
+        Employee manager = new Employee();
+        manager.setId(5L);
+        manager.setActive(true);
+        manager.setRoleType(RoleType.MANAGER);
+        manager.setCompany(gorle);
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(employee));
+        when(employeeRepository.findById(5L)).thenReturn(Optional.of(manager));
+
+        assertThatThrownBy(() -> employeeService.setReportingManager(1L, 5L))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("same company");
+        verify(employeeRepository, never()).save(any());
+    }
+
+    @Test
+    void update_rejectsCompanyChangeWithOldManager() {
+        Company cyond = new Company();
+        cyond.setCode("CYOND");
+        Company gorle = new Company();
+        gorle.setCode("GORLE");
+        employee.setCompany(cyond);
+        employee.setReportingManagerId(5L);
+        Employee manager = new Employee();
+        manager.setId(5L);
+        manager.setActive(true);
+        manager.setRoleType(RoleType.MANAGER);
+        manager.setCompany(cyond);
+        EmployeeRequest update = new EmployeeRequest();
+        update.setCompanyCode("GORLE");
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(employee));
+        when(employeeRepository.findById(5L)).thenReturn(Optional.of(manager));
+        when(companyRepository.findByCodeIgnoreCase("GORLE")).thenReturn(Optional.of(gorle));
+
+        assertThatThrownBy(() -> employeeService.update(1L, update))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("new company");
+        verify(employeeRepository, never()).save(any());
     }
 
     @Test
@@ -253,6 +360,64 @@ class EmployeeServiceTest {
     }
 
     @Test
+    void update_assignsAndClearsValidReportingManager() {
+        Company company = new Company();
+        company.setCode("CYOND");
+        employee.setCompany(company);
+        Employee manager = new Employee();
+        manager.setId(2L);
+        manager.setCompany(company);
+        manager.setRoleType(RoleType.MANAGER);
+        manager.setActive(true);
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(employee));
+        when(employeeRepository.findById(2L)).thenReturn(Optional.of(manager));
+        when(employeeRepository.save(employee)).thenReturn(employee);
+        EmployeeRequest update = new EmployeeRequest();
+        update.setDepartment("Team B");
+        update.setReportingManagerId(2L);
+        employeeService.update(1L, update);
+        assertThat(employee.getDepartment()).isEqualTo("Team B");
+        assertThat(employee.getReportingManagerId()).isEqualTo(2L);
+        update.setReportingManagerId(0L);
+        employeeService.update(1L, update);
+        assertThat(employee.getReportingManagerId()).isNull();
+    }
+
+    @Test
+    void update_rejectsCrossCompanyReportingManager() {
+        Company cyond = new Company();
+        cyond.setCode("CYOND");
+        Company gorle = new Company();
+        gorle.setCode("GORLE");
+        employee.setCompany(cyond);
+        Employee manager = new Employee();
+        manager.setId(2L);
+        manager.setCompany(gorle);
+        manager.setRoleType(RoleType.MANAGER);
+        manager.setActive(true);
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(employee));
+        when(employeeRepository.findById(2L)).thenReturn(Optional.of(manager));
+        EmployeeRequest update = new EmployeeRequest();
+        update.setReportingManagerId(2L);
+        assertThatThrownBy(() -> employeeService.update(1L, update))
+                .hasMessageContaining("same company");
+        verify(employeeRepository, never()).save(any(Employee.class));
+    }
+
+    @Test
+    void update_preservesAnnualCtcWhenOmittedAndUpdatesWhenProvided() {
+        employee.setAnnualCtc(new BigDecimal("1200000"));
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(employee));
+        when(employeeRepository.save(employee)).thenReturn(employee);
+        EmployeeRequest update = new EmployeeRequest();
+        employeeService.update(1L, update);
+        assertThat(employee.getAnnualCtc()).isEqualByComparingTo("1200000");
+        update.setAnnualCtc(new BigDecimal("1500000"));
+        employeeService.update(1L, update);
+        assertThat(employee.getAnnualCtc()).isEqualByComparingTo("1500000");
+    }
+
+    @Test
     void update_updatesEmployee() {
 
         when(employeeRepository.findById(1L))
@@ -350,6 +515,3 @@ class EmployeeServiceTest {
         verify(entityManager).clear();
     }
 }
-
-
-

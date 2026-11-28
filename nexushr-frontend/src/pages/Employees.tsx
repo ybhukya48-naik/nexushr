@@ -7,7 +7,6 @@ import type { FormEvent } from "react";
 import {
   createEmployee,
   defaultEmployeePassword,
-  employeeEmailDomain,
   getEmployees,
   resetEmployeePassword,
   updateEmployee,
@@ -496,9 +495,9 @@ export default function Employees() {
   const pageRows = directoryRows.slice((safePage - 1) * pageSize, safePage * pageSize);
   const shownRows = listOpen ? pageRows : pageRows.slice(0, 6);
 
-  function updateForm(
-    field: keyof EmployeeRequest,
-    value: string | number | boolean,
+  function updateForm<K extends keyof EmployeeRequest>(
+    field: K,
+    value: EmployeeRequest[K],
   ) {
     setForm((current) => ({
       ...current,
@@ -526,8 +525,10 @@ export default function Employees() {
       designation: employee.designation,
       joiningDate: employee.joiningDate,
       baseSalary: employee.baseSalary,
+      annualCtc: employee.annualCtc ?? undefined,
       active: employee.active,
       companyCode: employee.companyCode || "CYOND",
+      reportingManagerId: employee.reportingManagerId ?? 0,
     });
 
     setShowCreateForm(true);
@@ -600,11 +601,6 @@ export default function Employees() {
       ? form.companyCode
       : (getWorkspaceCompany() ?? "CYOND");
     const email = form.email.trim().toLowerCase();
-    if (editingEmployeeId === null && !email.endsWith(employeeEmailDomain(companyCode))) {
-      setSaving(false);
-      setSaveError(`Use an email that ends with ${employeeEmailDomain(companyCode)}.`);
-      return;
-    }
     const employeeData: EmployeeRequest = editingEmployeeId !== null
       ? {
           ...form,
@@ -625,13 +621,15 @@ export default function Employees() {
           accountNumber: "",
           password: defaultEmployeePassword(companyCode),
           roleType: "EMPLOYEE",
-          department: form.designation.trim(),
+          department: form.department.trim() || form.designation.trim(),
           designation: form.designation.trim(),
           joiningDate: new Date().toISOString().slice(0, 10),
           baseSalary: 0,
+          annualCtc: form.annualCtc,
           active: true,
           companyCode,
           starterAccount: true,
+          reportingManagerId: form.reportingManagerId,
         };
 
     try {
@@ -874,7 +872,7 @@ export default function Employees() {
 
             {editingEmployeeId === null && (
               <p className="employee-password-note">
-                First password is {defaultEmployeePassword(getWorkspaceCompany() ?? "CYOND")}. The email must end with {employeeEmailDomain(getWorkspaceCompany() ?? "CYOND")}. The employee sets a new password, then creates the rest of the profile.
+                First password is {defaultEmployeePassword(getWorkspaceCompany() ?? "CYOND")}. Enter the employee's own email. The employee sets a new password, then creates the rest of the profile.
               </p>
             )}
 
@@ -896,19 +894,49 @@ export default function Employees() {
               </select>
             </label>}
 
-            {editingEmployeeId !== null && <label>
-              Department
+            <label>
+              Team or department
               <input
-                required
+                list="employee-team-options"
+                required={editingEmployeeId !== null}
                 value={form.department}
-                onChange={(event) =>
-                  updateForm(
-                    "department",
-                    event.target.value,
-                  )
-                }
+                onChange={(event) => updateForm("department", event.target.value)}
+                placeholder="Select or enter a team"
               />
-            </label>}
+              <datalist id="employee-team-options">
+                {TEAM_ORDER.map((team) => <option key={team} value={team} />)}
+              </datalist>
+            </label>
+
+            <label>
+              Choose a team
+              <select
+                value={["TEAM-A", "TEAM-B", "TEAM-C", "TEAM-D", "TEAM-E", "TEAM-F", "TEAM-G"].includes(form.department) ? form.department : ""}
+                onChange={(event) => updateForm("department", event.target.value)}
+              >
+                <option value="">Select a team or enter a department above</option>
+                {["A", "B", "C", "D", "E", "F", "G"].map((letter) => (
+                  <option key={letter} value={`TEAM-${letter}`}>Team {letter}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Reporting manager
+              <select
+                value={form.reportingManagerId ?? ""}
+                onChange={(event) => updateForm("reportingManagerId", event.target.value ? Number(event.target.value) : editingEmployeeId === null ? undefined : 0)}
+              >
+                <option value={editingEmployeeId === null ? "" : 0}>Not assigned</option>
+                {employees.filter((person) =>
+                  person.active && person.roleType === "MANAGER" &&
+                  person.id !== editingEmployeeId && isCompanyMatch(person.companyCode, company),
+                ).map((person) => (
+                  <option key={person.id} value={person.id}>{person.fullName} - {person.employeeCode}</option>
+                ))}
+              </select>
+            </label>
+            <p>Assign a reporting manager to make this employee visible in that manager's team.</p>
 
             <label>
               Designation
@@ -939,21 +967,23 @@ export default function Employees() {
               />
             </label>}
 
-            {editingEmployeeId !== null && <label>
-              Base Salary
+            <label>
+              Annual CTC
               <input
-                required
-                min="0"
+                min="0.01"
+                step="0.01"
                 type="number"
-                value={form.baseSalary}
+                value={form.annualCtc ?? ""}
+                placeholder="Total yearly CTC"
                 onChange={(event) =>
                   updateForm(
-                    "baseSalary",
-                    Number(event.target.value),
+                    "annualCtc",
+                    event.target.value ? Number(event.target.value) : undefined,
                   )
                 }
               />
-            </label>}
+              <small>Yearly amount; monthly CTC is this value divided by 12. Leave blank to retain the existing salary.</small>
+            </label>
 
             {editingEmployeeId !== null && <label>
               Active
@@ -1231,6 +1261,3 @@ export default function Employees() {
     </section>
   );
 }
-
-
-

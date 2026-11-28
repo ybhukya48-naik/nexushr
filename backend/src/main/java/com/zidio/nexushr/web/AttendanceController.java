@@ -19,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -69,6 +70,20 @@ public class AttendanceController {
         Long actorId = attendanceService.findEmployeeIdByUsername(authentication.getName());
         Long targetEmployeeId = punchTarget(employeeId, actorId, authentication);
         return attendanceService.checkOut(targetEmployeeId, actorId);
+    }
+
+    @PostMapping("/lunch/start")
+    @PreAuthorize("isAuthenticated()")
+    public AttendanceRecord startLunch(Authentication authentication, HttpServletRequest request) {
+        requireWindowsComputer(request);
+        return attendanceService.lunch(attendanceService.findEmployeeIdByUsername(authentication.getName()), true);
+    }
+
+    @PostMapping("/lunch/end")
+    @PreAuthorize("isAuthenticated()")
+    public AttendanceRecord endLunch(Authentication authentication, HttpServletRequest request) {
+        requireWindowsComputer(request);
+        return attendanceService.lunch(attendanceService.findEmployeeIdByUsername(authentication.getName()), false);
     }
 
     @PostMapping("/biometric/check-in")
@@ -185,6 +200,22 @@ public class AttendanceController {
                 .toList();
     }
 
+    public record TeamAttendance(Long employeeId, LocalDateTime checkInTime,
+                                 LocalDateTime checkOutTime, boolean onLunch) {}
+
+    @GetMapping("/team-today")
+    @PreAuthorize("hasRole('MANAGER')")
+    public List<TeamAttendance> teamToday(Authentication authentication) {
+        Long self = authorizationService.authenticatedEmployeeId(authentication);
+        return attendanceService.listByDate(LocalDate.now(AttendanceService.COMPANY_ZONE)).stream()
+                .filter(record -> record.getEmployee() != null
+                        && !record.getEmployee().getId().equals(self)
+                        && authorizationService.canSeeEmployee(record.getEmployee(), authentication))
+                .map(record -> new TeamAttendance(record.getEmployee().getId(),
+                        record.getCheckInTime(), record.getCheckOutTime(), record.getLunchStartedAt() != null))
+                .toList();
+    }
+
     @GetMapping("/daily-counts")
     @PreAuthorize("isAuthenticated()")
     public List<DailyCheckInCount> dailyCounts(
@@ -272,7 +303,6 @@ public class AttendanceController {
             String role = authority.getAuthority();
             if ("ROLE_HR".equals(role)
                     || "ROLE_ADMIN".equals(role)
-                    || "ROLE_MANAGER".equals(role)
                     || "ROLE_SUPER_ADMIN".equals(role)) {
                 return true;
             }

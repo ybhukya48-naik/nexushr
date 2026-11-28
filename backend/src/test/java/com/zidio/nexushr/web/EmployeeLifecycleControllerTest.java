@@ -115,19 +115,7 @@ class EmployeeLifecycleControllerTest {
 
     @Test
     @WithMockUser(roles = "MANAGER")
-    void submitOnboarding_managerIsAllowed() throws Exception {
-
-        Employee result = employee(
-                1L,
-                EmployeeLifecycleStatus.PENDING_APPROVAL,
-                false
-        );
-
-        when(lifecycleService.submitOnboarding(
-                anyLong(),
-                any(),
-                any()
-        )).thenReturn(result);
+    void submitOnboarding_managerIsForbidden() throws Exception {
 
         mockMvc.perform(
                 post("/api/v1/employees/1/submit-onboarding")
@@ -136,7 +124,7 @@ class EmployeeLifecycleControllerTest {
                                 request("manager@example.com", "Submit")
                         ))
         )
-                .andExpect(status().isOk());
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -303,39 +291,19 @@ class EmployeeLifecycleControllerTest {
 
     @Test
     @WithMockUser(roles = "MANAGER")
-    void promote_managerIsAllowed() throws Exception {
-
-        Employee result = employee(
-                1L,
-                EmployeeLifecycleStatus.ACTIVE,
-                true
-        );
-        result.setDesignation("Senior Engineer");
-        result.setBaseSalary(new BigDecimal("70000"));
-
+    void promote_managerIsForbidden() throws Exception {
         EmployeeLifecycleRequest request =
                 request("manager@example.com", "Promotion");
 
         request.setDesignation("Senior Engineer");
         request.setBaseSalary(new BigDecimal("70000"));
 
-        when(lifecycleService.promote(
-                eq(1L),
-                eq("manager@example.com"),
-                eq("Promotion"),
-                eq("Senior Engineer"),
-                eq(new BigDecimal("70000"))
-        )).thenReturn(result);
-
         mockMvc.perform(
                 post("/api/v1/employees/1/promote")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
         )
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.designation")
-                        .value("Senior Engineer"))
-                .andExpect(jsonPath("$.baseSalary").value(70000));
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -406,19 +374,7 @@ class EmployeeLifecycleControllerTest {
 
     @Test
     @WithMockUser(roles = "MANAGER")
-    void resign_managerIsAllowed() throws Exception {
-
-        Employee result = employee(
-                1L,
-                EmployeeLifecycleStatus.OFFBOARDING,
-                true
-        );
-
-        when(lifecycleService.resign(
-                eq(1L),
-                eq("manager@example.com"),
-                eq("Resignation approved")
-        )).thenReturn(result);
+    void resign_managerIsForbidden() throws Exception {
 
         mockMvc.perform(
                 post("/api/v1/employees/1/resign")
@@ -430,9 +386,7 @@ class EmployeeLifecycleControllerTest {
                                 )
                         ))
         )
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.lifecycleStatus")
-                        .value("OFFBOARDING"));
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -493,16 +447,11 @@ class EmployeeLifecycleControllerTest {
 
     @Test
     @WithMockUser(roles = "MANAGER")
-    void lifecycleHistory_managerIsAllowed() throws Exception {
-
-        when(lifecycleService.getHistory(1L))
-                .thenReturn(List.of());
-
+    void lifecycleHistory_managerIsForbidden() throws Exception {
         mockMvc.perform(
                 get("/api/v1/employees/1/lifecycle-history")
         )
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isEmpty());
+                .andExpect(status().isForbidden());
     }
 
     @Test

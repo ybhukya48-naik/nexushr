@@ -65,6 +65,12 @@ public class AttendanceRecord {
     @Column(name = "break_minutes", nullable = false)
     private Integer breakMinutes = 0;
 
+    @Column(name = "manual_lunch", nullable = false)
+    private boolean manualLunch;
+
+    @Column(name = "lunch_started_at")
+    private LocalDateTime lunchStartedAt;
+
     @Column(name = "attendance_status", length = 20)
     private String attendanceStatus;
 
@@ -138,9 +144,32 @@ public class AttendanceRecord {
     public Integer getWorkMinutes() {
         if (checkInTime != null && checkOutTime == null) {
             LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Kolkata"));
+            if (manualLunch) {
+                int closed = closedWorkMinutes == null ? 0 : closedWorkMinutes;
+                if (lunchStartedAt != null || sessionStartedAt == null) {
+                    return closed;
+                }
+                LocalDateTime end = now;
+                if (employee != null && !employee.isSiteVisitor()) {
+                    LocalDateTime confirmed = AttendanceRules.inactivityMeasuredFrom(lastActivityAt, sessionStartedAt);
+                    if (confirmed != null && !now.isBefore(confirmed.plusMinutes(AttendanceRules.INACTIVE_LIMIT_MINUTES))) {
+                        end = confirmed;
+                    }
+                }
+                return closed + AttendanceRules.sessionMinutes(sessionStartedAt, end);
+            }
             LocalDateTime deadline = AttendanceRules.automaticLogoutAt(checkInTime);
             boolean earlierDay = deadline != null && attendanceDate != null && attendanceDate.isBefore(now.toLocalDate());
             LocalDateTime end = earlierDay && now.isAfter(deadline) ? deadline : now;
+            if (employee != null && !employee.isSiteVisitor()) {
+                LocalDateTime confirmed = AttendanceRules.inactivityMeasuredFrom(lastActivityAt, sessionStartedAt);
+                if (confirmed == null) {
+                    confirmed = checkInTime;
+                }
+                if (!now.isBefore(confirmed.plusMinutes(AttendanceRules.INACTIVE_LIMIT_MINUTES))) {
+                    end = confirmed;
+                }
+            }
             if (end.isBefore(checkInTime)) {
                 end = checkInTime;
             }
@@ -168,6 +197,9 @@ public class AttendanceRecord {
     }
 
     public Integer getOvertimeMinutes() {
+        if (manualLunch && checkOutTime == null && checkInTime != null) {
+            return Math.max(0, getWorkMinutes() - AttendanceRules.WORK_MINUTES);
+        }
         return overtimeMinutes;
     }
 
@@ -197,6 +229,22 @@ public class AttendanceRecord {
 
     public void setBreakMinutes(Integer breakMinutes) {
         this.breakMinutes = breakMinutes;
+    }
+
+    public boolean isManualLunch() {
+        return manualLunch;
+    }
+
+    public void setManualLunch(boolean manualLunch) {
+        this.manualLunch = manualLunch;
+    }
+
+    public LocalDateTime getLunchStartedAt() {
+        return lunchStartedAt;
+    }
+
+    public void setLunchStartedAt(LocalDateTime lunchStartedAt) {
+        this.lunchStartedAt = lunchStartedAt;
     }
 
     public String getAttendanceStatus() {

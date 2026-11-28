@@ -20,6 +20,9 @@ export interface AttendanceRecord {
   sessionStartedAt?: string | null;
   closedWorkMinutes?: number;
   breakMinutes?: number;
+  manualLunch?: boolean;
+  lunchStartedAt?: string | null;
+  lastActivityAt?: string | null;
   attendanceStatus?: string | null;
   lateWarning?: boolean;
   yellowFlag?: boolean;
@@ -65,11 +68,12 @@ function istDateKey(now: Date) {
   }).format(now);
 }
 
-function forgotCheckout(record?: { attendanceDate?: string; checkInTime?: string; checkOutTime?: string } | null, now = new Date()) {
+function forgotCheckout(record?: { attendanceDate?: string; checkInTime?: string; checkOutTime?: string; manualLunch?: boolean } | null, now = new Date()) {
   const deadline = logoutDeadlineMs(record);
   const dateKey = String(record?.attendanceDate || record?.checkInTime || "").slice(0, 10);
   return Boolean(
-    record?.checkInTime
+    !record?.manualLunch
+    && record?.checkInTime
     && !record.checkOutTime
     && deadline
     && now.getTime() >= deadline
@@ -96,7 +100,7 @@ export function isWindowsComputer() {
 
 /** A finished day has a check-out, or it is a previous day past 9 hours from check-in. */
 export function dayIsComplete(
-  record?: { checkInTime?: string; checkOutTime?: string; attendanceDate?: string } | null,
+  record?: { checkInTime?: string; checkOutTime?: string; attendanceDate?: string; manualLunch?: boolean } | null,
   now = new Date(),
 ) {
   if (!record?.checkInTime) {
@@ -107,7 +111,7 @@ export function dayIsComplete(
 
 /** A missed check-out is a previous day still open 9 hours after check-in. Signing out of the site is not a check-out. */
 export function isCheckoutMissing(
-  record?: { checkInTime?: string; checkOutTime?: string; attendanceDate?: string } | null,
+  record?: { checkInTime?: string; checkOutTime?: string; attendanceDate?: string; manualLunch?: boolean } | null,
   now = new Date(),
 ) {
   return forgotCheckout(record, now);
@@ -115,7 +119,7 @@ export function isCheckoutMissing(
 
 /** Checkout to show. A forgotten previous day closes 9 hours after check-in. */
 export function shownCheckOut(
-  record?: { checkInTime?: string; checkOutTime?: string; attendanceDate?: string } | null,
+  record?: { checkInTime?: string; checkOutTime?: string; attendanceDate?: string; manualLunch?: boolean } | null,
   now = new Date(),
 ) {
   if (record?.checkOutTime) {
@@ -132,6 +136,11 @@ export const DAY_PRESENCE_MINUTES = 9 * 60;
 
 type PresenceRecord = (Pick<AttendanceRecord, "checkInTime" | "checkOutTime" | "breakMinutes" | "workMinutes" | "sessionStartedAt"> & {
   attendanceDate?: string;
+  manualLunch?: boolean;
+  lunchStartedAt?: string | null;
+  closedWorkMinutes?: number;
+  lastActivityAt?: string | null;
+  employee?: EmployeeResponse;
 }) | null;
 
 /** Time on the clock, without counting hours past 9 toward the day. */
@@ -139,6 +148,9 @@ export function presenceMinutes(
   record?: PresenceRecord,
   now = new Date(),
 ) {
+  if (record?.manualLunch) {
+    return Math.floor(presenceSeconds(record, now) / 60);
+  }
   if (!record?.checkInTime) {
     return Math.max(0, record?.workMinutes ?? 0);
   }
@@ -164,7 +176,7 @@ export function dayCountedMinutes(
   record?: Parameters<typeof presenceMinutes>[0],
   now = new Date(),
 ) {
-  return Math.min(DAY_PRESENCE_MINUTES, presenceMinutes(record, now));
+  return Math.min(record?.manualLunch ? 8 * 60 : DAY_PRESENCE_MINUTES, presenceMinutes(record, now));
 }
 
 /** Time after check-in plus 9 hours. Lunch inside those 9 hours does not hide it. */
@@ -181,6 +193,17 @@ export function presenceSeconds(
   record?: PresenceRecord,
   now = new Date(),
 ) {
+  if (record?.manualLunch) {
+    const closed = Math.max(0, record.closedWorkMinutes ?? 0) * 60;
+    if (record.checkOutTime || record.lunchStartedAt || !record.sessionStartedAt) {
+      return closed;
+    }
+    const start = new Date(record.sessionStartedAt).getTime();
+    const confirmed = record.lastActivityAt ? new Date(record.lastActivityAt).getTime() : start;
+    const end = !record.employee?.siteVisitor && now.getTime() >= confirmed + 30 * 60_000
+      ? confirmed : now.getTime();
+    return closed + (Number.isNaN(start) ? 0 : Math.max(0, Math.floor((end - start) / 1000)));
+  }
   if (!record?.checkInTime) {
     return Math.max(0, (record?.workMinutes ?? 0) * 60);
   }
@@ -206,13 +229,16 @@ export function dayCountedSeconds(
   record?: Parameters<typeof presenceMinutes>[0],
   now = new Date(),
 ) {
-  return Math.min(DAY_PRESENCE_SECONDS, presenceSeconds(record, now));
+  return Math.min(record?.manualLunch ? 8 * 3600 : DAY_PRESENCE_SECONDS, presenceSeconds(record, now));
 }
 
 export function dayExtraSeconds(
   record?: PresenceRecord,
   now = new Date(),
 ) {
+  if (record?.manualLunch) {
+    return Math.max(0, presenceSeconds(record, now) - 8 * 3600);
+  }
   if (!record?.checkInTime) {
     return 0;
   }
@@ -263,11 +289,10 @@ export function datesFrom(start: string, end: string) {
 }
 
 export function clockedWorkMinutes(
-  record?: (Pick<AttendanceRecord, "checkInTime" | "checkOutTime" | "breakMinutes" | "workMinutes"> & {
-    attendanceDate?: string;
-  }) | null,
+  record?: PresenceRecord,
   now = new Date(),
 ) {
+  if (record?.manualLunch) return Math.floor(presenceSeconds(record, now) / 60);
   if (!record?.checkInTime) {
     return Math.max(0, record?.workMinutes ?? 0);
   }
@@ -469,6 +494,14 @@ export async function checkOut(employeeId?: number) {
   });
 }
 
+export async function startLunch() {
+  return attendanceRequest<AttendanceRecord>("/attendance/lunch/start", { method: "POST" });
+}
+
+export async function endLunch() {
+  return attendanceRequest<AttendanceRecord>("/attendance/lunch/end", { method: "POST" });
+}
+
 async function postSiteSelfie(path: string, selfie: File, failure: string) {
   const token = localStorage.getItem("nexushr_token");
   const body = new FormData();
@@ -615,22 +648,22 @@ export function HoursTotals({ records, now }: { records: AttendanceRecord[]; now
       <article>
         <span>Today working hours</span>
         <strong>{formatHoursSeconds(dayCountedSeconds(todayRow, now))}</strong>
-        <em>Up to 9 hours, including 1 flexible lunch hour</em>
+        <em>Up to 8 working hours; flexible lunch is separate. Legacy records may use a 9-hour rule.</em>
       </article>
       <article>
         <span>Month working hours</span>
         <strong>{formatHoursSeconds(monthSeconds)}</strong>
-        <em>1st through today, 9 hours each day</em>
+        <em>1st through today; up to 8 working hours per manual-lunch day</em>
       </article>
       <article>
         <span>History total working hours</span>
         <strong>{formatHoursSeconds(historySeconds)}</strong>
-        <em>Every recorded day, up to 9 hours</em>
+        <em>Every recorded day; legacy records may use a 9-hour rule</em>
       </article>
       <article className="hours-extra">
         <span>Extra working hours</span>
         <strong>{formatHoursSeconds(todayExtra)}</strong>
-        <em>Today. Not counted in the 9 hours.</em>
+        <em>Today. Separate from regular working hours.</em>
         <em>Month {formatHoursSeconds(monthExtra)}</em>
         <em>History {formatHoursSeconds(historyExtra)}</em>
       </article>
@@ -668,8 +701,8 @@ export interface LeaveBalance {
   remainingDays: number;
 }
 
-export async function getLeaves() {
-  return attendanceRequest<LeaveRequest[]>("/leaves");
+export async function getLeaves(mine = false) {
+  return attendanceRequest<LeaveRequest[]>(mine ? "/leaves/me" : "/leaves");
 }
 
 export async function createLeave(
@@ -775,7 +808,7 @@ export default function Attendance() {
 
   // Management users must explicitly select an employee before using
   // Check In / Check Out. "All employees" remains a view-only filter.
-  const isManagementRole = ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"].includes(currentRole);
+  const isManagementRole = ["ADMIN", "HR", "SUPER_ADMIN"].includes(currentRole);
   const canPunch = currentRole === "EMPLOYEE";
   const siteVisitor = Boolean(currentEmployee?.siteVisitor);
   const officePunchAllowed = isWindowsComputer() || siteVisitor;
@@ -840,6 +873,7 @@ export default function Attendance() {
     actionEmployeeRecord?.checkInTime && !actionEmployeeRecord?.checkOutTime,
   );
   const canResume = Boolean(actionEmployeeRecord?.checkOutTime);
+  const onLunch = Boolean(actionEmployeeRecord?.lunchStartedAt);
 
 
 
@@ -907,7 +941,7 @@ export default function Attendance() {
     setAttendanceLoaded(false);
 
     try {
-      const isManagementRole = ["ADMIN", "SUPER_ADMIN", "HR", "MANAGER"].includes(
+      const isManagementRole = ["ADMIN", "SUPER_ADMIN", "HR"].includes(
         currentRole,
       );
 
@@ -1180,6 +1214,15 @@ export default function Attendance() {
       return { work: "-", breakTime: "-" };
     }
 
+    if (record.manualLunch) {
+      const currentBreak = record.lunchStartedAt
+        ? Math.max(0, Math.floor((currentTime.getTime() - new Date(record.lunchStartedAt).getTime()) / 60000))
+        : 0;
+      return {
+        work: formatAsHours(clockedWorkMinutes(record, currentTime)),
+        breakTime: formatAsHours((record.breakMinutes ?? 0) + currentBreak),
+      };
+    }
     const closedSeconds = Math.max(0, record.closedWorkMinutes ?? 0) * 60;
     const breakSeconds = Math.max(0, record.breakMinutes ?? 0) * 60;
     const lunchSeconds = 60 * 60;
@@ -1271,7 +1314,7 @@ export default function Attendance() {
                 : siteVisitor && !selfie
                   ? "Site visitors add a selfie, then check in."
                   : canResume
-                    ? "Check in again. Work time resumes and the lunch gap is break time."
+                    ? "Check in again to resume working time."
                     : undefined
             }
           >
@@ -1302,6 +1345,7 @@ export default function Attendance() {
               !isToday ||
               !actionEmployee ||
               !sessionOpen ||
+              Boolean(actionEmployeeRecord?.lunchStartedAt) ||
               (siteVisitor && !selfie)
             }
             title={
@@ -1311,6 +1355,8 @@ export default function Attendance() {
                 ? "Check-out is available only for today."
                 : !sessionOpen
                   ? "Check in before checking out."
+                  : actionEmployeeRecord?.lunchStartedAt
+                    ? "End lunch before checking out."
                   : siteVisitor && !selfie
                     ? "Site visitors take a selfie, then check out."
                     : undefined
@@ -1329,9 +1375,7 @@ export default function Attendance() {
             className="secondary-button"
             onClick={() =>
               void runAction(
-                () => siteVisitor && canPunch
-                  ? siteCheckOut(selfie as File)
-                  : checkOut(),
+                () => startLunch(),
                 "Lunch started. Working hours are paused.",
               )
             }
@@ -1342,7 +1386,7 @@ export default function Attendance() {
               !isToday ||
               !actionEmployee ||
               !sessionOpen ||
-              (siteVisitor && canPunch && !selfie)
+              onLunch
             }
             title={
               !officePunchAllowed
@@ -1350,8 +1394,8 @@ export default function Attendance() {
                 : !actionEmployee
                 ? "Select an employee, then check out for lunch."
                 : !sessionOpen
-                  ? "Check in first. Lunch check-out pauses working hours."
-                  : "Check out for lunch. The system is inactive while you are away."
+                  ? "Check in first."
+                  : "Start lunch to pause working hours."
             }
           >
             Start lunch
@@ -1361,9 +1405,7 @@ export default function Attendance() {
             className="secondary-button"
             onClick={() =>
               void runAction(
-                () => siteVisitor && canPunch
-                  ? siteCheckIn(selfie as File)
-                  : officeCheckIn(),
+                () => endLunch(),
                 "Lunch ended. Working hours continue.",
               )
             }
@@ -1373,18 +1415,14 @@ export default function Attendance() {
               !attendanceLoaded ||
               !isToday ||
               !actionEmployee ||
-              sessionOpen ||
-              !canResume ||
-              (siteVisitor && canPunch && !selfie)
+              !onLunch
             }
             title={
               !actionEmployee
                 ? "Select an employee, then check in after lunch."
-                : sessionOpen
-                  ? "Check out for lunch before checking in again."
-                  : !canResume
-                    ? "Check in for the day before the lunch check-in."
-                    : "Check in after lunch. Working hours continue."
+                : !onLunch
+                  ? "Start lunch first."
+                  : "End lunch to resume working hours."
             }
           >
             End lunch
@@ -1470,16 +1508,16 @@ export default function Attendance() {
         </div>
       )}
 
-      {canPunch && (
+      {canPunch && isToday && (
         <div className="ux-clock">
           <div>
-            <span>{formatDate(date)} · General shift 9:30–6:30 · {sessionOpen ? "Checked in" : "Not checked in"}</span>
+            <span>{formatDate(date)} · General shift 9:30–6:30 · {onLunch ? "On lunch" : sessionOpen ? "Checked in" : canResume ? "Checked out" : "Not checked in"}</span>
             <strong>
               {String(Math.floor((actionEmployeeRecord ? clockedWorkMinutes(actionEmployeeRecord, currentTime) : 0) / 60)).padStart(2, "0")}
               :
               {String((actionEmployeeRecord ? clockedWorkMinutes(actionEmployeeRecord, currentTime) : 0) % 60).padStart(2, "0")}
             </strong>
-            <em>{(actionEmployeeRecord ? dayExtraMinutes(actionEmployeeRecord, currentTime) : 0) > 0 ? `Extra ${formatAsHours(dayExtraMinutes(actionEmployeeRecord, currentTime))} is not counted in the 9 hour day.` : sessionOpen ? "A day is 9 hours, including 1 flexible lunch hour." : "Check in to start the day."}</em>
+            <em>{(actionEmployeeRecord ? dayExtraMinutes(actionEmployeeRecord, currentTime) : 0) > 0 ? `Extra ${formatAsHours(dayExtraMinutes(actionEmployeeRecord, currentTime))} is shown separately.` : canResume ? "Your work session has ended." : sessionOpen ? "8 working hours and 1 flexible lunch hour." : "Check in to start the day."}</em>
           </div>
         </div>
       )}
@@ -1791,10 +1829,3 @@ export default function Attendance() {
     </>
   );
 }
-
-
-
-
-
-
-

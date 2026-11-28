@@ -1,8 +1,10 @@
 package com.zidio.nexushr.repository;
 
 import com.zidio.nexushr.domain.AttendanceRecord;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -31,6 +33,17 @@ public interface AttendanceRepository
             Long employeeId,
             LocalDate attendanceDate
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from AttendanceRecord a where a.employee.id = :employeeId and a.attendanceDate = :date")
+    Optional<AttendanceRecord> lockByEmployeeAndDate(@Param("employeeId") Long employeeId, @Param("date") LocalDate date);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from AttendanceRecord a where a.id = :id")
+    Optional<AttendanceRecord> lockById(@Param("id") Long id);
+
+    @Query("select a.id from AttendanceRecord a where a.checkInTime is not null and a.checkOutTime is null")
+    List<Long> findOpenRecordIds();
 
     @EntityGraph(attributePaths = {"employee", "employee.company"})
     List<AttendanceRecord> findByEmployee_IdOrderByAttendanceDateDesc(

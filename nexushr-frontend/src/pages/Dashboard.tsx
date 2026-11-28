@@ -14,6 +14,8 @@ import {
 import {
   checkOut,
   officeCheckIn,
+  startLunch,
+  endLunch,
   createLeave,
   updateLeaveStatus,
   getAttendanceByDate,
@@ -198,15 +200,26 @@ export default function Dashboard() {
   const [showAllDays, setShowAllDays] = useState(false);
 
   useEffect(() => {
+    if (!me) return;
+    const refresh = () => {
+      void getEmployeeAttendance(me.id).then((history) => {
+        setSelfRecord(history.find((row) => row.attendanceDate?.slice(0, 10) === todayIso()) ?? null);
+      }).catch((err) => setPunchNote(err instanceof Error ? err.message : "Unable to refresh attendance."));
+    };
+    window.addEventListener("nexushr-attendance-refresh", refresh);
+    return () => window.removeEventListener("nexushr-attendance-refresh", refresh);
+  }, [me]);
+
+  useEffect(() => {
     let cancelled = false;
     const today = todayIso();
     const dates = monthDateKeys();
     const from = dates[0];
     const to = dates[dates.length - 1];
     Promise.all([
-      getCurrentEmployee().catch(() => null),
+      getCurrentEmployee(),
       getEmployees().catch(() => [] as EmployeeResponse[]),
-      getAttendanceByDate(today).catch(() => [] as AttendanceRecord[]),
+      getAttendanceByDate(today),
     ])
       .then(([current, employees, attendance]) => {
         if (cancelled) {
@@ -223,7 +236,7 @@ export default function Dashboard() {
         setPeople(listedPeople);
         setTodayRows(rows);
         setSelfRecord(current?.id
-          ? rows.find((row) => row.employee?.id === current.id) ?? null
+          ? asList<AttendanceRecord>(attendance).find((row) => row.employee?.id === current.id) ?? null
           : null);
       })
       .catch((err) => {
@@ -416,18 +429,10 @@ export default function Dashboard() {
   const displayName = me?.fullName || localStorage.getItem("nexushr_user") || "there";
   const myRecord = selfRecord ?? todayRows.find((row) => row.employee?.id === me?.id);
   const selfOpen = Boolean(myRecord?.checkInTime && !myRecord?.checkOutTime);
-  const selfOut = Boolean(myRecord?.checkOutTime);
-  const lunchStarted = selfOut ? new Date(String(myRecord?.checkOutTime)).getTime() : 0;
+  const selfOut = Boolean(myRecord?.lunchStartedAt);
+  const lunchStarted = selfOut ? new Date(String(myRecord?.lunchStartedAt)).getTime() : 0;
   const lunchSeconds = lunchStarted ? Math.max(0, Math.floor((clockNow.getTime() - lunchStarted) / 1000)) : 0;
-  const workSeconds = (() => {
-    if (!myRecord?.checkInTime) {
-      return 0;
-    }
-    const start = new Date(myRecord.checkInTime).getTime();
-    const end = myRecord.checkOutTime ? new Date(myRecord.checkOutTime).getTime() : clockNow.getTime();
-    const breakMs = (myRecord.breakMinutes ?? 0) * 60_000;
-    return Math.max(0, Math.floor((end - start - breakMs) / 1000));
-  })();
+  const workSeconds = dayCountedSeconds(myRecord, clockNow) + dayExtraSeconds(myRecord, clockNow);
   const lunchPerson = people.find((person) => String(person.id) === lunchEmployeeId);
   async function openDay(date: string) {
     const day = date.slice(0, 10);
@@ -468,15 +473,16 @@ export default function Dashboard() {
     }, 0);
   }
 
-  async function punchSelf(kind: "out" | "in") {
+  async function punchSelf(kind: "out" | "in" | "lunch-start" | "lunch-end") {
     if (!me) {
       return;
     }
     setPunching(true);
     setPunchNote("");
     try {
-      await (kind === "out" ? checkOut(me.id) : officeCheckIn(me.id));
-      setPunchNote(kind === "out" ? "Checked out. The lunch hour can be any time." : "Checked in. Working hours continue.");
+      const saved = await (kind === "out" ? checkOut() : kind === "in" ? officeCheckIn() : kind === "lunch-start" ? startLunch() : endLunch());
+      setSelfRecord(saved);
+      setPunchNote(kind === "out" ? "Checked out." : kind === "in" ? "Checked in." : kind === "lunch-start" ? "Lunch started." : "Lunch ended.");
       setRefreshTick((value) => value + 1);
     } catch (err) {
       setPunchNote(
@@ -913,22 +919,26 @@ export default function Dashboard() {
       <section className="hr-card hr-lunch">
         <div>
           <strong>Check in and check out</strong>
-          <p className="hr-empty">The lunch hour is flexible. Check out when you leave, and check in when you are back. It can be any hour.</p>
+          <p className="hr-empty">Start and end the flexible lunch separately from check-out.</p>
         </div>
         <div className="hr-timer" aria-live="polite">
           <span>{selfOut ? "Lunch timer" : "Work timer"}</span>
           <strong>{formatTimer(selfOut ? lunchSeconds : workSeconds)}</strong>
-          <em>{selfOut ? "1 hour is paid. Extra time stays a break." : "1 flexible hour"}</em>
+          <em>{selfOut ? "Lunch is excluded from work time." : "1 flexible lunch hour"}</em>
         </div>
+        <p className="hr-empty">Worked: {formatTimer(workSeconds)} · Lunch: {formatTimer((myRecord?.breakMinutes ?? 0) * 60 + lunchSeconds)} · Extra: {formatTimer(Math.max(0, workSeconds - 8 * 3600))}</p>
         <div className="attendance-actions">
           <button className="primary-button" type="button" disabled={punching || !windowsPunch || !me || selfOpen} onClick={() => void punchSelf("in")}>
             Check in
           </button>
-          <button className="secondary-button" type="button" disabled={punching || !windowsPunch || !me || !selfOpen} onClick={() => void punchSelf("out")}>
+          <button className="secondary-button" type="button" disabled={punching || !windowsPunch || !me || !selfOpen || selfOut} onClick={() => void punchSelf("out")}>
             Check out
           </button>
+          <button className="secondary-button" type="button" disabled={punching || !windowsPunch || !me || !selfOpen || selfOut} onClick={() => void punchSelf("lunch-start")}>Start lunch</button>
+          <button className="secondary-button" type="button" disabled={punching || !windowsPunch || !me || !selfOut} onClick={() => void punchSelf("lunch-end")}>End lunch</button>
         </div>
         {!windowsPunch && <p className="hr-empty">Check in and check out work on a Windows or Mac computer. A phone cannot punch.</p>}
+        {selfOut && <p className="hr-empty">End lunch before checking out.</p>}
         {punchNote && <p className="hr-empty">{punchNote}</p>}
       </section>
 

@@ -18,6 +18,7 @@ public class EmployeeRequest {
     private String designation;
     private LocalDate joiningDate;
     private BigDecimal baseSalary;
+    private BigDecimal annualCtc;
     private Boolean active;
 
     private String companyCode;
@@ -115,6 +116,14 @@ public class EmployeeRequest {
 
     public BigDecimal getBaseSalary() {
         return baseSalary;
+    }
+
+    public BigDecimal getAnnualCtc() {
+        return annualCtc;
+    }
+
+    public void setAnnualCtc(BigDecimal annualCtc) {
+        this.annualCtc = annualCtc;
     }
 
     public void setBaseSalary(BigDecimal baseSalary) {

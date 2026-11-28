@@ -96,6 +96,7 @@ export interface EmployeeResponse {
   designation: string;
   joiningDate: string;
   baseSalary: number;
+  annualCtc?: number | null;
   active: boolean;
  gender?: "MALE" | "FEMALE" | "OTHER" | "PREFER_NOT_TO_SAY";
   lifecycleStatus: EmployeeLifecycleStatus;
@@ -118,9 +119,11 @@ export interface EmployeeRequest {
   designation: string;
   joiningDate: string;
   baseSalary: number;
+  annualCtc?: number;
   active: boolean;
   companyCode?: string;
   starterAccount?: boolean;
+  reportingManagerId?: number;
 }
 
 export interface EmployeeLifecycleRequest {
@@ -294,6 +297,9 @@ export async function login(
   const response = await postLogin(username, password, site);
 
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Username or password might be incorrect.");
+    }
     let message = "Invalid username or password";
     try {
       const errorBody = await response.json() as { message?: string; error?: string };
@@ -521,6 +527,62 @@ export async function uploadEmployeePhoto(id: number | "me", file: File) {
 
 export function getEmployee(id: number) {
   return request<EmployeeResponse>(`/employees/${id}`);
+}
+
+export interface TeamMember {
+  id: number;
+  employeeCode: string;
+  fullName: string;
+  department: string;
+  designation: string;
+}
+
+export function getMyTeam() {
+  return request<TeamMember[]>("/employees/me/team");
+}
+
+export interface TeamAttendance {
+  employeeId: number;
+  checkInTime: string | null;
+  checkOutTime: string | null;
+  onLunch: boolean;
+}
+
+export function getTeamAttendanceToday() {
+  return request<TeamAttendance[]>("/attendance/team-today");
+}
+
+export interface ManagerTeamReport {
+  month: string;
+  members: {
+    id: number;
+    code: string;
+    name: string;
+    department: string;
+    designation: string;
+    workedMinutes: number;
+    overtimeMinutes: number;
+    payrollStatus: string;
+    attendance: {
+      date: string;
+      checkIn: string | null;
+      checkOut: string | null;
+      onLunch: boolean;
+      workedMinutes: number;
+      overtimeMinutes: number;
+    }[];
+    leave: {
+      startDate: string;
+      endDate: string;
+      type: string | null;
+      halfDay: boolean;
+      status: string;
+    }[];
+  }[];
+}
+
+export function getManagerTeamReport(month: string) {
+  return request<ManagerTeamReport>(`/manager/team-report?month=${encodeURIComponent(month)}`);
 }
 
 export function defaultEmployeePassword(company?: string) {
@@ -921,8 +983,11 @@ export interface PayrollAutoComponentsResponse {
   employeeCode: string;
   payMonth: string;
   businessDays: number;
+  presentDays: number;
   expectedWorkMinutes: number;
   workedMinutes: number;
+  todayWorkedMinutes: number | null;
+  paidLeaveMinutes: number;
   shortfallMinutes: number;
   overtimeMinutes: number;
   leaveDeduction: number;
@@ -945,6 +1010,7 @@ export interface PayrollRecord {
   ctc?: number;
   workedMinutes?: number;
   expectedWorkMinutes?: number;
+  overtimeMinutes?: number;
   leaveDeduction: number;
   otherDeductions: number;
   deductions: number;

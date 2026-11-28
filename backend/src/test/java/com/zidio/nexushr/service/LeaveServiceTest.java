@@ -1,8 +1,10 @@
 package com.zidio.nexushr.service;
 
 import com.zidio.nexushr.domain.Employee;
+import com.zidio.nexushr.domain.Company;
 import com.zidio.nexushr.domain.LeaveRequest;
 import com.zidio.nexushr.domain.LeaveStatus;
+import com.zidio.nexushr.domain.RoleType;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.repository.LeaveRequestRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +30,9 @@ class LeaveServiceTest {
 
     @Mock
     private EmployeeRepository employeeRepository;
+
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private LeaveService leaveService;
@@ -80,6 +85,56 @@ class LeaveServiceTest {
                 anyCollection()
         );
         verify(leaveRequestRepository).save(leaveRequest);
+    }
+
+    @Test
+    void create_allowsSecondHalfDayCasualLeave() {
+        LeaveRequest existing = new LeaveRequest();
+        existing.setId(2L);
+        existing.setStartDate(LocalDate.of(2026, 8, 3));
+        existing.setEndDate(existing.getStartDate());
+        existing.setLeaveType("CASUAL");
+        existing.setHalfDay(true);
+        existing.setStatus(LeaveStatus.APPROVED);
+        leaveRequest.setStartDate(LocalDate.of(2026, 8, 10));
+        leaveRequest.setEndDate(leaveRequest.getStartDate());
+        leaveRequest.setLeaveType("CASUAL");
+        leaveRequest.setHalfDay(true);
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(employee));
+        when(leaveRequestRepository.findByEmployee_IdAndStatus(1L, LeaveStatus.APPROVED))
+                .thenReturn(List.of(existing));
+        when(leaveRequestRepository.findByEmployee_IdOrderByStartDateDesc(1L)).thenReturn(List.of(existing));
+        when(leaveRequestRepository.save(leaveRequest)).thenReturn(leaveRequest);
+        assertThat(leaveService.create(leaveRequest)).isSameAs(leaveRequest);
+        assertThat(leaveService.getLeaveBalance(1L).getUsedDays()).isEqualByComparingTo("0.5");
+    }
+
+    @Test
+    void create_notifiesApproversInTheSameCompanyInsteadOfManager() {
+        Company company = new Company();
+        company.setCode("CYOND");
+        Company other = new Company();
+        other.setCode("GORLE");
+        employee.setCompany(company);
+        Employee hr = new Employee();
+        hr.setId(5L);
+        hr.setRoleType(RoleType.HR);
+        hr.setCompany(company);
+        Employee otherHr = new Employee();
+        otherHr.setId(6L);
+        otherHr.setRoleType(RoleType.HR);
+        otherHr.setCompany(other);
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(employee));
+        when(employeeRepository.findByRoleTypeAndActiveTrue(RoleType.HR)).thenReturn(List.of(hr, otherHr));
+        when(leaveRequestRepository.save(leaveRequest)).thenReturn(leaveRequest);
+
+        leaveService.create(leaveRequest);
+
+        verify(notificationService).sendNotification(eq(5L), eq("Leave approval required"), anyString(),
+                any(), any(), any(), any());
+        verify(notificationService, never()).sendNotification(eq(6L), anyString(), anyString(),
+                any(), any(), any(), any());
+        verify(employeeRepository, never()).findByRoleTypeAndActiveTrue(RoleType.MANAGER);
     }
 
     @Test
@@ -351,8 +406,8 @@ class LeaveServiceTest {
 
         assertThat(result.getEmployeeId()).isEqualTo(1L);
         assertThat(result.getAnnualEntitlement()).isEqualTo(24);
-        assertThat(result.getUsedDays()).isEqualTo(5);
-        assertThat(result.getRemainingDays()).isEqualTo(19);
+        assertThat(result.getUsedDays()).isEqualByComparingTo("5");
+        assertThat(result.getRemainingDays()).isEqualByComparingTo("19");
 
         verify(employeeRepository).findById(1L);
         verify(leaveRequestRepository)
@@ -383,8 +438,8 @@ class LeaveServiceTest {
 
         var result = leaveService.getLeaveBalance(1L);
 
-        assertThat(result.getUsedDays()).isEqualTo(3);
-        assertThat(result.getRemainingDays()).isEqualTo(21);
+        assertThat(result.getUsedDays()).isEqualByComparingTo("3");
+        assertThat(result.getRemainingDays()).isEqualByComparingTo("21");
     }
 
     @Test
@@ -407,7 +462,7 @@ class LeaveServiceTest {
 
         assertThat(result.getAnnualEntitlement()).isEqualTo(24);
         assertThat(result.getUsedDays()).isZero();
-        assertThat(result.getRemainingDays()).isEqualTo(24);
+        assertThat(result.getRemainingDays()).isEqualByComparingTo("24");
     }
 
     @Test
@@ -428,7 +483,7 @@ class LeaveServiceTest {
 
         var result = leaveService.getLeaveBalance(1L);
 
-        assertThat(result.getUsedDays()).isEqualTo(46);
+        assertThat(result.getUsedDays()).isEqualByComparingTo("46");
         assertThat(result.getRemainingDays()).isZero();
     }
 

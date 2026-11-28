@@ -1,6 +1,6 @@
 import { isCompanyMatch } from "../utils/company";
 import { getWorkspaceCompany } from "../utils/workspace";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   createPayroll,
@@ -44,7 +44,8 @@ function toOptionalNumber(value: string): number | undefined {
 export default function Payroll() {
   const navigate = useNavigate();
   const role = (localStorage.getItem("nexushr_role") || "EMPLOYEE").toUpperCase();
-  const isManagementRole = ["ADMIN", "SUPER_ADMIN", "HR", "MANAGER"].includes(role);
+  const isManagementRole = ["ADMIN", "SUPER_ADMIN", "HR"].includes(role);
+  const isPersonalPayroll = !isManagementRole;
 
   const [employees, setEmployees] = useState<EmployeeResponse[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string>(
@@ -57,6 +58,7 @@ export default function Payroll() {
   }, []);
   const [records, setRecords] = useState<PayrollRecord[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");
+  const [employeeSearch, setEmployeeSearch] = useState("");
   const [payMonth, setPayMonth] = useState(currentMonth());
 
   const [ctc, setCtc] = useState("");
@@ -76,6 +78,7 @@ export default function Payroll() {
   const [autoComponents, setAutoComponents] =
     useState<PayrollAutoComponentsResponse | null>(null);
   const [autoComponentsLoading, setAutoComponentsLoading] = useState(false);
+  const autoRequest = useRef(0);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -129,8 +132,6 @@ export default function Payroll() {
     setError("");
 
     try {
-      const isManagementRole = ["ADMIN", "SUPER_ADMIN", "HR", "MANAGER"].includes(role);
-
       if (!isManagementRole) {
         const me = await getCurrentEmployee();
 
@@ -168,8 +169,10 @@ export default function Payroll() {
     employeeId: string,
     targetMonth: string,
   ) {
+    const requestId = ++autoRequest.current;
     if (!isManagementRole || !employeeId) {
       setAutoComponents(null);
+      setAutoComponentsLoading(false);
       return;
     }
 
@@ -181,16 +184,19 @@ export default function Payroll() {
         targetMonth,
       );
 
+      if (requestId !== autoRequest.current) return;
       setAutoComponents(components);
 
       if (autoFromAttendance) {
         setOvertime("");
       }
     } catch (err) {
+      if (requestId !== autoRequest.current) return;
       console.error("Auto payroll component load failed:", err);
       setAutoComponents(null);
+      setError(err instanceof Error ? err.message : "Unable to calculate attendance.");
     } finally {
-      setAutoComponentsLoading(false);
+      if (requestId === autoRequest.current) setAutoComponentsLoading(false);
     }
   }
 
@@ -215,10 +221,6 @@ export default function Payroll() {
   }, []);
 
   useEffect(() => {
-    if (!isManagementRole || !selectedEmployee) {
-      return;
-    }
-
     void loadAutoComponents(selectedEmployee, payMonth);
   }, [selectedEmployee, payMonth, isManagementRole, autoFromAttendance]);
 
@@ -385,9 +387,9 @@ export default function Payroll() {
       <div className="employees-header">
         <div>
           <p className="page-eyebrow">{selectedCompany === "GORLE" ? "Gorle Group" : selectedCompany === "CYOND" ? "CYOND" : selectedCompany}</p>
-          <h1>{role === "EMPLOYEE" ? "My Pay" : "Payroll"}</h1>
+          <h1>{isPersonalPayroll ? "My Pay" : "Payroll"}</h1>
           <p>
-            {role === "EMPLOYEE"
+            {isPersonalPayroll
               ? "Download your payslip."
               : "Download a payslip, or email that payslip to the employee."}
           </p>
@@ -455,7 +457,7 @@ export default function Payroll() {
             <div>
               <strong>Generate from working hours</strong>
               <span>
-                Adds check-in to check-out for every day in {payMonth}, including a day that is still open. The monthly CTC amount is paid in proportion to those hours. PF, insurance, and professional tax stay on the record.
+                Uses recorded working hours in {payMonth}, including current manual-attendance sessions. The monthly CTC amount is paid in proportion to those hours. Paid records are not changed.
               </span>
             </div>
             <button
@@ -472,17 +474,29 @@ export default function Payroll() {
         <form className="payroll-salary-form" onSubmit={handleGenerate}>
           <div className="employee-filters">
             <label>
+              Search employees
+              <input
+                type="search"
+                placeholder="Search name or employee code"
+                value={employeeSearch}
+                onChange={(event) => setEmployeeSearch(event.target.value)}
+              />
+            </label>
+            <label>
               Employee
               <select
                 required
                 value={selectedEmployee}
                 onChange={(event) =>
-                  setSelectedEmployee(event.target.value)
+                  { autoRequest.current++; setAutoComponents(null); setCtc(""); setSelectedEmployee(event.target.value); }
                 }
               >
                 <option value="">Choose an employee</option>
 
-                {companyEmployees.map((employee) => (
+                {companyEmployees.filter((employee) =>
+                  String(employee.id) === selectedEmployee ||
+                  `${employee.employeeCode} ${employee.fullName}`.toLowerCase().includes(employeeSearch.trim().toLowerCase()),
+                ).map((employee) => (
                   <option key={employee.id} value={employee.id}>
                     {employee.employeeCode} - {employee.fullName}
                   </option>
@@ -501,8 +515,8 @@ export default function Payroll() {
                   <strong>{selectedEmployeeData.designation}</strong>
                 </div>
                 <div>
-                  <span>Base Salary</span>
-                  <strong>{money(selectedEmployeeData.baseSalary)}</strong>
+                  <span>{selectedEmployeeData.annualCtc != null ? "Stored annual CTC" : "Legacy monthly salary"}</span>
+                  <strong>{money(selectedEmployeeData.annualCtc ?? selectedEmployeeData.baseSalary)}</strong>
                 </div>
                 <div>
                   <span>Status</span>
@@ -522,7 +536,7 @@ export default function Payroll() {
                 required
                 type="month"
                 value={payMonth}
-                onChange={(event) => setPayMonth(event.target.value)}
+                onChange={(event) => { autoRequest.current++; setAutoComponents(null); setPayMonth(event.target.value); }}
               />
             </label>
 
@@ -537,7 +551,7 @@ export default function Payroll() {
                   }
                 />
                 <span>
-                  Check-in and check-out fill Overtime and Leave Deduction below.
+                  Completed attendance determines earnings. Overtime hours are shown separately.
                 </span>
               </div>
             </label>
@@ -563,11 +577,29 @@ export default function Payroll() {
                       Attendance calculation for {autoComponents.employeeCode}
                     </strong>
                     <span>
-                      {payMonth} runs from the 1st through day {new Date(Number(payMonth.slice(0, 4)), Number(payMonth.slice(5, 7)), 0).getDate()}. Worked {(autoComponents.workedMinutes / 60).toFixed(1)}h of {(autoComponents.expectedWorkMinutes / 60).toFixed(1)}h.
-                      {ctc.trim() ? ` Yearly CTC ${money(Number(ctc))}. One month is ${money(Number(ctc) / 12)}.` : selectedEmployeeData?.baseSalary ? ` Monthly amount ${money(selectedEmployeeData.baseSalary)}.` : " Enter a yearly CTC, or save a base salary, before pay can be calculated."}
+                      {payMonth}: {autoComponents.businessDays} scheduled working days, {autoComponents.presentDays} present days. Worked {(autoComponents.workedMinutes / 60).toFixed(1)}h of {(autoComponents.expectedWorkMinutes / 60).toFixed(1)}h; approved paid casual leave {(autoComponents.paidLeaveMinutes / 60).toFixed(1)}h.
+                      {ctc.trim() ? ` Yearly CTC ${money(Number(ctc))}. One month is ${money(Number(ctc) / 12)}.` : selectedEmployeeData?.annualCtc != null ? ` Stored yearly CTC ${money(selectedEmployeeData.annualCtc)}. One month is ${money(selectedEmployeeData.annualCtc / 12)}.` : selectedEmployeeData?.baseSalary ? ` Legacy monthly salary ${money(selectedEmployeeData.baseSalary)}.` : " Enter or save a yearly CTC before pay can be calculated."}
                     </span>
+                    {autoComponents.todayWorkedMinutes != null && (() => {
+                      const override = Number(ctc);
+                      const annual = ctc.trim() && Number.isFinite(override) && override > 0
+                        ? override : selectedEmployeeData?.annualCtc;
+                      const monthly = annual != null
+                        ? Math.round((annual / 12) * 100) / 100
+                        : selectedEmployeeData?.baseSalary;
+                      const minutes = autoComponents.todayWorkedMinutes;
+                      return (
+                        <span>
+                          Today: {Math.floor(minutes / 60)}h {minutes % 60}m payroll-eligible work
+                          {monthly != null && monthly > 0 && autoComponents.expectedWorkMinutes > 0
+                            ? ` · Estimated gross for today's work: ${money(monthly * minutes / autoComponents.expectedWorkMinutes)} (${money(monthly)} monthly CTC ÷ ${(autoComponents.expectedWorkMinutes / 60).toFixed(1)} scheduled hours).`
+                            : " · Set a CTC and scheduled hours to estimate today's earnings."}
+                          {" "}Before deductions and incentives; monthly cap, paid leave and rounding may affect final pay.
+                        </span>
+                      );
+                    })()}
                     <span>
-                      Earnings use these hours. Extra time after the day is not added to the CTC.
+                      Overtime {(autoComponents.overtimeMinutes / 60).toFixed(1)}h is shown separately and is not added to CTC earnings.
                     </span>
                   </div>
                 )}
@@ -577,7 +609,15 @@ export default function Payroll() {
           </div>
           {(() => {
             const yearly = Number(ctc);
-            const monthAmount = ctc.trim() && Number.isFinite(yearly) && yearly > 0 ? yearly / 12 : 0;
+            const monthAmount = ctc.trim() && Number.isFinite(yearly) && yearly > 0
+              ? yearly / 12
+              : selectedEmployeeData?.annualCtc != null
+                ? selectedEmployeeData.annualCtc / 12
+                : selectedEmployeeData?.baseSalary || 0;
+            const ratio = autoComponents && autoComponents.expectedWorkMinutes > 0
+              ? Math.min(1, Math.max(0, (autoComponents.workedMinutes + autoComponents.paidLeaveMinutes) / autoComponents.expectedWorkMinutes))
+              : 0;
+            const earned = monthAmount * ratio;
             const incentiveAmount = Number(bonus) || 0;
             const deductionAmount = (Number(pf) || 0) + (Number(insurance) || 0) + (Number(professionalTax) || 0) + (Number(tds) || 0) + (Number(otherDeductions) || 0);
             const shown = (amount: number) => (monthAmount > 0 || amount > 0 ? money(amount) : "₹0.00");
@@ -586,8 +626,9 @@ export default function Payroll() {
                 <section>
                   <h3>Gross</h3>
                   <label>
-                    CTC
+                    Annual CTC
                     <input min="0" type="number" step="0.01" value={ctc} onChange={(event) => setCtc(event.target.value)} placeholder="Yearly amount" />
+                    <small>Optional override for this payroll record; edit the employee to change their stored CTC.</small>
                   </label>
                   <label>
                     One month
@@ -596,16 +637,16 @@ export default function Payroll() {
                 </section>
                 <section>
                   <h3>Earnings</h3>
-                  <label>Basic<input readOnly value={shown(monthAmount * 0.61)} /></label>
-                  <label>HRA<input readOnly value={shown(monthAmount * 0.3)} /></label>
-                  <label>Conveyance<input readOnly value={shown(monthAmount * 0.036)} /></label>
-                  <label>Medical<input readOnly value={shown(monthAmount * 0.028)} /></label>
-                  <label>Other allowance<input readOnly value={shown(monthAmount * 0.026)} /></label>
+                  <label>Basic<input readOnly value={shown(earned * 0.61)} /></label>
+                  <label>HRA<input readOnly value={shown(earned * 0.3)} /></label>
+                  <label>Conveyance<input readOnly value={shown(earned * 0.036)} /></label>
+                  <label>Medical<input readOnly value={shown(earned * 0.028)} /></label>
+                  <label>Other allowance<input readOnly value={shown(earned * 0.026)} /></label>
                   <label>
                     Incentives
                     <input min="0" type="number" step="0.01" value={bonus} onChange={(event) => setBonus(event.target.value)} placeholder="Extra, not part of the CTC" />
                   </label>
-                  <label>Total earnings<input readOnly value={shown(monthAmount + incentiveAmount)} /></label>
+                  <label>Total earnings<input readOnly value={shown(earned + incentiveAmount)} /></label>
                 </section>
                 <section>
                   <h3>Deductions</h3>
@@ -637,12 +678,12 @@ export default function Payroll() {
             <p className="page-eyebrow">Payroll Records</p>
             <h2>Salary Records</h2>
             <p>
-              {role === "EMPLOYEE"
+              {isPersonalPayroll
                 ? "Your salary records. Download a payslip here."
                 : "Generated payroll records and payment status."}
             </p>
           </div>
-          {role === "EMPLOYEE" && (
+          {isPersonalPayroll && (
             <div className="payroll-page-actions">
               <button
                 type="button"
@@ -676,12 +717,12 @@ export default function Payroll() {
         ) : visibleRecords.length === 0 ? (
           <div className="employee-empty-state">
             <strong>
-              {role === "EMPLOYEE"
+              {isPersonalPayroll
                 ? "No payslip yet"
                 : `No payroll records for ${payMonth}`}
             </strong>
             <span>
-              {role === "EMPLOYEE"
+              {isPersonalPayroll
                 ? "Your payslip appears here after pay is calculated."
                 : "Calculate pay from attendance for this month."}
             </span>
@@ -693,9 +734,10 @@ export default function Payroll() {
                 <tr>
                   <th>Employee</th>
                   <th>Month</th>
-                  {isManagementRole && <th>Hours</th>}
+                  {isManagementRole && <th>Worked / scheduled</th>}
+                  {isManagementRole && <th>Extra hours</th>}
                   <th>Gross Salary</th>
-                  {isManagementRole && <th>CTC</th>}
+                  {isManagementRole && <th>Annual / monthly CTC</th>}
                   {isManagementRole && <th>PF</th>}
                   {isManagementRole && <th>Insurance</th>}
                   {isManagementRole && <th>Professional tax</th>}
@@ -722,12 +764,13 @@ export default function Payroll() {
                       <td>
                         {record.workedMinutes == null
                           ? "—"
-                          : `${(record.workedMinutes / 60).toFixed(1)}h`}
+                          : `${(record.workedMinutes / 60).toFixed(1)}h / ${record.expectedWorkMinutes == null ? "—" : `${(record.expectedWorkMinutes / 60).toFixed(1)}h`}`}
                       </td>
                     )}
+                    {isManagementRole && <td>{record.overtimeMinutes == null ? "—" : `${(record.overtimeMinutes / 60).toFixed(1)}h (unpaid)`}</td>}
 
                     <td>{money(record.grossSalary)}</td>
-                    {isManagementRole && <td>{record.ctc ? money(record.ctc) : "—"}</td>}
+                    {isManagementRole && <td>{record.ctc ? `${money(record.ctc)} / ${money(record.ctc / 12)}` : "—"}</td>}
 
                     {isManagementRole && <td>{money(record.pf)}</td>}
                     {isManagementRole && <td>{money(record.esi || 0)}</td>}
@@ -872,7 +915,7 @@ export default function Payroll() {
           </div>
 
           <p>
-            Worked {((payslip.workedMinutes || 0) / 60).toFixed(1)}h of {((payslip.expectedWorkMinutes || 0) / 60).toFixed(1)}h. Earnings follow those hours.
+            Worked {((payslip.workedMinutes || 0) / 60).toFixed(1)}h of {((payslip.expectedWorkMinutes || 0) / 60).toFixed(1)}h. Earnings may also include approved paid casual leave.
           </p>
           <div className="employee-summary-grid">
             <div className="employee-summary-card">
@@ -937,17 +980,6 @@ export default function Payroll() {
     </section>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 

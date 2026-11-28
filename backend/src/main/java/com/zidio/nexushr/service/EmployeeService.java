@@ -42,6 +42,21 @@ public class EmployeeService {
         return employeeRepository.findAll();
     }
 
+    public List<Employee> findDirectReports(Long managerId) {
+        return employeeRepository.findByReportingManagerIdAndActiveTrue(managerId);
+    }
+
+    private void applyAnnualCtc(Employee employee, BigDecimal annualCtc) {
+        if (annualCtc != null) {
+            if (annualCtc.signum() <= 0 || annualCtc.scale() > 2 || annualCtc.precision() - annualCtc.scale() > 17) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST,
+                        "Annual CTC must be positive, with at most 17 integer digits and two decimal places");
+            }
+            employee.setAnnualCtc(annualCtc);
+        }
+    }
+
     public Employee findById(Long id) {
         return employeeRepository.findById(id)
                 .orElseThrow(() ->
@@ -76,13 +91,8 @@ public class EmployeeService {
 
         boolean starter = Boolean.TRUE.equals(request.getStarterAccount());
         String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
-        if (starter) {
-            String domain = CompanyPasswords.emailDomain(companyCode);
-            if (!email.endsWith(domain)) {
-                throw new IllegalArgumentException(
-                        "Use an employee email that ends with " + domain
-                );
-            }
+        if (starter && !email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+            throw new IllegalArgumentException("Enter a valid employee email address");
         }
 
         Employee employee = new Employee();
@@ -132,6 +142,7 @@ public class EmployeeService {
         if (request.getBaseSalary() != null) {
             employee.setBaseSalary(request.getBaseSalary());
         }
+        applyAnnualCtc(employee, request.getAnnualCtc());
 
         employee.setActive(true);
         employee.setLifecycleStatus(
@@ -139,6 +150,11 @@ public class EmployeeService {
         );
         if (request.getSiteVisitor() != null) {
             employee.setSiteVisitor(request.getSiteVisitor());
+        }
+
+        if (request.getReportingManagerId() != null) {
+            Employee manager = validateReportingManager(employee, request.getReportingManagerId());
+            employee.setReportingManagerId(manager.getId());
         }
 
         return employeeRepository.save(employee);
@@ -151,6 +167,9 @@ public class EmployeeService {
         Employee employee = findById(id);
 
 
+        boolean companyChanged = request.getCompanyCode() != null && !request.getCompanyCode().isBlank()
+                && (employee.getCompany() == null
+                || !request.getCompanyCode().equalsIgnoreCase(employee.getCompany().getCode()));
         if (request.getCompanyCode() != null && !request.getCompanyCode().isBlank()) {
             Company company = companyRepository.findByCodeIgnoreCase(request.getCompanyCode())
                     .orElseThrow(() -> new IllegalArgumentException(
@@ -223,6 +242,7 @@ public class EmployeeService {
                     request.getBaseSalary()
             );
         }
+        applyAnnualCtc(employee, request.getAnnualCtc());
 
         if (request.getActive() != null) {
             employee.setActive(
@@ -235,7 +255,26 @@ public class EmployeeService {
         }
 
         if (request.getReportingManagerId() != null) {
-            employee.setReportingManagerId(request.getReportingManagerId());
+            Long managerId = request.getReportingManagerId();
+            if (managerId == 0) {
+                employee.setReportingManagerId(null);
+            } else {
+                try {
+                    validateReportingManager(employee, managerId);
+                } catch (IllegalArgumentException ex) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
+                }
+                employee.setReportingManagerId(managerId);
+            }
+        } else if (companyChanged && employee.getReportingManagerId() != null) {
+            try {
+                validateReportingManager(employee, employee.getReportingManagerId());
+            } catch (IllegalArgumentException ex) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST,
+                        "Select a reporting manager in the new company or clear the assignment", ex);
+            }
         }
 
         if (request.getPassword() != null
@@ -273,13 +312,21 @@ public class EmployeeService {
     public Employee setReportingManager(Long id, Long managerId) {
         Employee employee = findById(id);
         if (managerId != null) {
-            if (managerId.equals(id)) {
-                throw new IllegalArgumentException("An employee cannot report to themselves");
-            }
-            findById(managerId);
+            validateReportingManager(employee, managerId);
         }
         employee.setReportingManagerId(managerId);
         return employeeRepository.save(employee);
+    }
+
+    private Employee validateReportingManager(Employee employee, Long managerId) {
+        Employee manager = findById(managerId);
+        if (managerId.equals(employee.getId()) || !manager.isActive()
+                || manager.getRoleType() != RoleType.MANAGER || manager.getCompany() == null
+                || employee.getCompany() == null
+                || !manager.getCompany().getCode().equalsIgnoreCase(employee.getCompany().getCode())) {
+            throw new IllegalArgumentException("Reporting manager must be another active manager in the same company");
+        }
+        return manager;
     }
 
     public Employee setActive(Long id, boolean active) {

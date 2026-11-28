@@ -130,24 +130,9 @@ class DashboardControllerTest {
 
     @Test
     @WithMockUser(roles = "MANAGER")
-    void summary_accessibleByManager() throws Exception {
-        when(employeeRepository.count()).thenReturn(0L);
-        when(employeeRepository.countByLifecycleStatus(EmployeeLifecycleStatus.ACTIVE))
-                .thenReturn(0L);
-        when(employeeRepository.countByLifecycleStatus(EmployeeLifecycleStatus.PENDING_ONBOARDING))
-                .thenReturn(0L);
-        when(employeeRepository.countByLifecycleStatus(EmployeeLifecycleStatus.OFFBOARDING))
-                .thenReturn(0L);
-        when(attendanceRepository.count()).thenReturn(0L);
-        when(leaveRequestRepository.count()).thenReturn(0L);
-        when(leaveRequestRepository.countByStatus(LeaveStatus.PENDING))
-                .thenReturn(0L);
-        when(payrollRepository.count()).thenReturn(0L);
-        when(payrollRepository.countByStatus(PayrollStatus.PAID))
-                .thenReturn(0L);
-
+    void summary_forbiddenForManager() throws Exception {
         mockMvc.perform(get("/api/v1/dashboard/summary"))
-                .andExpect(status().isOk());
+                .andExpect(status().isForbidden());
     }
 
     @Test

@@ -1,17 +1,19 @@
 package com.zidio.nexushr.web.dto;
 
+import java.math.BigDecimal;
+
 public class LeaveBalanceResponse {
 
     private final Long employeeId;
     private final int annualEntitlement;
-    private final long usedDays;
-    private final long remainingDays;
+    private final BigDecimal usedDays;
+    private final BigDecimal remainingDays;
 
     public LeaveBalanceResponse(
             Long employeeId,
             int annualEntitlement,
-            long usedDays,
-            long remainingDays) {
+            BigDecimal usedDays,
+            BigDecimal remainingDays) {
 
         this.employeeId = employeeId;
         this.annualEntitlement = annualEntitlement;
@@ -27,11 +29,11 @@ public class LeaveBalanceResponse {
         return annualEntitlement;
     }
 
-    public long getUsedDays() {
+    public BigDecimal getUsedDays() {
         return usedDays;
     }
 
-    public long getRemainingDays() {
+    public BigDecimal getRemainingDays() {
         return remainingDays;
     }
 }

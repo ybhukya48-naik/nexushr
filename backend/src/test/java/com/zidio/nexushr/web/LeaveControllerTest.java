@@ -100,21 +100,33 @@ class LeaveControllerTest {
 
     @Test
     @WithMockUser(roles = "MANAGER")
-    void manager_canApproveLeave() throws Exception {
-        LeaveRequest approved = new LeaveRequest();
-        approved.setId(1L);
-        approved.setStatus(LeaveStatus.APPROVED);
-
-        when(authorizationService.canAccessLeave(eq(1L), any())).thenReturn(true);
-        when(leaveService.updateStatus(
-                eq(1L),
-                eq(LeaveStatus.APPROVED)
-        )).thenReturn(approved);
-
+    void manager_cannotApproveLeave() throws Exception {
         mockMvc.perform(patch("/api/v1/leaves/1/status")
                         .param("status", "APPROVED"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "manager@example.com", roles = "MANAGER")
+    void managerCanReadOwnLeaveAndRequestOnlyForSelf() throws Exception {
+        when(attendanceService.findEmployeeIdByUsername("manager@example.com")).thenReturn(10L);
+        LeaveRequest own = new LeaveRequest();
+        own.setId(5L);
+        own.setStatus(LeaveStatus.PENDING);
+        when(leaveService.findByEmployee(10L)).thenReturn(List.of(own));
+        when(leaveService.create(any(LeaveRequest.class))).thenReturn(own);
+
+        mockMvc.perform(get("/api/v1/leaves/me"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("APPROVED"));
+                .andExpect(jsonPath("$[0].id").value(5));
+        mockMvc.perform(post("/api/v1/leaves").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"employee\":{\"id\":10},\"startDate\":\"2026-12-01\",\"endDate\":\"2026-12-01\",\"reason\":\"test\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/leaves").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"employee\":{\"id\":11},\"startDate\":\"2026-12-01\",\"endDate\":\"2026-12-01\",\"reason\":\"test\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/leaves"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -175,7 +187,7 @@ class LeaveControllerTest {
     @WithMockUser(username = "employee@example.com", roles = "EMPLOYEE")
     void employee_canViewOwnLeaveBalance() throws Exception {
         LeaveBalanceResponse balance =
-                new LeaveBalanceResponse(1L, 24, 5, 19);
+                new LeaveBalanceResponse(1L, 24, java.math.BigDecimal.valueOf(5), java.math.BigDecimal.valueOf(19));
 
         when(attendanceService.findEmployeeIdByUsername(
                 "employee@example.com"
@@ -201,23 +213,9 @@ class LeaveControllerTest {
 
     @Test
     @WithMockUser(username = "manager@example.com", roles = "MANAGER")
-    void manager_canViewEmployeeLeaveBalance() throws Exception {
-        when(authorizationService.isEmployeeSelfOrManagement(
-                eq(2L), any()
-        )).thenReturn(true);
-
-        LeaveBalanceResponse balance =
-                new LeaveBalanceResponse(2L, 24, 8, 16);
-
-        when(leaveService.getLeaveBalance(2L))
-                .thenReturn(balance);
-
+    void manager_cannotViewEmployeeLeaveBalance() throws Exception {
         mockMvc.perform(get("/api/v1/leaves/balance/2"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.employeeId").value(2))
-                .andExpect(jsonPath("$.annualEntitlement").value(24))
-                .andExpect(jsonPath("$.usedDays").value(8))
-                .andExpect(jsonPath("$.remainingDays").value(16));
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -228,7 +226,7 @@ class LeaveControllerTest {
         )).thenReturn(true);
 
         LeaveBalanceResponse balance =
-                new LeaveBalanceResponse(3L, 24, 10, 14);
+                new LeaveBalanceResponse(3L, 24, java.math.BigDecimal.valueOf(10), java.math.BigDecimal.valueOf(14));
 
         when(leaveService.getLeaveBalance(3L))
                 .thenReturn(balance);

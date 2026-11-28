@@ -192,6 +192,18 @@ public final class AttendanceRules {
         return Math.min(WORK_MINUTES, minutes);
     }
 
+    public static int payrollMinutes(com.zidio.nexushr.domain.AttendanceRecord record, LocalDateTime now) {
+        if (record.isManualLunch()) {
+            if (record.getAttendanceDate() != null && record.getAttendanceDate().isAfter(now.toLocalDate())) {
+                return 0;
+            }
+            return Math.min(WORK_MINUTES, Math.max(0, record.getWorkMinutes() == null ? 0 : record.getWorkMinutes()));
+        }
+        return finishedDayMinutes(record.getCheckInTime(), record.getCheckOutTime(), record.getAttendanceDate(),
+                record.getWorkMinutes() == null ? 0 : record.getWorkMinutes(),
+                record.getBreakMinutes() == null ? 0 : record.getBreakMinutes(), now);
+    }
+
     /**
      * A finished day uses the stored minutes. An open check-in counts from
      * that check-in until now. A forgotten day from before today stops at

@@ -102,6 +102,46 @@ public class SecurityConfig {
 
                 .requestMatchers("/actuator/health/**").permitAll()
 
+                // Managers have personal attendance and a limited direct-report view,
+                // not HR administration or company-wide aggregates.
+                .requestMatchers(HttpMethod.GET, "/api/v1/employees/me/team")
+                .hasRole("MANAGER")
+                .requestMatchers(HttpMethod.GET, "/api/v1/attendance/team-today")
+                .hasRole("MANAGER")
+                .requestMatchers("/api/v1/manager/**")
+                .hasRole("MANAGER")
+                .requestMatchers(HttpMethod.POST, "/api/v1/notifications/**")
+                .hasAnyRole("HR", "ADMIN", "SUPER_ADMIN")
+                .requestMatchers("/api/v1/dashboard/**", "/api/v1/ai/**")
+                .hasAnyRole("HR", "ADMIN", "SUPER_ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/v1/leaves/me")
+                .hasAnyRole("HR", "ADMIN", "SUPER_ADMIN", "EMPLOYEE", "MANAGER")
+                .requestMatchers(HttpMethod.POST, "/api/v1/leaves")
+                .hasAnyRole("HR", "ADMIN", "SUPER_ADMIN", "EMPLOYEE", "MANAGER")
+                .requestMatchers("/api/v1/leaves", "/api/v1/leaves/**",
+                    "/api/v1/performance/**")
+                .hasAnyRole("HR", "ADMIN", "SUPER_ADMIN", "EMPLOYEE")
+                .requestMatchers("/api/v1/employees/*/submit-onboarding",
+                    "/api/v1/employees/*/approve", "/api/v1/employees/*/start-offboarding",
+                    "/api/v1/employees/*/complete-offboarding", "/api/v1/employees/*/lifecycle-history",
+                    "/api/v1/employees/*/promote", "/api/v1/employees/*/transfer",
+                    "/api/v1/employees/*/resign", "/api/v1/employees/*/documents",
+                    "/api/v1/employees/documents/**")
+                .hasAnyRole("HR", "ADMIN", "SUPER_ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/v1/attendance",
+                    "/api/v1/attendance/import-excel", "/api/v1/attendance/import-paste")
+                .hasAnyRole("HR", "ADMIN", "SUPER_ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/v1/attendance", "/api/v1/attendance/range",
+                    "/api/v1/attendance/metrics", "/api/v1/attendance/monthly-summary")
+                .hasAnyRole("HR", "ADMIN", "SUPER_ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/v1/attendance/daily-counts")
+                .hasAnyRole("HR", "ADMIN", "SUPER_ADMIN", "EMPLOYEE")
+                .requestMatchers(HttpMethod.POST, "/api/v1/payroll/**", "/api/v1/payroll")
+                .hasAnyRole("HR", "ADMIN", "SUPER_ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/v1/payroll", "/api/v1/payroll/auto-components",
+                    "/api/v1/payroll/sample-attendance")
+                .hasAnyRole("HR", "ADMIN", "SUPER_ADMIN")
+
 
                 // =========================================================
                 // SWAGGER / OPENAPI
@@ -252,7 +292,7 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/api/v1/employees/**"
                 )
-                .hasAnyRole("HR", "ADMIN", "MANAGER")
+                .hasAnyRole("HR", "ADMIN", "SUPER_ADMIN")
 
 
                 // =========================================================
@@ -327,12 +367,15 @@ public class SecurityConfig {
                     HttpMethod.POST,
                     "/api/v1/attendance/check-in",
                     "/api/v1/attendance/check-out",
+                    "/api/v1/attendance/lunch/start",
+                    "/api/v1/attendance/lunch/end",
                     "/api/v1/attendance/biometric/check-in",
                     "/api/v1/attendance/biometric/check-out"
                 )
                 .hasAnyRole(
                     "HR",
                     "ADMIN",
+                    "SUPER_ADMIN",
                     "MANAGER",
                     "EMPLOYEE"
                 )
@@ -585,4 +628,3 @@ public class SecurityConfig {
         return source;
     }
 }
-

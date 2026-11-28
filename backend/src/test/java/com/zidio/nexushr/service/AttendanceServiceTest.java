@@ -2,21 +2,33 @@ package com.zidio.nexushr.service;
 
 import com.zidio.nexushr.domain.AttendanceRecord;
 import com.zidio.nexushr.domain.Employee;
+import com.zidio.nexushr.domain.EmployeeLifecycleStatus;
+import com.zidio.nexushr.domain.PayrollRecord;
+import com.zidio.nexushr.domain.PayrollStatus;
+import com.zidio.nexushr.domain.LeaveRequest;
+import com.zidio.nexushr.domain.LeaveStatus;
 import com.zidio.nexushr.repository.AttendanceRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
+import com.zidio.nexushr.repository.PayrollRepository;
+import com.zidio.nexushr.repository.LeaveRequestRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -27,6 +39,12 @@ class AttendanceServiceTest {
 
     @Mock
     private EmployeeRepository employeeRepository;
+
+    @Mock
+    private PayrollRepository payrollRepository;
+
+    @Mock
+    private LeaveRequestRepository leaveRequestRepository;
 
     @InjectMocks
     private AttendanceService attendanceService;
@@ -59,6 +77,173 @@ class AttendanceServiceTest {
         );
 
         record.setWorkMinutes(480);
+    }
+
+    @Test
+    void checkoutRequiresManuallyEndingLunch() {
+        LocalDateTime now = LocalDateTime.now(AttendanceService.COMPANY_ZONE);
+        AttendanceRecord today = new AttendanceRecord();
+        today.setEmployee(employee);
+        today.setAttendanceDate(now.toLocalDate());
+        today.setCheckInTime(now.minusHours(1));
+        today.setManualLunch(true);
+        today.setLunchStartedAt(now.minusMinutes(15));
+        when(employeeRepository.findById(100L)).thenReturn(Optional.of(employee));
+        when(attendanceRepository.lockByEmployeeAndDate(100L, now.toLocalDate())).thenReturn(Optional.of(today));
+        assertThatThrownBy(() -> attendanceService.checkOut(100L)).hasMessageContaining("End lunch before checking out");
+        assertThat(today.getLunchStartedAt()).isNotNull();
+        assertThat(today.getCheckOutTime()).isNull();
+        verify(attendanceRepository, never()).save(any());
+    }
+
+    @Test
+    void manualLunchPausesWorkAndCheckoutDoesNotStartLunch() {
+        LocalDateTime now = LocalDateTime.now(AttendanceService.COMPANY_ZONE);
+        AttendanceRecord today = new AttendanceRecord();
+        today.setEmployee(employee);
+        today.setAttendanceDate(now.toLocalDate());
+        today.setCheckInTime(now.minusHours(2));
+        today.setSessionStartedAt(now.minusHours(2));
+        today.setManualLunch(true);
+        when(employeeRepository.findById(100L)).thenReturn(Optional.of(employee));
+        when(attendanceRepository.lockByEmployeeAndDate(100L, now.toLocalDate())).thenReturn(Optional.of(today));
+        when(attendanceRepository.save(today)).thenReturn(today);
+
+        attendanceService.lunch(100L, true);
+        assertThat(today.getCheckOutTime()).isNull();
+        assertThat(today.getLunchStartedAt()).isNotNull();
+        assertThat(today.getWorkMinutes()).isBetween(120, 121);
+        assertThatThrownBy(() -> attendanceService.lunch(100L, true))
+                .hasMessageContaining("already started");
+
+        attendanceService.lunch(100L, false);
+        assertThat(today.getLunchStartedAt()).isNull();
+        assertThat(today.getSessionStartedAt()).isNotNull();
+        attendanceService.checkOut(100L);
+        assertThat(today.getLunchStartedAt()).isNull();
+        assertThat(today.getCheckOutTime()).isNotNull();
+        assertThat(today.getWorkMinutes()).isBetween(120, 121);
+    }
+
+    @Test
+    void eightHoursWithoutLunchAreNotAutomaticallyReduced() {
+        LocalDateTime now = LocalDateTime.now(AttendanceService.COMPANY_ZONE);
+        AttendanceRecord today = new AttendanceRecord();
+        today.setEmployee(employee);
+        today.setAttendanceDate(now.toLocalDate());
+        today.setCheckInTime(now.minusHours(9));
+        today.setSessionStartedAt(now.minusHours(9));
+        today.setManualLunch(true);
+        when(employeeRepository.findById(100L)).thenReturn(Optional.of(employee));
+        when(attendanceRepository.lockByEmployeeAndDate(100L, now.toLocalDate())).thenReturn(Optional.of(today));
+        when(attendanceRepository.save(today)).thenReturn(today);
+
+        attendanceService.checkOut(100L);
+        assertThat(today.getWorkMinutes()).isBetween(540, 541);
+        assertThat(today.getOvertimeMinutes()).isBetween(60, 61);
+        assertThat(AttendanceRules.payrollMinutes(today, now)).isEqualTo(480);
+        assertThat(today.getLunchStartedAt()).isNull();
+    }
+
+    @Test
+    void generatePayroll_usesStoredAnnualCtcForNewRecords() {
+        employee.setBaseSalary(new BigDecimal("50000"));
+        employee.setAnnualCtc(new BigDecimal("1200000"));
+        when(employeeRepository.findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus.ACTIVE))
+                .thenReturn(List.of(employee));
+        when(payrollRepository.findByPayMonth("2026-07")).thenReturn(List.of());
+        when(attendanceRepository.findByAttendanceDateBetween(any(), any())).thenReturn(List.of(record));
+        List<PayrollRecord> saved = new java.util.ArrayList<>();
+        when(payrollRepository.saveAll(anyList())).thenAnswer(invocation -> {
+            List<PayrollRecord> batch = invocation.getArgument(0);
+            saved.addAll(batch);
+            return batch;
+        });
+        attendanceService.generatePayrollFromAttendance("2026-07", "");
+        assertThat(saved).hasSize(1);
+        assertThat(saved.get(0).getCtc()).isEqualByComparingTo("1200000");
+        assertThat(saved.get(0).getEarnedGross()).isEqualByComparingTo("3703.70");
+        assertThat(saved.get(0).getCasualLeave()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void sampleWorkbookShowsMonthlyCtcFromAnnualCtc() throws IOException {
+        employee.setBaseSalary(new BigDecimal("50000"));
+        employee.setAnnualCtc(new BigDecimal("288000"));
+        when(employeeRepository.findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus.ACTIVE))
+                .thenReturn(List.of(employee));
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(
+                new ByteArrayInputStream(attendanceService.sampleAttendanceWorkbook()))) {
+            assertThat(workbook.getSheetAt(0).getRow(0).getCell(4).getStringCellValue())
+                    .isEqualTo("Monthly CTC");
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(4).getStringCellValue())
+                    .isEqualTo("24000.00");
+        }
+    }
+
+    @Test
+    void sampleWorkbookFallbackValuesAreMonthly() throws IOException {
+        when(employeeRepository.findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus.ACTIVE))
+                .thenReturn(List.of());
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(
+                new ByteArrayInputStream(attendanceService.sampleAttendanceWorkbook()))) {
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(4).getStringCellValue())
+                    .isEqualTo("60000");
+        }
+    }
+
+    @Test
+    void generatePayroll_creditsApprovedHalfDayCasualLeave() {
+        employee.setAnnualCtc(new BigDecimal("288000"));
+        LeaveRequest leave = new LeaveRequest();
+        leave.setStartDate(LocalDate.of(2026, 7, 2));
+        leave.setEndDate(leave.getStartDate());
+        leave.setLeaveType("CASUAL");
+        leave.setHalfDay(true);
+        leave.setStatus(LeaveStatus.APPROVED);
+        when(employeeRepository.findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus.ACTIVE))
+                .thenReturn(List.of(employee));
+        when(leaveRequestRepository.findByEmployee_IdAndStatus(100L, LeaveStatus.APPROVED))
+                .thenReturn(List.of(leave));
+        List<PayrollRecord> saved = new java.util.ArrayList<>();
+        when(payrollRepository.saveAll(anyList())).thenAnswer(invocation -> {
+            List<PayrollRecord> batch = invocation.getArgument(0);
+            saved.addAll(batch);
+            return batch;
+        });
+        attendanceService.generatePayrollFromAttendance("2026-07", "");
+        assertThat(saved).hasSize(1);
+        assertThat(saved.get(0).getWorkedMinutes()).isZero();
+        assertThat(saved.get(0).getEarnedGross()).isEqualByComparingTo("444.44");
+        assertThat(saved.get(0).getCasualLeave()).isEqualByComparingTo("0.5");
+    }
+
+    @Test
+    void generatePayroll_preservesAnnualCtcAndDoesNotChangePaidRecords() {
+        employee.setBaseSalary(new BigDecimal("1200000"));
+        PayrollRecord payroll = new PayrollRecord();
+        payroll.setEmployee(employee);
+        payroll.setPayMonth("2026-07");
+        payroll.setCtc(new BigDecimal("1200000"));
+        payroll.setStatus(PayrollStatus.GENERATED);
+        when(employeeRepository.findByActiveTrueAndLifecycleStatus(EmployeeLifecycleStatus.ACTIVE))
+                .thenReturn(List.of(employee));
+        when(payrollRepository.findByPayMonth("2026-07")).thenReturn(List.of(payroll));
+        when(attendanceRepository.findByAttendanceDateBetween(any(), any())).thenReturn(List.of(record));
+
+        attendanceService.generatePayrollFromAttendance("2026-07", "");
+
+        assertThat(payroll.getCtc()).isEqualByComparingTo("1200000");
+        assertThat(payroll.getEarnedGross()).isEqualByComparingTo("3703.70");
+        verify(payrollRepository).saveAll(anyList());
+
+        reset(payrollRepository);
+        payroll.setStatus(PayrollStatus.PAID);
+        when(payrollRepository.findByPayMonth("2026-07")).thenReturn(List.of(payroll));
+        attendanceService.generatePayrollFromAttendance("2026-07", "");
+        verify(payrollRepository, never()).saveAll(anyList());
     }
 
     @Test
@@ -111,7 +296,7 @@ class AttendanceServiceTest {
                 .thenReturn(Optional.of(employee));
 
         when(attendanceRepository
-                .findByEmployee_IdAndAttendanceDate(
+                .lockByEmployeeAndDate(
                         eq(100L),
                         any(LocalDate.class)))
                 .thenReturn(Optional.empty());
@@ -150,7 +335,7 @@ class AttendanceServiceTest {
                 .findById(100L);
 
         verify(attendanceRepository)
-                .findByEmployee_IdAndAttendanceDate(
+                .lockByEmployeeAndDate(
                         eq(100L),
                         eq(LocalDate.now(AttendanceService.COMPANY_ZONE)));
 
@@ -179,7 +364,7 @@ class AttendanceServiceTest {
                 .thenReturn(Optional.of(employee));
 
         when(attendanceRepository
-                .findByEmployee_IdAndAttendanceDate(
+                .lockByEmployeeAndDate(
                         eq(100L),
                         eq(LocalDate.now(AttendanceService.COMPANY_ZONE))))
                 .thenReturn(Optional.of(todayRecord));
@@ -203,7 +388,7 @@ class AttendanceServiceTest {
                 .findById(100L);
 
         verify(attendanceRepository)
-                .findByEmployee_IdAndAttendanceDate(
+                .lockByEmployeeAndDate(
                         100L,
                         LocalDate.now(AttendanceService.COMPANY_ZONE));
 

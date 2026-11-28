@@ -11,6 +11,8 @@ import {
 } from "react-router-dom";
 import {
   getCurrentEmployee,
+  getTeamAttendanceToday,
+  getManagerTeamReport,
   getEmployeeNotifications,
   downloadPayslipPdf,
   getEmployeePayroll,
@@ -32,11 +34,15 @@ import {
   websiteSessionActive,
   type AiWorkforceDashboardResponse,
   type EmployeeResponse,
+  type TeamAttendance,
+  type ManagerTeamReport,
   type NotificationResponse,
 } from "./api";
 import {
   checkOut,
   officeCheckIn,
+  startLunch,
+  endLunch,
   getAttendanceAudit,
   getEmployeeAttendance,
   createLeave,
@@ -45,6 +51,7 @@ import {
   type AttendanceAuditEntry,
   type LeaveRequest,
   dayCountedSeconds,
+  clockedWorkMinutes,
   dayExtraSeconds,
   dayIsComplete,
   formatHoursSeconds,
@@ -83,13 +90,13 @@ const navItems: ReadonlyArray<
   readonly [string, string, readonly string[]]
 > = [
   ["Dashboard", "/", ["HR", "MANAGER", "EMPLOYEE", "ADMIN", "SUPER_ADMIN"]],
-  ["Employees", "/employees", ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"]],
+  ["Employees", "/employees", ["ADMIN", "HR", "SUPER_ADMIN"]],
   ["Attendance", "/attendance", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
   ["Leave", "/leave", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
   ["Payroll", "/payroll", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
-  ["Performance", "/performance", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
-  ["AI Insights", "/ai", ["ADMIN", "HR", "MANAGER", "SUPER_ADMIN"]],
-  ["Notifications", "/notifications", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
+  ["Performance", "/performance", ["ADMIN", "HR", "EMPLOYEE", "SUPER_ADMIN"]],
+  ["AI Insights", "/ai", ["ADMIN", "HR", "SUPER_ADMIN"]],
+  ["Notifications", "/notifications", ["ADMIN", "HR", "EMPLOYEE", "SUPER_ADMIN"]],
   ["Profile", "/profile", ["ADMIN", "HR", "MANAGER", "EMPLOYEE", "SUPER_ADMIN"]],
 ] as const;
 
@@ -333,7 +340,7 @@ function AppRoutes() {
         })
         .catch(() => {
           if (!cancelled) {
-            setAttendanceAlert("");
+            setAttendanceAlert("Unable to load attendance status. Check your connection.");
           }
         });
     }
@@ -341,10 +348,11 @@ function AppRoutes() {
     loadStatus();
     const timer = window.setInterval(loadStatus, 60000);
     const heartbeat = window.setInterval(() => {
-      if (document.visibilityState !== "visible" || !document.hasFocus()) {
-        return;
-      }
-      void sendAttendanceHeartbeat().catch(() => undefined);
+      void sendAttendanceHeartbeat()
+        .then(() => window.dispatchEvent(new Event("nexushr-attendance-refresh")))
+        .catch(() => {
+          if (!cancelled) setAttendanceAlert("Attendance connection failed. Check your internet connection.");
+        });
     }, 60000);
     return () => {
       cancelled = true;
@@ -603,11 +611,11 @@ function AppRoutes() {
               {label === "Dashboard"
                 ? signedRole === "ADMIN" || signedRole === "SUPER_ADMIN" ? "Dashboard" : "Home"
                 : label === "Attendance"
-                  ? role === "EMPLOYEE" ? "My Attendance" : "Attendance"
+                  ? role === "EMPLOYEE" || role === "MANAGER" ? "My Attendance" : "Attendance"
                   : label === "Leave"
-                    ? role === "EMPLOYEE" ? "My Leave" : "Leave"
+                    ? role === "EMPLOYEE" || role === "MANAGER" ? "My Leave" : "Leave"
                     : label === "Payroll"
-                      ? role === "EMPLOYEE" ? "My Pay" : "Payroll"
+                      ? role === "EMPLOYEE" || role === "MANAGER" ? "My Pay" : "Payroll"
                       : label === "Performance"
                         ? role === "EMPLOYEE" ? "My Reviews" : "Performance"
                         : label === "AI Insights"
@@ -667,7 +675,7 @@ function AppRoutes() {
                         type="button"
                         onClick={() => {
                           setBellOpen(false);
-                          navigate("/notifications");
+                          navigate(role === "MANAGER" ? "/#manager-notifications" : "/notifications");
                         }}
                       >
                         <strong>{item.title}</strong>
@@ -680,7 +688,7 @@ function AppRoutes() {
                     className="bell-all"
                     onClick={() => {
                       setBellOpen(false);
-                      navigate("/notifications");
+                      navigate(role === "MANAGER" ? "/#manager-notifications" : "/notifications");
                     }}
                   >
                     See all updates
@@ -734,6 +742,8 @@ function AppRoutes() {
                 element={
                   signedRole === "EMPLOYEE" ? (
                     <EmployeeDashboard />
+                  ) : signedRole === "MANAGER" ? (
+                    <ManagerDashboard />
                   ) : signedRole === "ADMIN" || signedRole === "SUPER_ADMIN" ? (
                     <AdminDashboard />
                   ) : (
@@ -742,14 +752,14 @@ function AppRoutes() {
                 }
               />
               <Route path="/profile" element={<EmployeeProfile />} />
-              <Route path="/employees" element={<Employees />} />
-              <Route path="/employees/:id" element={<EmployeeProfile />} />
+              <Route path="/employees" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <Employees />} />
+              <Route path="/employees/:id" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <EmployeeProfile />} />
               <Route path="/attendance" element={<Attendance />} />
               <Route path="/leave" element={<Leave />} />
               <Route path="/payroll" element={<Payroll />} />
-              <Route path="/performance" element={<Performance />} />
-              <Route path="/ai" element={<AIInsights />} />
-              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/performance" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <Performance />} />
+              <Route path="/ai" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <AIInsights />} />
+              <Route path="/notifications" element={signedRole === "MANAGER" ? <Navigate to="/" replace /> : <Notifications />} />
               <Route
                 path="/admin"
                 element={isAdmin ? <Admin view="settings" /> : <Navigate to="/" replace />}
@@ -916,20 +926,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
       await openSession(response);
     } catch (err) {
       console.error(err);
-      const message = err instanceof Error ? err.message : "Invalid username or password.";
-      const needsProfile = message.toLowerCase().includes("not saved yet")
-        || message.toLowerCase().includes("create your profile");
-      if (needsProfile) {
-        setCreating(true);
-        setError("");
-        setNotice(
-          employee
-            ? "This account needs a password. Create your profile with your own password."
-            : "This account needs a password. Create your profile, then sign in on the correct login page for your role.",
-        );
-        return;
-      }
-      setError(message);
+      setError(err instanceof Error ? err.message : "Unable to sign in.");
     } finally {
       setLoading(false);
     }
@@ -1118,7 +1115,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
                   ? "A cyond manager signs in with their own email and password. A Gorle manager signs in with the employee code and password."
                   : kind === "admin"
                   ? "Example: employee code 310310 opens the admin panel. Use Entity for the Gorle admin panel or the CYOND admin panel."
-                  : "hr@gorlegroup.com opens HR. Use Entity to switch between Gorle Group and CYOND without signing in again."}
+                  : "Sign in with the email or employee code assigned to your account."}
               </p>
 
             </div>
@@ -1252,7 +1249,7 @@ function Login({ kind = "hr" }: { kind?: "hr" | "employee" | "manager" | "admin"
 
               {creating ? (
                 <p className="login-notice">
-                  HR login uses hr@gorlegroup.com, then Entity switches Gorle Group and CYOND. Admin panel example: employee code 310310. Other Gorle people use their employee code. Other cyond people use their @cyond.com email.
+                  Use the email address assigned to your account, or your employee code.
                 </p>
               ) : employee ? (
                 <p className="login-notice">
@@ -1381,6 +1378,186 @@ function formatTimer(totalSeconds: number) {
   return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+function ManagerDashboard() {
+  const location = useLocation();
+  const [employee, setEmployee] = useState<EmployeeResponse | null>(null);
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [teamAttendance, setTeamAttendance] = useState<TeamAttendance[]>([]);
+  const [clockNow, setClockNow] = useState(() => new Date());
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [month, setMonth] = useState(() => todayKey().slice(0, 7));
+  const [selection, setSelection] = useState<{
+    key: string;
+    section: "team" | "attendance" | "leave" | "payroll" | "reports" | "notifications";
+  }>({ key: location.key, section: location.hash === "#manager-notifications" ? "notifications" : "team" });
+  const section = selection.key === location.key
+    ? selection.section
+    : location.hash === "#manager-notifications" ? "notifications" : "team";
+  const [report, setReport] = useState<ManagerTeamReport | null>(null);
+  const [reportError, setReportError] = useState("");
+  const [reportLoading, setReportLoading] = useState(true);
+  const [reportRefresh, setReportRefresh] = useState(0);
+  const [notifications, setNotifications] = useState<NotificationResponse[]>([]);
+  const [notificationError, setNotificationError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const [me, teamRecords] = await Promise.all([getCurrentEmployee(), getTeamAttendanceToday()]);
+        const history = await getEmployeeAttendance(me.id);
+        if (active) {
+          setEmployee(me);
+          setTeamAttendance(teamRecords);
+          setRecords(history);
+        }
+      } catch (err) {
+        if (active) setError(err instanceof Error ? err.message : "Unable to load your dashboard.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    void load();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setReportLoading(true);
+    setReportError("");
+    setReport(null);
+    getManagerTeamReport(month).then((result) => {
+      if (active) setReport(result);
+    }).catch((err) => {
+      if (active) setReportError(err instanceof Error ? err.message : "Unable to load team report.");
+    }).finally(() => {
+      if (active) setReportLoading(false);
+    });
+    return () => { active = false; };
+  }, [month, reportRefresh]);
+
+  useEffect(() => {
+    if (!employee) return;
+    let active = true;
+    getEmployeeNotifications(employee.id).then((items) => {
+      if (active) setNotifications(items);
+    }).catch((err) => {
+      if (active) setNotificationError(err instanceof Error ? err.message : "Unable to load notifications.");
+    });
+    return () => { active = false; };
+  }, [employee]);
+
+  const today = records.find((record) => record.attendanceDate?.slice(0, 10) === todayKey());
+  const checkedIn = Boolean(today?.checkInTime && !today.checkOutTime);
+  const worked = clockedWorkMinutes(today, clockNow);
+  const activeLunch = today?.lunchStartedAt ? Math.max(0, Math.floor((clockNow.getTime() - new Date(today.lunchStartedAt).getTime()) / 60000)) : 0;
+  const duration = (minutes: number) => `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!employee) return;
+    const refresh = () => {
+      void getEmployeeAttendance(employee.id).then(setRecords)
+        .catch((err) => setError(err instanceof Error ? err.message : "Unable to refresh attendance."));
+      void getTeamAttendanceToday().then(setTeamAttendance)
+        .catch((err) => setError(err instanceof Error ? err.message : "Unable to refresh team attendance."));
+      setReportRefresh((value) => value + 1);
+    };
+    window.addEventListener("nexushr-attendance-refresh", refresh);
+    return () => window.removeEventListener("nexushr-attendance-refresh", refresh);
+  }, [employee]);
+
+  async function punch(kind: "in" | "out" | "lunch-start" | "lunch-end") {
+    if (!employee) return;
+    setBusy(true);
+    setError("");
+    try {
+      await (kind === "in" ? officeCheckIn() : kind === "out" ? checkOut() : kind === "lunch-start" ? startLunch() : endLunch());
+      setRecords(await getEmployeeAttendance(employee.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save attendance.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="dashboard-page">
+      <div className="dashboard-hero">
+        <div className="dashboard-hero-copy">
+          <p className="eyebrow">MANAGER DASHBOARD</p>
+          <h2>Welcome{employee ? `, ${employee.fullName}` : ""}</h2>
+        </div>
+      </div>
+      {error && <p role="alert" className="page-alert">{error}</p>}
+      {loading ? <p>Loading dashboard...</p> : (
+        <>
+          <section className="panel">
+            <h3>My attendance</h3>
+            <p>{!today?.checkInTime ? "Not checked in" : today.lunchStartedAt ? "On lunch" : checkedIn ? "Checked in" : "Checked out"}</p>
+            <p>Worked: {duration(worked)} · Lunch: {duration((today?.breakMinutes ?? 0) + activeLunch)} · Remaining: {duration(Math.max(0, 480 - worked))} · Extra: {duration(Math.max(0, worked - 480))}</p>
+            <div className="attendance-actions">
+              <button type="button" className="primary-button" disabled={busy || checkedIn || !employee} onClick={() => void punch("in")}>Check in</button>
+              <button type="button" className="secondary-button" disabled={busy || !checkedIn || !employee || Boolean(today?.lunchStartedAt)} onClick={() => void punch("out")}>Check out</button>
+              <button type="button" className="secondary-button" disabled={busy || !checkedIn || Boolean(today?.lunchStartedAt)} onClick={() => void punch("lunch-start")}>Start lunch</button>
+              <button type="button" className="secondary-button" disabled={busy || !today?.lunchStartedAt} onClick={() => void punch("lunch-end")}>End lunch</button>
+            </div>
+            {today?.lunchStartedAt && <p>End lunch before checking out.</p>}
+          </section>
+          <section className="panel">
+            <h3>My team workspace</h3>
+            <p>Only your assigned direct reports in your company are shown. HR manages leave approvals and payroll amounts.</p>
+            <div className="attendance-actions">
+              {(["team", "attendance", "leave", "payroll", "reports", "notifications"] as const).map((item) => (
+                <button key={item} type="button" className="secondary-button" aria-pressed={section === item}
+                  onClick={() => setSelection({ key: location.key, section: item })}>{item[0].toUpperCase() + item.slice(1)}</button>
+              ))}
+            </div>
+            {section !== "notifications" && (
+              <label>Report month <input type="month" value={month} min="2000-01" max="2100-12"
+                onChange={(event) => { if (event.target.value) setMonth(event.target.value); }} /></label>
+            )}
+            {section === "notifications" ? (
+              <>
+                <h4>My notifications</h4>
+                {notificationError && <p role="alert">{notificationError}</p>}
+                {!notificationError && notifications.length === 0 && <p>No notifications.</p>}
+                <ul>{notifications.map((notice) => <li key={notice.id}>{notice.message}</li>)}</ul>
+              </>
+            ) : reportLoading ? <p>Loading team report...</p> : reportError ? <p role="alert">{reportError}</p> : !report?.members.length ? (
+              <p>No direct reports are assigned to you. Ask HR to set the Reporting Manager for your team.</p>
+            ) : (
+              <>
+                {section === "reports" && <p>Team members: {report.members.length} · Recorded work: {duration(report.members.reduce((sum, member) => sum + member.workedMinutes, 0))} · Extra: {duration(report.members.reduce((sum, member) => sum + member.overtimeMinutes, 0))}</p>}
+                {report.members.map((member) => {
+                  const live = teamAttendance.find((record) => record.employeeId === member.id);
+                  const status = !live ? "Not checked in" : live.checkOutTime ? "Checked out" : live.onLunch ? "On lunch" : "Checked in";
+                  return (
+                    <article key={member.id} className="panel">
+                      <h4>{member.name} · {member.code}</h4>
+                      {section === "team" && <p>{member.department} · {member.designation} · Today: {status} · Month work: {duration(member.workedMinutes)} · Extra: {duration(member.overtimeMinutes)}</p>}
+                      {section === "attendance" && (member.attendance.length === 0 ? <p>No attendance for this month.</p> : <ul>{member.attendance.map((day) => <li key={day.date}>{day.date} · {day.checkIn ? `In ${new Date(day.checkIn).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : "No check-in"} · {day.checkOut ? `Out ${new Date(day.checkOut).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : day.onLunch ? "On lunch" : "Open"} · Work {duration(day.workedMinutes)} · Extra {duration(day.overtimeMinutes)}</li>)}</ul>)}
+                      {section === "leave" && (member.leave.length === 0 ? <p>No leave in this month.</p> : <ul>{member.leave.map((leave, index) => <li key={`${leave.startDate}-${leave.endDate}-${index}`}>{leave.startDate} – {leave.endDate} · {leave.type || "Leave"}{leave.halfDay ? " · Half day" : ""} · {leave.status} (HR approval)</li>)}</ul>)}
+                      {section === "payroll" && <p>Payroll status: {member.payrollStatus.replaceAll("_", " ")} · Work: {duration(member.workedMinutes)} · Extra: {duration(member.overtimeMinutes)}. Salary amounts are private.</p>}
+                      {section === "reports" && <p>Recorded work: {duration(member.workedMinutes)} · Extra: {duration(member.overtimeMinutes)} · Attendance days: {member.attendance.filter((day) => day.checkIn).length} · Leave requests: {member.leave.length}</p>}
+                    </article>
+                  );
+                })}
+              </>
+            )}
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+
 function EmployeeDashboard() {
   const navigate = useNavigate();
   const cachedDashboard = readDashboardSnapshot();
@@ -1388,6 +1565,7 @@ function EmployeeDashboard() {
     useState<EmployeeResponse | null>(cachedDashboard?.employee ?? null);
   const [records, setRecords] = useState<AttendanceRecord[]>(cachedDashboard?.records ?? []);
   const [audit, setAudit] = useState<AttendanceAuditEntry[]>([]);
+  const [auditError, setAuditError] = useState("");
   const [leaveCount, setLeaveCount] = useState(0);
   const [myLeaves, setMyLeaves] = useState<LeaveRequest[]>([]);
   const [nextHoliday, setNextHoliday] = useState("None listed");
@@ -1409,6 +1587,23 @@ function EmployeeDashboard() {
   }, []);
 
   useEffect(() => {
+    if (!employee) return;
+    const refresh = () => {
+      void getEmployeeAttendance(employee.id).then(setRecords)
+        .catch((err) => setPunchNote(err instanceof Error ? err.message : "Unable to refresh attendance."));
+      void getAttendanceAudit(employee.id).then((entries) => {
+        setAudit(entries);
+        setAuditError("");
+      }).catch((err) => {
+        setAudit([]);
+        setAuditError(err instanceof Error ? err.message : "Unable to refresh punch history.");
+      });
+    };
+    window.addEventListener("nexushr-attendance-refresh", refresh);
+    return () => window.removeEventListener("nexushr-attendance-refresh", refresh);
+  }, [employee]);
+
+  useEffect(() => {
     let cancelled = false;
     getCurrentEmployee()
       .then((me) => {
@@ -1419,7 +1614,10 @@ function EmployeeDashboard() {
         setLoading(false);
         return Promise.all([
           getEmployeeAttendance(me.id).catch(() => []),
-          getAttendanceAudit(me.id).catch(() => []),
+          getAttendanceAudit(me.id).catch((err) => {
+            if (!cancelled) setAuditError(err instanceof Error ? err.message : "Unable to load punch history.");
+            return [];
+          }),
           getLeaves().catch(() => []),
           getEmployeePayroll(me.id).catch(() => []),
           getHolidays().catch(() => []),
@@ -1528,6 +1726,13 @@ function EmployeeDashboard() {
       setRecords(savedHistory);
       writeDashboardSnapshot(signedInEmployee, savedHistory);
       setPunchNote(kind === "out" ? "Checked out." : "Checked in.");
+      try {
+        setAudit(await getAttendanceAudit(signedInEmployee.id));
+        setAuditError("");
+      } catch (err) {
+        setAudit([]);
+        setAuditError(err instanceof Error ? err.message : "Unable to refresh punch history.");
+      }
     } catch (err) {
       setPunchNote(
         err instanceof Error
@@ -1566,7 +1771,7 @@ function EmployeeDashboard() {
     setPunching(true);
     setPunchNote("");
     try {
-      await (kind === "out" ? checkOut() : officeCheckIn());
+      await (kind === "out" ? startLunch() : endLunch());
       const history = await getEmployeeAttendance(signedInEmployee.id);
       const savedHistory = [...history].sort((a, b) => b.attendanceDate.localeCompare(a.attendanceDate));
       setRecords(savedHistory);
@@ -1622,25 +1827,24 @@ function EmployeeDashboard() {
         const historySeconds = records.reduce((sum, row) => sum + dayCountedSeconds(row, clockNow), 0);
         const historyExtra = records.reduce((sum, row) => sum + dayExtraSeconds(row, clockNow), 0);
         const warnings = monthRows.filter((row) => row.yellowFlag).length;
-        const halfDay = warnings >= 3 ? Math.round(Number(employee.baseSalary || 0) / 26 / 2) : 0;
         const workday = new Date().getDay() !== 0;
-        const onLunchNow = Boolean(todayRecord?.checkInTime && todayRecord?.checkOutTime);
+        const onLunchNow = Boolean(todayRecord?.lunchStartedAt);
         const notices = [
           workday && !todayRecord?.checkInTime ? "Check-in is missing today." : "",
-          todayRecord?.checkInTime && !todayRecord.checkOutTime && todaySeconds < 9 * 60 * 60
-            ? "You are still checked in. Signing out of the website does not check you out. If you forget, check-out is saved 9 hours after check-in."
+          todayRecord?.checkInTime && !todayRecord.checkOutTime && todaySeconds < 8 * 60 * 60
+            ? "Keep the app connected. After 30 minutes without a heartbeat, checkout is saved at the last heartbeat."
             : "",
-          todayRecord?.checkInTime && !todayRecord.checkOutTime && todaySeconds >= 9 * 60 * 60
-            ? "9 hours are complete. Extra hours are showing. Check out when you leave."
+          todayRecord?.checkInTime && !todayRecord.checkOutTime && todaySeconds >= 8 * 60 * 60
+            ? "8 working hours are complete. Extra hours are shown separately."
             : "",
           isCheckoutMissing(todayRecord)
-            ? "Check-out was missed. It is saved 9 hours after check-in, and the attendance record stays."
+            ? "An older attendance record is missing check-out. Contact HR if it needs correction."
             : "",
           todayRecord?.yellowFlag && !onLunchNow
             ? "Desktop was inactive for more than 30 minutes. This is a warning."
             : "",
           warnings >= 3
-            ? `3 inactivity warnings this month. A half day, ₹${halfDay.toLocaleString("en-IN")}, is cut from salary.`
+            ? "3 inactivity warnings this month. A half-day deduction applies."
             : "",
         ].filter(Boolean);
         const monthStamp = today.slice(0, 7);
@@ -1649,7 +1853,7 @@ function EmployeeDashboard() {
           (leave.status === "APPROVED" || leave.status === "PENDING")
           && leave.leaveType === "CASUAL"
           && leave.startDate.startsWith(monthStamp),
-        ).length;
+        ).reduce((sum, leave) => sum + (leave.halfDay ? 0.5 : 1), 0);
         const sickTaken = savedLeaves.filter((leave) => leave.status === "APPROVED" && leave.leaveType === "SICK").length;
         const compOff = savedLeaves.filter((leave) => leave.status === "APPROVED" && leave.leaveType === "COMP_OFF").length;
         const week = monthDateKeys(7).map((date) => ({
@@ -1666,8 +1870,8 @@ function EmployeeDashboard() {
         const wfhTime = !todayRecord?.checkInTime
           ? "No check-in yet"
           : `Check in ${formatClock(todayRecord.checkInTime)} · ${todayRecord.checkOutTime ? `Check out ${formatClock(todayRecord.checkOutTime)}` : "Still in"} · ${formatHoursSeconds(todaySeconds)}`;
-        const onLunch = Boolean(todayRecord?.checkInTime && todayRecord?.checkOutTime);
-        const lunchStarted = onLunch ? new Date(String(todayRecord?.checkOutTime)).getTime() : 0;
+        const onLunch = Boolean(todayRecord?.lunchStartedAt);
+        const lunchStarted = onLunch ? new Date(String(todayRecord?.lunchStartedAt)).getTime() : 0;
         const lunchSeconds = lunchStarted
           ? Math.max(0, Math.floor((clockNow.getTime() - lunchStarted) / 1000))
           : Math.max(0, (todayRecord?.breakMinutes ?? 0) * 60);
@@ -1683,12 +1887,12 @@ function EmployeeDashboard() {
                 <article>
                   <span>Month working hours</span>
                   <strong>{formatHoursSeconds(monthSeconds)}</strong>
-                  <em>1st through today. Salary uses finished days, {formatHoursSeconds(doneSeconds)}.</em>
+                  <em>1st through today. Completed days: {formatHoursSeconds(doneSeconds)}.</em>
                 </article>
                 <article>
                   <span>History total working hours</span>
                   <strong>{formatHoursSeconds(historySeconds)}</strong>
-                  <em>Every recorded day, up to 9 hours.</em>
+                  <em>Every recorded day, up to 8 working hours.</em>
                 </article>
                 <article className="hours-extra">
                   <span>Extra working hours</span>
@@ -1706,7 +1910,7 @@ function EmployeeDashboard() {
                       <button className="primary-button" type="button" disabled={punching || !isWindowsComputer() || checkedIn} onClick={() => void punch("in")}>
                         Check in
                       </button>
-                      <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !checkedIn} onClick={() => void punch("out")}>
+                      <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !checkedIn || onLunch} onClick={() => void punch("out")}>
                         Check out
                       </button>
                     </div>
@@ -1717,14 +1921,14 @@ function EmployeeDashboard() {
                     <strong>{formatTimer(lunchSeconds)}</strong>
                     <em>{onLunch ? "lunch timer" : "lunch taken"}</em>
                     <div className="attendance-actions">
-                      <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !todayRecord?.checkInTime || Boolean(todayRecord?.checkOutTime)} onClick={() => void punchLunch("out")}>
+                      <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !checkedIn || onLunch} onClick={() => void punchLunch("out")}>
                         Start lunch
                       </button>
-                      <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !todayRecord?.checkOutTime} onClick={() => void punchLunch("in")}>
+                      <button className="secondary-button" type="button" disabled={punching || !isWindowsComputer() || !onLunch} onClick={() => void punchLunch("in")}>
                         End lunch
                       </button>
                     </div>
-                    <em>{lunchSeconds > 3600 ? "Past 1 paid hour. Extra time stays a break." : "1 hour is paid. It can be any hour."}</em>
+                    <em>{lunchSeconds > 3600 ? "Past 1 hour; lunch time is excluded from work." : "Flexible lunch; lunch time is excluded from work."}</em>
                   </div>
                 </div>
               </article>
@@ -1879,6 +2083,7 @@ function EmployeeDashboard() {
                   <p>Your check-in, check-out, and the working hours used for salary.</p>
                 </div>
               </div>
+              {auditError && <p role="alert">Punch history unavailable: {auditError}</p>}
               <div className="employees-table-wrap month-history">
                 <table className="employees-table">
                   <thead>
@@ -2132,8 +2337,3 @@ export default function App() {
     </PageGuard>
   );
 }
-
-
-
-
-

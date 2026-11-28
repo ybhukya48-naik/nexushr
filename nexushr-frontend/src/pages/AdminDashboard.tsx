@@ -7,6 +7,7 @@ import {
   type EmployeeResponse,
 } from "../api";
 import { asWorkspaceCompany, getWorkspaceCompany } from "../utils/workspace";
+import { checkOut, officeCheckIn, startLunch, endLunch, getEmployeeAttendance, isWindowsComputer, clockedWorkMinutes, type AttendanceRecord } from "./Attendance";
 import "./Dashboard.css";
 
 function formatClock(value?: string | null) {
@@ -63,6 +64,9 @@ export default function AdminDashboard() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(() => new Date());
+  const [selfRecord, setSelfRecord] = useState<AttendanceRecord | null>(null);
+  const [punching, setPunching] = useState(false);
+  const [selfReady, setSelfReady] = useState(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30000);
@@ -73,16 +77,12 @@ export default function AdminDashboard() {
     let cancelled = false;
     setLoading(true);
     setError("");
-    void Promise.all([
-      getAdminOverview(),
-      getCurrentEmployee().catch(() => null),
-    ])
-      .then(([overview, person]) => {
+    void getAdminOverview()
+      .then((overview) => {
         if (cancelled) {
           return;
         }
         setRows(overview.rows ?? []);
-        setMe(person);
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -99,6 +99,52 @@ export default function AdminDashboard() {
     };
   }, [company]);
 
+  useEffect(() => {
+    let active = true;
+    void getCurrentEmployee()
+      .then((person) => { if (active) setMe(person); })
+      .catch((err) => {
+        if (active) setError(err instanceof Error ? err.message : "Unable to load your profile.");
+      });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!me) return;
+    let active = true;
+    const refresh = () => {
+      void getEmployeeAttendance(me.id).then((history) => {
+        if (!active) return;
+        const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+        setSelfRecord(history.find((row) => row.attendanceDate?.slice(0, 10) === today) ?? null);
+        setSelfReady(true);
+      }).catch((err) => {
+        if (!active) return;
+        setSelfReady(false);
+        setError(err instanceof Error ? err.message : "Unable to load your attendance.");
+      });
+    };
+    refresh();
+    window.addEventListener("nexushr-attendance-refresh", refresh);
+    return () => {
+      active = false;
+      window.removeEventListener("nexushr-attendance-refresh", refresh);
+    };
+  }, [me]);
+
+  async function punchSelf(action: "in" | "out" | "start" | "end") {
+    setPunching(true);
+    setError("");
+    try {
+      const saved = await (action === "in" ? officeCheckIn() : action === "out" ? checkOut() : action === "start" ? startLunch() : endLunch());
+      setSelfRecord(saved);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save attendance.");
+    } finally {
+      setPunching(false);
+    }
+  }
+
   const people = rows.filter((row) => !company || asWorkspaceCompany(row.company) === company);
   const active = people.filter((row) => row.active);
   const chairmen = active.filter(isChairman);
@@ -111,6 +157,11 @@ export default function AdminDashboard() {
   const missingCheckOut = active.filter((row) => row.checkInTime && !row.checkOutTime);
   const companyName = company === "GORLE" ? "Gorle Group" : "CYOND";
   const displayName = me?.fullName?.trim() || "Admin";
+  const worked = clockedWorkMinutes(selfRecord ?? undefined, now);
+  const lunch = (selfRecord?.breakMinutes ?? 0) + (selfRecord?.lunchStartedAt
+    ? Math.max(0, Math.floor((now.getTime() - new Date(selfRecord.lunchStartedAt).getTime()) / 60000))
+    : 0);
+  const hours = (minutes: number) => `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 
   function reportsOf(person: AdminEmployeeRow, chairman: boolean) {
     const direct = people.filter((row) => row.reportingManagerId === person.id);
@@ -134,6 +185,20 @@ export default function AdminDashboard() {
       </header>
 
       {error && <p className="page-alert">{error}</p>}
+
+      <section className="hr-card">
+        <h3>My attendance</h3>
+        <p>{!selfReady ? "Attendance loading or unavailable" : selfRecord?.lunchStartedAt ? "Lunch in progress" : selfRecord?.checkInTime && !selfRecord.checkOutTime ? "Checked in" : selfRecord?.checkOutTime ? "Checked out" : "Not checked in"}</p>
+        <p>Worked: {hours(worked)} · Lunch: {hours(lunch)} · Extra: {hours(Math.max(0, worked - 480))}</p>
+        <div className="attendance-actions">
+          <button type="button" disabled={punching || !selfReady || !me || !isWindowsComputer() || Boolean(selfRecord?.checkInTime && !selfRecord.checkOutTime)} onClick={() => void punchSelf("in")}>Check in</button>
+          <button type="button" disabled={punching || !selfReady || !me || !isWindowsComputer() || !selfRecord?.checkInTime || Boolean(selfRecord.checkOutTime || selfRecord.lunchStartedAt)} onClick={() => void punchSelf("out")}>Check out</button>
+          <button type="button" disabled={punching || !selfReady || !me || !isWindowsComputer() || !selfRecord?.checkInTime || Boolean(selfRecord.checkOutTime || selfRecord.lunchStartedAt)} onClick={() => void punchSelf("start")}>Start lunch</button>
+          <button type="button" disabled={punching || !selfReady || !me || !isWindowsComputer() || !selfRecord?.lunchStartedAt} onClick={() => void punchSelf("end")}>End lunch</button>
+        </div>
+        {!isWindowsComputer() && <p>Attendance controls require a Windows or Mac computer.</p>}
+        {selfRecord?.lunchStartedAt && <p>End lunch before checking out.</p>}
+      </section>
 
       <section className="hr-kpis">
         <button type="button" onClick={() => navigate("/employees")}>

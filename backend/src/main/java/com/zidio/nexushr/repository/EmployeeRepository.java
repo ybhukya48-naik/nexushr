@@ -79,6 +79,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     List<Employee> findByRoleTypeAndActiveTrue(RoleType roleType);
 
+    List<Employee> findByReportingManagerIdAndActiveTrue(Long reportingManagerId);
+
     @Query("""
         SELECT e.department, COUNT(e)
         FROM Employee e
@@ -96,4 +98,3 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     List<Object[]> countEmployeesByRole();
     Optional<Employee> findByFullNameIgnoreCase(String fullName);
 }
-

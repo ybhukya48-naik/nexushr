@@ -13,6 +13,8 @@ import com.zidio.nexushr.repository.CompanyHolidayRepository;
 import com.zidio.nexushr.repository.EmployeeRepository;
 import com.zidio.nexushr.service.NotificationService;
 import com.zidio.nexushr.repository.PayrollRepository;
+import com.zidio.nexushr.repository.LeaveRequestRepository;
+import com.zidio.nexushr.domain.LeaveStatus;
 import com.zidio.nexushr.web.dto.PayrollAutoComponentsResponse;
 import com.zidio.nexushr.web.dto.PayrollRequest;
 import com.zidio.nexushr.web.dto.PayslipResponse;
@@ -43,6 +45,7 @@ public class PayrollService {
     private final EmployeeRepository employeeRepository;
         private final AttendanceRepository attendanceRepository;
     private final NotificationService notificationService;
+    private final LeaveRequestRepository leaveRequestRepository;
 
     @Autowired(required = false)
     private CompanyHolidayRepository companyHolidayRepository;
@@ -57,12 +60,14 @@ public class PayrollService {
             PayrollRepository payrollRepository,
             EmployeeRepository employeeRepository,
                         AttendanceRepository attendanceRepository,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            LeaveRequestRepository leaveRequestRepository) {
 
         this.payrollRepository = payrollRepository;
         this.employeeRepository = employeeRepository;
                 this.attendanceRepository = attendanceRepository;
         this.notificationService = notificationService;
+        this.leaveRequestRepository = leaveRequestRepository;
     }
 
     public PayrollRecord create(PayrollRequest request) {
@@ -123,7 +128,8 @@ public class PayrollService {
         validateNonNegative("CTC", requestedCtc);
         boolean hasBase = employee.getBaseSalary() != null
                 && employee.getBaseSalary().compareTo(ZERO) > 0;
-        if (!hasBase && requestedCtc.compareTo(ZERO) <= 0 && request.getBasicSalary() == null) {
+        boolean hasAnnualCtc = employee.getAnnualCtc() != null && employee.getAnnualCtc().signum() > 0;
+        if (!hasBase && !hasAnnualCtc && requestedCtc.compareTo(ZERO) <= 0 && request.getBasicSalary() == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Enter a yearly CTC, or save a base salary greater than zero"
@@ -146,11 +152,14 @@ public class PayrollService {
 
         BigDecimal monthlyCtc = requestedCtc.compareTo(ZERO) > 0
                 ? requestedCtc.divide(BigDecimal.valueOf(12), 2, RoundingMode.HALF_UP)
+                : hasAnnualCtc
+                ? EmployeeCtc.monthly(employee)
                 : hasBase
                 ? employee.getBaseSalary()
                 : amount(request.getBasicSalary());
         BigDecimal yearlyCtc = requestedCtc.compareTo(ZERO) > 0
                 ? requestedCtc
+                : hasAnnualCtc ? employee.getAnnualCtc()
                 : monthlyCtc.multiply(BigDecimal.valueOf(12)).setScale(2, RoundingMode.HALF_UP);
 
         PayrollAutoComponentsResponse hours = calculateAutoComponents(
@@ -160,7 +169,7 @@ public class PayrollService {
         );
         CtcSalarySplit.Parts parts = CtcSalarySplit.split(
                 monthlyCtc,
-                hours.workedMinutes(),
+                hours.workedMinutes() + hours.paidLeaveMinutes(),
                 hours.expectedWorkMinutes()
         );
         BigDecimal basicSalary = parts.basic();
@@ -218,6 +227,8 @@ public class PayrollService {
         payrollRecord.setWorkingDays(hours.businessDays());
         payrollRecord.setActualHours(BigDecimal.valueOf(hours.workedMinutes())
                 .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP));
+        payrollRecord.setCasualLeave(BigDecimal.valueOf(hours.approvedCasualLeaveMinutes())
+                .divide(BigDecimal.valueOf(AttendanceRules.WORK_MINUTES), 2, RoundingMode.HALF_UP));
         payrollRecord.setRequiredHours(BigDecimal.valueOf(8));
 
         payrollRecord.setGrossSalary(grossSalary);
@@ -234,7 +245,7 @@ public class PayrollService {
         payrollRecord.setExpectedWorkMinutes(hours.expectedWorkMinutes());
         payrollRecord.setWorkedMinutes(hours.workedMinutes());
         payrollRecord.setShortfallMinutes(hours.shortfallMinutes());
-        payrollRecord.setOvertimeMinutes(0);
+        payrollRecord.setOvertimeMinutes(hours.overtimeMinutes());
 
         payrollRecord.setStatus(PayrollStatus.GENERATED);
 
@@ -261,9 +272,7 @@ public class PayrollService {
                         "Employee not found: " + employeeId
                 ));
 
-        BigDecimal monthly = employee.getBaseSalary() == null
-                ? ZERO
-                : employee.getBaseSalary().max(ZERO);
+        BigDecimal monthly = EmployeeCtc.monthly(employee);
 
         return calculateAutoComponents(
                 employee,
@@ -451,16 +460,17 @@ public class PayrollService {
         boolean gorle = HoursPayPolicy.gorle(
                 employee.getCompany() == null ? null : employee.getCompany().getCode());
         String companyCode = employee.getCompany() == null ? "" : employee.getCompany().getCode();
+        Set<LocalDate> holidays = holidayDates(effectiveStart, endDate, companyCode);
         int businessDays = HoursPayPolicy.expectedMinutes(
                 effectiveStart,
                 endDate,
                 gorle,
-                holidayDates(effectiveStart, endDate, companyCode)) / HoursPayPolicy.DAY_MINUTES;
+                holidays) / HoursPayPolicy.DAY_MINUTES;
         int expectedWorkMinutes = HoursPayPolicy.expectedPaidMinutes(
                 effectiveStart,
                 endDate,
                 gorle,
-                holidayDates(effectiveStart, endDate, companyCode));
+                holidays);
 
         List<AttendanceRecord> records = attendanceRepository
                 .findByEmployee_IdAndAttendanceDateBetween(
@@ -470,14 +480,12 @@ public class PayrollService {
                 );
 
         java.time.LocalDateTime now = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Kolkata"));
+        int presentDays = (int) records.stream()
+                .filter(record -> record.getCheckInTime() != null && record.getAttendanceDate() != null
+                        && !record.getAttendanceDate().isAfter(now.toLocalDate()))
+                .map(AttendanceRecord::getAttendanceDate).distinct().count();
         int workedMinutes = records.stream()
-                .mapToInt(record -> AttendanceRules.finishedDayMinutes(
-                        record.getCheckInTime(),
-                        record.getCheckOutTime(),
-                        record.getAttendanceDate(),
-                        record.getWorkMinutes() == null ? 0 : record.getWorkMinutes(),
-                        record.getBreakMinutes() == null ? 0 : record.getBreakMinutes(),
-                        now))
+                .mapToInt(record -> AttendanceRules.payrollMinutes(record, now))
                 .sum();
         int deductedMinutes = records.stream()
                 .map(AttendanceRecord::getDeductedMinutes)
@@ -486,13 +494,25 @@ public class PayrollService {
                 .sum();
         workedMinutes = Math.max(0, workedMinutes - deductedMinutes);
 
+        Integer todayWorkedMinutes = month.equals(YearMonth.from(now))
+                ? records.stream()
+                    .filter(record -> now.toLocalDate().equals(record.getAttendanceDate()))
+                    .mapToInt(record -> Math.max(0, AttendanceRules.payrollMinutes(record, now)
+                            - (record.getDeductedMinutes() == null ? 0 : record.getDeductedMinutes())))
+                    .sum()
+                : null;
+
         int overtimeMinutes = records.stream()
                 .map(AttendanceRecord::getOvertimeMinutes)
                 .filter(java.util.Objects::nonNull)
                 .mapToInt(Integer::intValue)
                 .sum();
 
-        int shortfallMinutes = HoursPayPolicy.deductibleShortfall(expectedWorkMinutes, workedMinutes);
+        PaidCasualLeave.Credit casualLeave = PaidCasualLeave.calculate(
+                leaveRequestRepository.findByEmployee_IdAndStatus(employee.getId(), LeaveStatus.APPROVED),
+                records, effectiveStart, endDate, gorle, holidays, now);
+        int paidLeaveMinutes = casualLeave.creditedMinutes();
+        int shortfallMinutes = Math.max(0, expectedWorkMinutes - workedMinutes - paidLeaveMinutes);
 
         if (expectedWorkMinutes <= 0) {
             return new PayrollAutoComponentsResponse(
@@ -500,8 +520,12 @@ public class PayrollService {
                     employee.getEmployeeCode(),
                     payMonth,
                     businessDays,
+                    presentDays,
                     0,
                     workedMinutes,
+                    todayWorkedMinutes,
+                    casualLeave.approvedMinutes(),
+                    paidLeaveMinutes,
                     0,
                     overtimeMinutes,
                     ZERO.setScale(2, RoundingMode.HALF_UP),
@@ -517,17 +541,19 @@ public class PayrollService {
                 .multiply(BigDecimal.valueOf(shortfallMinutes))
                 .setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal overtimeAmount = perMinuteRate
-                .multiply(BigDecimal.valueOf(overtimeMinutes))
-                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal overtimeAmount = ZERO.setScale(2, RoundingMode.HALF_UP);
 
         return new PayrollAutoComponentsResponse(
                 employee.getId(),
                 employee.getEmployeeCode(),
                 payMonth,
                 businessDays,
+                presentDays,
                 expectedWorkMinutes,
                 workedMinutes,
+                todayWorkedMinutes,
+                casualLeave.approvedMinutes(),
+                paidLeaveMinutes,
                 shortfallMinutes,
                 overtimeMinutes,
                 leaveDeduction,
@@ -573,4 +599,3 @@ public class PayrollService {
         return code == null || code.isBlank() || code.equalsIgnoreCase(companyCode);
     }
 }
-

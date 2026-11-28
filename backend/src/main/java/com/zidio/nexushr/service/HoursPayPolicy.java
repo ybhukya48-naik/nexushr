@@ -6,7 +6,7 @@ import java.util.Set;
 
 /**
  * A paid day is 8 working hours inside 9 hours. The other hour is a flexible lunch.
- * One casual leave and one paid leave each month are not deducted.
+ * Payroll credits up to one approved casual leave day per month separately.
  * Sundays and listed public holidays are not working days.
  * Gorle Group also does not deduct the second Saturday.
  */

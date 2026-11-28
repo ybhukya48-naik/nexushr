@@ -123,6 +123,7 @@ export default function EmployeeProfile() {
           designation: data.designation,
           joiningDate: data.joiningDate,
           baseSalary: data.baseSalary,
+          annualCtc: data.annualCtc ?? undefined,
           active: data.active,
           companyCode: data.companyCode || "CYOND",
         });
@@ -234,7 +235,7 @@ export default function EmployeeProfile() {
 
   function updateForm(
     field: keyof EmployeeRequest,
-    value: string | number | boolean,
+    value: string | number | boolean | undefined,
   ) {
     setForm((current) =>
       current
@@ -263,6 +264,7 @@ export default function EmployeeProfile() {
       designation: employee.designation,
       joiningDate: employee.joiningDate,
       baseSalary: employee.baseSalary,
+      annualCtc: employee.annualCtc ?? undefined,
       active: employee.active,
       companyCode: employee.companyCode || "CYOND",
     });
@@ -295,6 +297,7 @@ export default function EmployeeProfile() {
         designation: updated.designation,
         joiningDate: updated.joiningDate,
         baseSalary: updated.baseSalary,
+        annualCtc: updated.annualCtc ?? undefined,
         active: updated.active,
         companyCode: updated.companyCode || "CYOND",
       });
@@ -616,19 +619,21 @@ export default function EmployeeProfile() {
 
             {canSeePay && (
             <label>
-              Base Salary
+              Annual CTC
               <input
-                required
-                min="0"
+                min="0.01"
+                step="0.01"
                 type="number"
-                value={form.baseSalary}
+                value={form.annualCtc ?? ""}
+                placeholder="Total yearly CTC"
                 onChange={(event) =>
                   updateForm(
-                    "baseSalary",
-                    Number(event.target.value),
+                    "annualCtc",
+                    event.target.value ? Number(event.target.value) : undefined,
                   )
                 }
               />
+              <small>Yearly amount divided by 12. Leave blank to retain the existing salary.</small>
             </label>
             )}
 
@@ -729,11 +734,14 @@ export default function EmployeeProfile() {
 
             {canSeePay && (
             <label>
-              Base Salary
+              Annual CTC
               <input
-                value={`\u20B9${employee.baseSalary.toLocaleString("en-IN")}`}
+                value={employee.annualCtc == null ? "Not set" : `\u20B9${employee.annualCtc.toLocaleString("en-IN")}`}
                 readOnly
               />
+              {employee.annualCtc == null && employee.baseSalary > 0 && (
+                <small>Legacy monthly salary: ₹{employee.baseSalary.toLocaleString("en-IN")}</small>
+              )}
             </label>
             )}
 
@@ -797,7 +805,7 @@ export default function EmployeeProfile() {
           <h2>{profileTab === "leave" ? "Leave" : profileTab === "pay" ? "Pay" : profileTab === "documents" ? "Documents" : "Performance"}</h2>
           <p>
             {profileTab === "leave" && "Leave requests for this person are on the Leave page."}
-            {profileTab === "pay" && (canSeePay ? `Base salary ₹${employee.baseSalary.toLocaleString("en-IN")}. Payslips are on the Payroll page.` : "Your payslip is on My Pay. Base salary stays with HR.")}
+            {profileTab === "pay" && (canSeePay ? `Annual CTC ${employee.annualCtc == null ? "not set" : `₹${employee.annualCtc.toLocaleString("en-IN")}`}. Payslips are on the Payroll page.` : "Your payslip is on My Pay. Salary details stay with HR.")}
             {profileTab === "documents" && "No documents are saved on this record yet."}
             {profileTab === "performance" && "Reviews and hours are on the Performance page."}
           </p>
@@ -822,5 +830,3 @@ export default function EmployeeProfile() {
     </section>
   );
 }
-
-
